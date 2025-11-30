@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Trash2 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getRequirements, updateRequirement, deleteRequirement } from '../../lib/api/requirements';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 
@@ -26,41 +26,34 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'ALL'>('ALL');
 
-  useEffect(() => {
-    const loadRequirements = async () => {
-      if (!user) return;
-      const result = await getRequirements(user.id);
-      if (result.success && result.requirements) {
-        setRequirements(result.requirements);
-      }
-      setLoading(false);
-    };
-    if (user) {
-      loadRequirements();
+  const loadRequirements = useCallback(async () => {
+    if (!user) return;
+    const result = await getRequirements(user.id);
+    if (result.success && result.requirements) {
+      setRequirements(result.requirements);
     }
+    setLoading(false);
   }, [user]);
 
-  const handleStatusChange = async (id: string, newStatus: RequirementStatus) => {
-    const result = await updateRequirement(id, { status: newStatus });
-    if (result.success && user) {
-      const freshResult = await getRequirements(user.id);
-      if (freshResult.success && freshResult.requirements) {
-        setRequirements(freshResult.requirements);
-      }
-    }
-  };
+  useEffect(() => {
+    loadRequirements();
+  }, [loadRequirements]);
 
-  const handleDelete = async (id: string) => {
+  const handleStatusChange = useCallback(async (id: string, newStatus: RequirementStatus) => {
+    const result = await updateRequirement(id, { status: newStatus });
+    if (result.success) {
+      await loadRequirements();
+    }
+  }, [loadRequirements]);
+
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm('Are you sure you want to delete this requirement?')) {
       const result = await deleteRequirement(id);
-      if (result.success && user) {
-        const freshResult = await getRequirements(user.id);
-        if (freshResult.success && freshResult.requirements) {
-          setRequirements(freshResult.requirements);
-        }
+      if (result.success) {
+        await loadRequirements();
       }
     }
-  };
+  }, [loadRequirements]);
 
   const filteredRequirements = requirements.filter(req => {
     const matchesSearch = 

@@ -118,7 +118,7 @@ export const register = async (
       },
       requiresVerification: true,
     };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Registration failed' };
   }
 };
@@ -164,7 +164,7 @@ export const login = async (
 
     if (user.password_hash !== passwordHash) {
       const newAttempts = user.failed_login_attempts + 1;
-      const updates: any = { failed_login_attempts: newAttempts };
+      const updates: { failed_login_attempts: number; locked_until?: string } = { failed_login_attempts: newAttempts };
 
       if (newAttempts >= 5) {
         const lockUntil = new Date();
@@ -257,7 +257,7 @@ export const login = async (
         origin_ip: user.origin_ip,
       },
     };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Login failed' };
   }
 };

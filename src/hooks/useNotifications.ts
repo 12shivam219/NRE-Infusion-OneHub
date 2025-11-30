@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from './useAuth';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '../lib/api/notifications';
 import type { Database } from '../lib/database.types';
 
@@ -11,7 +11,7 @@ export const useNotifications = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!user) return;
 
     setLoading(true);
@@ -20,16 +20,16 @@ export const useNotifications = () => {
       setNotifications(result.notifications);
     }
     setLoading(false);
-  };
+  }, [user]);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async () => {
     if (!user) return;
 
     const result = await getUnreadCount(user.id);
     if (result.success && result.count !== undefined) {
       setUnreadCount(result.count);
     }
-  };
+  }, [user]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     await markAsRead(notificationId);
@@ -55,7 +55,7 @@ export const useNotifications = () => {
 
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, loadNotifications, loadUnreadCount]);
 
   return {
     notifications,

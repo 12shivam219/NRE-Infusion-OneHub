@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Upload, FileText, Download, Trash2, Edit, Grid2X2, Grid3X3 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getDocuments, uploadDocument, deleteDocument, downloadDocument } from '../../lib/api/documents';
 import type { Database } from '../../lib/database.types';
 
@@ -14,21 +14,7 @@ export const DocumentsPage = () => {
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [editorLayout, setEditorLayout] = useState<'single' | '2x2' | '3x3'>('single');
 
-  useEffect(() => {
-    const loadDocuments = async () => {
-      if (!user) return;
-
-      const result = await getDocuments(user.id);
-      if (result.success && result.documents) {
-        setDocuments(result.documents);
-      }
-      setLoading(false);
-    };
-
-    loadDocuments();
-  }, [user]);
-
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     if (!user) return;
 
     const result = await getDocuments(user.id);
@@ -36,7 +22,11 @@ export const DocumentsPage = () => {
       setDocuments(result.documents);
     }
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -44,33 +34,18 @@ export const DocumentsPage = () => {
 
     setUploading(true);
 
-    try {
-      for (const file of Array.from(files)) {
-        if (
-          file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-          file.type === 'application/msword' ||
-          file.type === 'application/pdf'
-        ) {
-          const result = await uploadDocument(file, user.id);
-          if (!result.success) {
-            console.error('Upload failed for', file.name, result.error);
-            alert(`Failed to upload ${file.name}: ${result.error}`);
-          } else {
-            console.log('Successfully uploaded:', file.name);
-          }
-        }
+    for (const file of Array.from(files)) {
+      if (
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        file.type === 'application/msword' ||
+        file.type === 'application/pdf'
+      ) {
+        await uploadDocument(file, user.id);
       }
-
-      // Refresh documents list after all uploads
-      await loadDocuments();
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert('An error occurred during upload');
-    } finally {
-      setUploading(false);
-      // Reset file input
-      e.target.value = '';
     }
+
+    await loadDocuments();
+    setUploading(false);
   };
 
   const handleDelete = async (documentId: string) => {

@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import type { Database, RequirementStatus } from '../database.types';
+import type { Database } from '../database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type RequirementInsert = Database['public']['Tables']['requirements']['Insert'];
@@ -24,7 +24,7 @@ export const getRequirements = async (
     }
 
     return { success: true, requirements: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch requirements' };
   }
 };
@@ -44,7 +44,7 @@ export const createRequirement = async (
     }
 
     return { success: true, requirement: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to create requirement' };
   }
 };
@@ -66,7 +66,7 @@ export const updateRequirement = async (
     }
 
     return { success: true, requirement: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to update requirement' };
   }
 };
@@ -85,7 +85,7 @@ export const deleteRequirement = async (
     }
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to delete requirement' };
   }
 };

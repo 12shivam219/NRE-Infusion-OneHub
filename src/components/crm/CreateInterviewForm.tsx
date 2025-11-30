@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { createInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
@@ -62,22 +62,23 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
     feedback_notes: '',
   });
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
-      const [reqResult, consResult] = await Promise.all([
-        getRequirements(user.id),
-        getConsultants(user.id),
-      ]);
-      if (reqResult.success && reqResult.requirements) {
-        setRequirements(reqResult.requirements);
-      }
-      if (consResult.success && consResult.consultants) {
-        setConsultants(consResult.consultants);
-      }
-    };
-    loadData();
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    const [reqResult, consResult] = await Promise.all([
+      getRequirements(user.id),
+      getConsultants(user.id),
+    ]);
+    if (reqResult.success && reqResult.requirements) {
+      setRequirements(reqResult.requirements);
+    }
+    if (consResult.success && consResult.consultants) {
+      setConsultants(consResult.consultants);
+    }
   }, [user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Auto-generate subject line when requirement or date changes
   useEffect(() => {

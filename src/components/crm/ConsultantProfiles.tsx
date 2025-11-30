@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Trash2, Mail, Phone } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getConsultants, updateConsultant, deleteConsultant } from '../../lib/api/consultants';
 import type { Database } from '../../lib/database.types';
 
@@ -24,42 +24,30 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [selectedConsultant, setSelectedConsultant] = useState<Consultant | null>(null);
 
-  useEffect(() => {
-    const loadConsultants = async () => {
-      if (!user) return;
-      const result = await getConsultants(user.id);
-      if (result.success && result.consultants) {
-        setConsultants(result.consultants);
-      }
-      setLoading(false);
-    };
-    
-    if (user) {
-      loadConsultants();
+  const loadConsultants = useCallback(async () => {
+    if (!user) return;
+    const result = await getConsultants(user.id);
+    if (result.success && result.consultants) {
+      setConsultants(result.consultants);
     }
+    setLoading(false);
   }, [user]);
 
-  const handleDelete = async (id: string) => {
+  useEffect(() => {
+    loadConsultants();
+  }, [loadConsultants]);
+
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm('Are you sure you want to delete this consultant?')) {
       await deleteConsultant(id);
-      if (user) {
-        const result = await getConsultants(user.id);
-        if (result.success && result.consultants) {
-          setConsultants(result.consultants);
-        }
-      }
+      await loadConsultants();
     }
-  };
+  }, [loadConsultants]);
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  const handleStatusChange = useCallback(async (id: string, newStatus: string) => {
     await updateConsultant(id, { status: newStatus });
-    if (user) {
-      const result = await getConsultants(user.id);
-      if (result.success && result.consultants) {
-        setConsultants(result.consultants);
-      }
-    }
-  };
+    await loadConsultants();
+  }, [loadConsultants]);
 
   const filteredConsultants = consultants.filter(con => {
     const matchesSearch = 

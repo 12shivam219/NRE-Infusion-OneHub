@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Trash2, Plus } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getInterviews, updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import type { Database } from '../../lib/database.types';
@@ -27,48 +27,36 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
-      
-      const interviewsResult = await getInterviews(user.id);
-      if (interviewsResult.success && interviewsResult.interviews) {
-        setInterviews(interviewsResult.interviews);
-      }
-      
-      const reqResult = await getRequirements(user.id);
-      if (reqResult.success && reqResult.requirements) {
-        setRequirements(reqResult.requirements);
-      }
-      setLoading(false);
-    };
+  const loadData = useCallback(async () => {
+    if (!user) return;
     
-    if (user) {
-      loadData();
+    const interviewsResult = await getInterviews(user.id);
+    if (interviewsResult.success && interviewsResult.interviews) {
+      setInterviews(interviewsResult.interviews);
     }
+    
+    const reqResult = await getRequirements(user.id);
+    if (reqResult.success && reqResult.requirements) {
+      setRequirements(reqResult.requirements);
+    }
+    setLoading(false);
   }, [user]);
 
-  const handleDelete = async (id: string) => {
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm('Are you sure you want to delete this interview?')) {
       await deleteInterview(id);
-      if (user) {
-        const result = await getInterviews(user.id);
-        if (result.success && result.interviews) {
-          setInterviews(result.interviews);
-        }
-      }
+      await loadData();
     }
-  };
+  }, [loadData]);
 
-  const handleStatusChange = async (id: string, status: string) => {
+  const handleStatusChange = useCallback(async (id: string, status: string) => {
     await updateInterview(id, { status });
-    if (user) {
-      const result = await getInterviews(user.id);
-      if (result.success && result.interviews) {
-        setInterviews(result.interviews);
-      }
-    }
-  };
+    await loadData();
+  }, [loadData]);
 
   const getRequirementTitle = (requirementId: string) => {
     const req = requirements.find(r => r.id === requirementId);

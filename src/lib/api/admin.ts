@@ -64,7 +64,7 @@ const logAdminAction = async (
       ip_address: context.ipAddress ?? null,
     };
 
-    const { error } = await supabase.from('activity_logs').insert(payload as any);
+    const { error } = await supabase.from('activity_logs').insert(payload as ActivityLogInsert);
     if (error) {
       console.error('Activity log error:', error);
     }
@@ -130,7 +130,7 @@ export const getAllUsers = async (): Promise<{
     }
 
     return { success: true, users: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch users' };
   }
 };
@@ -140,18 +140,15 @@ export const updateUserStatus = async (
   status: UserStatus,
   options?: { adminId?: string; reason?: string }
 ): Promise<{ success: boolean; error?: string }> => {
-  try {
-    console.log(`[DB] Updating user ${userId} status to ${status}`);
-    
+  try {    
     const updatePayload: UserUpdate = {
       status,
       updated_at: new Date().toISOString(),
     };
 
-    console.log(`[DB] Payload:`, updatePayload);
     const { error } = await supabase
       .from('users')
-      .update(updatePayload as any)
+      .update(updatePayload)
       .eq('id', userId);
 
     if (error) {
@@ -159,7 +156,6 @@ export const updateUserStatus = async (
       return { success: false, error: error.message };
     }
 
-    console.log(`[DB] User updated successfully, now logging action`);
     await logAdminAction('user_status_updated', {
       adminId: options?.adminId,
       targetUserId: userId,
@@ -171,7 +167,6 @@ export const updateUserStatus = async (
       },
     });
 
-    console.log(`[DB] Action logged successfully`);
     return { success: true };
   } catch (error) {
     console.error('[DB] Update user status exception:', error);
@@ -210,7 +205,7 @@ export const updateUserRole = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to update user role' };
   }
 };
@@ -236,7 +231,7 @@ export const getLoginHistory = async (
     }
 
     return { success: true, history: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch login history' };
   }
 };
@@ -262,7 +257,7 @@ export const getUserSessions = async (
     }
 
     return { success: true, sessions: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch sessions' };
   }
 };
@@ -278,7 +273,7 @@ export const revokeSession = async (
 
     const { error } = await supabase
       .from('user_sessions')
-      .update(updatePayload as any)
+      .update(updatePayload)
       .eq('id', sessionId);
 
     if (error) {
@@ -293,7 +288,7 @@ export const revokeSession = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to revoke session' };
   }
 };
@@ -319,7 +314,7 @@ export const getActivityLogs = async (
     }
 
     return { success: true, logs: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch activity logs' };
   }
 };
@@ -341,7 +336,7 @@ export const getErrorReports = async (): Promise<{
     }
 
     return { success: true, errors: data };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch error reports' };
   }
 };
@@ -356,7 +351,7 @@ export const resolveError = async (
 
     const { error } = await supabase
       .from('error_reports')
-      .update(updatePayload as any)
+      .update(updatePayload)
       .eq('id', errorId);
 
     if (error) {
@@ -370,7 +365,7 @@ export const resolveError = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to resolve error' };
   }
 };
@@ -386,7 +381,7 @@ export const forceLogoutUserSessions = async (
 
     const { error } = await supabase
       .from('user_sessions')
-      .update(updatePayload as any)
+      .update(updatePayload)
       .eq('user_id', userId)
       .eq('revoked', false);
 
@@ -402,7 +397,7 @@ export const forceLogoutUserSessions = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to revoke sessions' };
   }
 };
@@ -429,7 +424,7 @@ export const getPendingApprovals = async (
     }
 
     return { success: true, users: data ?? [] };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to fetch pending approvals' };
   }
 };
@@ -483,7 +478,7 @@ export const getApprovalStatistics = async (): Promise<{
         totalPending: pendingApproval + pendingVerification,
       },
     };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to fetch approval statistics' };
   }
 };
@@ -506,7 +501,7 @@ export const getSuspiciousLogins = async (): Promise<{
     }
 
     return { success: true, events: data ?? [] };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to fetch suspicious logins' };
   }
 };
@@ -538,7 +533,7 @@ export const updateErrorStatus = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to update error status' };
   }
 };
@@ -557,14 +552,14 @@ export const addErrorNote = async (
       details: { note },
     };
 
-    const { error } = await supabase.from('activity_logs').insert(payload as any);
+    const { error } = await supabase.from('activity_logs').insert(payload);
 
     if (error) {
       return { success: false, error: error.message };
     }
 
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to add error note' };
   }
 };
@@ -585,7 +580,7 @@ export const getErrorNotes = async (
     }
 
     return { success: true, notes: data ?? [] };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch error notes' };
   }
 };
@@ -602,7 +597,7 @@ export const retryErrorAction = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to retry error action' };
   }
 };
@@ -651,7 +646,7 @@ export const getErrorAttachments = async (
     }
 
     return { success: true, attachments: attachmentsWithUrls };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to fetch error attachments' };
   }
 };
@@ -705,7 +700,7 @@ export const uploadErrorAttachment = async (
     });
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to upload attachment' };
   }
 };

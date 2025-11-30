@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { createRequirement } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
 import type { Database } from '../../lib/database.types';
@@ -56,16 +56,17 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
     location: '',
   });
 
-  useEffect(() => {
-    const loadConsultants = async () => {
-      if (!user) return;
-      const result = await getConsultants(user.id);
-      if (result.success && result.consultants) {
-        setConsultants(result.consultants);
-      }
-    };
-    loadConsultants();
+  const loadConsultants = useCallback(async () => {
+    if (!user) return;
+    const result = await getConsultants(user.id);
+    if (result.success && result.consultants) {
+      setConsultants(result.consultants);
+    }
   }, [user]);
+
+  useEffect(() => {
+    loadConsultants();
+  }, [loadConsultants]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

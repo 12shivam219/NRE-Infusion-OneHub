@@ -2,18 +2,18 @@ import {
   LayoutDashboard,
   FileText,
   Briefcase,
-  Users,
-  Settings,
   LogOut,
   Shield,
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
+
+type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
 
 interface SidebarProps {
-  currentPage: string;
-  onNavigate: (page: string) => void;
+  currentPage: AppPage;
+  onNavigate: (page: AppPage) => void;
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -75,7 +75,7 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
             return (
               <button
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                  onClick={() => onNavigate(item.id as AppPage)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                   isActive
                     ? 'bg-blue-600 text-white'
@@ -146,7 +146,7 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
                 <button
                   key={item.id}
                   onClick={() => {
-                    onNavigate(item.id);
+                    onNavigate(item.id as AppPage);
                     onToggle();
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${

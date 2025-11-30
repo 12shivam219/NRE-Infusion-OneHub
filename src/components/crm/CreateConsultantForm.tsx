@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { createConsultant } from '../../lib/api/consultants';
 
 type Project = {

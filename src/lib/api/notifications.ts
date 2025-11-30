@@ -19,7 +19,7 @@ export const getNotifications = async (
     }
 
     return { success: true, notifications: data };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to fetch notifications' };
   }
 };
@@ -39,7 +39,7 @@ export const getUnreadCount = async (
     }
 
     return { success: true, count: count || 0 };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to get unread count' };
   }
 };
@@ -58,7 +58,7 @@ export const markAsRead = async (
     }
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to mark as read' };
   }
 };
@@ -78,7 +78,7 @@ export const markAllAsRead = async (
     }
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to mark all as read' };
   }
 };
@@ -104,7 +104,7 @@ export const createNotification = async (
     }
 
     return { success: true };
-  } catch (error) {
+  } catch  {
     return { success: false, error: 'Failed to create notification' };
   }
 };

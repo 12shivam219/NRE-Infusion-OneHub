@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, Menu } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getNotifications, getUnreadCount, markAsRead } from '../../lib/api/notifications';
 import type { Database } from '../../lib/database.types';
 
@@ -16,28 +16,28 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadNotifications();
-      loadUnreadCount();
-    }
-  }, [user]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!user) return;
     const result = await getNotifications(user.id);
     if (result.success && result.notifications) {
       setNotifications(result.notifications.slice(0, 5));
     }
-  };
+  }, [user]);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async () => {
     if (!user) return;
     const result = await getUnreadCount(user.id);
     if (result.success && result.count !== undefined) {
       setUnreadCount(result.count);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+      loadUnreadCount();
+    }
+  }, [user, loadNotifications, loadUnreadCount]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     await markAsRead(notificationId);

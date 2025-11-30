@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileText, Briefcase, Users, TrendingUp } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getDocuments } from '../../lib/api/documents';
 import { getRequirements } from '../../lib/api/requirements';
 
@@ -10,11 +10,7 @@ export const Dashboard = () => {
   const [requirementCount, setRequirementCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadStats();
-  }, [user]);
-
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     if (!user) return;
 
     const [docsResult, reqsResult] = await Promise.all([
@@ -31,7 +27,11 @@ export const Dashboard = () => {
     }
 
     setLoading(false);
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
   const stats = [
     {

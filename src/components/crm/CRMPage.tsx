@@ -7,16 +7,17 @@ import { ConsultantProfiles } from './ConsultantProfiles';
 import { CreateRequirementForm } from './CreateRequirementForm';
 import { CreateInterviewForm } from './CreateInterviewForm';
 import { CreateConsultantForm } from './CreateConsultantForm';
-import { useAuth } from '../../contexts/AuthContext';
 
 type View = 'dashboard' | 'requirements' | 'interviews' | 'consultants';
 
+type QuickAddType = 'requirement' | 'interview' | 'consultant';
+
 export const CRMPage = () => {
-  const { user } = useAuth();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateInterview, setShowCreateInterview] = useState(false);
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
+
   const navTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'requirements', label: 'Requirements', icon: Briefcase },
@@ -54,7 +55,11 @@ export const CRMPage = () => {
       <div className="p-4 sm:p-6 md:p-8">
         {currentView === 'dashboard' && (
           <MarketingHubDashboard 
-            onQuickAdd={(type) => setQuickAddType(type)}
+            onQuickAdd={(type: QuickAddType) => {
+              if (type === 'requirement') setShowCreateForm(true);
+              else if (type === 'interview') setShowCreateInterview(true);
+              else if (type === 'consultant') setShowCreateConsultant(true);
+            }}
           />
         )}
 
@@ -82,7 +87,6 @@ export const CRMPage = () => {
           onClose={() => setShowCreateForm(false)}
           onSuccess={() => {
             setShowCreateForm(false);
-            window.location.reload();
           }}
         />
       )}
@@ -92,7 +96,6 @@ export const CRMPage = () => {
           onClose={() => setShowCreateInterview(false)}
           onSuccess={() => {
             setShowCreateInterview(false);
-            window.location.reload();
           }}
         />
       )}
@@ -102,7 +105,6 @@ export const CRMPage = () => {
           onClose={() => setShowCreateConsultant(false)}
           onSuccess={() => {
             setShowCreateConsultant(false);
-            window.location.reload();
           }}
         />
       )}

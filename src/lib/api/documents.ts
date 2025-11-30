@@ -14,19 +14,10 @@ export const uploadDocument = async (
     // Use the userId from your app's users table for the storage path
     const storagePath = `${userId}/${Date.now()}_${sanitizedFilename}`;
 
-    console.log('[UPLOAD] Starting document upload', { 
-      fileName: file.name, 
-      fileSize: file.size, 
-      mimeType: file.type,
-      userId,
-      storagePath
-    });
-
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('documents')
       .upload(storagePath, file);
 
-    console.log('[UPLOAD] Upload response:', { uploadError, data });
 
     if (uploadError) {
       console.error('[UPLOAD] Upload error:', uploadError);
@@ -53,7 +44,6 @@ export const uploadDocument = async (
       return { success: false, error: dbError.message };
     }
 
-    console.log('[UPLOAD] Upload successful:', document);
     return { success: true, document };
   } catch (error) {
     console.error('[UPLOAD] Exception:', error);
@@ -65,7 +55,6 @@ export const getDocuments = async (
   userId: string
 ): Promise<{ success: boolean; documents?: Document[]; error?: string }> => {
   try {
-    console.log('[FETCH] Getting documents for user:', userId);
     const { data, error } = await supabase
       .from('documents')
       .select('*')
@@ -77,7 +66,6 @@ export const getDocuments = async (
       return { success: false, error: error.message };
     }
 
-    console.log('[FETCH] Successfully fetched', data?.length || 0, 'documents');
     return { success: true, documents: data || [] };
   } catch (error) {
     console.error('[FETCH] Exception:', error);

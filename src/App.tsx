@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { Sidebar } from './components/layout/Sidebar';
@@ -13,7 +14,7 @@ type AuthView = 'login' | 'register';
 type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
 
 const AppContent = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshUser } = useAuth();
   const [authView, setAuthView] = useState<AuthView>('login');
   const [currentPage, setCurrentPage] = useState<AppPage>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -48,14 +49,13 @@ const AppContent = () => {
     if (authView === 'login') {
       return (
         <LoginForm
-          onSuccess={() => window.location.reload()}
+          onSuccess={() => refreshUser()}
           onSwitchToRegister={() => setAuthView('register')}
         />
       );
     } else {
       return (
         <RegisterForm
-          onSuccess={() => setAuthView('login')}
           onSwitchToLogin={() => setAuthView('login')}
         />
       );

@@ -3,11 +3,10 @@ import { UserPlus } from 'lucide-react';
 import { register } from '../../lib/auth';
 
 interface RegisterFormProps {
-  onSuccess: () => void;
   onSwitchToLogin: () => void;
 }
 
-export const RegisterForm = ({ onSuccess, onSwitchToLogin }: RegisterFormProps) => {
+export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

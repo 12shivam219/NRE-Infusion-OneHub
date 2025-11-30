@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard,
   UserCheck,
@@ -37,7 +37,7 @@ import {
   uploadErrorAttachment,
 } from '../../lib/api/admin';
 import type { Database, UserRole, UserStatus, ErrorStatus } from '../../lib/database.types';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -178,7 +178,7 @@ export const AdminPage = () => {
 
   const pageSize = 10;
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     const result = await getAllUsers();
     if (result.success && result.users) {
@@ -187,9 +187,9 @@ export const AdminPage = () => {
       alert(`Failed to load users: ${result.error}`);
     }
     setUsersLoading(false);
-  };
+  }, []);
 
-  const loadApprovals = async () => {
+  const loadApprovals = useCallback(async () => {
     setApprovalsLoading(true);
     const [queueResult, statsResult] = await Promise.all([
       getPendingApprovals(approvalsSearchTerm || undefined),
@@ -209,9 +209,9 @@ export const AdminPage = () => {
     }
 
     setApprovalsLoading(false);
-  };
+  }, [approvalsSearchTerm]);
 
-  const loadSecurityEvents = async () => {
+  const loadSecurityEvents = useCallback(async () => {
     setSecurityLoading(true);
     const result = await getSuspiciousLogins();
     if (result.success && result.events) {
@@ -220,9 +220,9 @@ export const AdminPage = () => {
       alert(`Failed to load security events: ${result.error}`);
     }
     setSecurityLoading(false);
-  };
+  }, []);
 
-  const loadErrors = async () => {
+  const loadErrors = useCallback(async () => {
     setErrorsLoading(true);
     setErrorsError(null);
     const result = await getErrorReports();
@@ -233,7 +233,7 @@ export const AdminPage = () => {
       setErrorsError(result.error);
     }
     setErrorsLoading(false);
-  };
+  }, []);
 
   const loadErrorDetails = async (errorId: string) => {
     setErrorDetailLoading(true);
@@ -287,7 +287,7 @@ export const AdminPage = () => {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   useEffect(() => {
     if (activeTab === 'dashboard') {
@@ -299,7 +299,7 @@ export const AdminPage = () => {
     } else if (activeTab === 'errors') {
       loadErrors();
     }
-  }, [activeTab]);
+  }, [activeTab, loadUsers, loadApprovals, loadSecurityEvents, loadErrors]);
 
   useEffect(() => {
     if (activeTab === 'approvals') {
@@ -307,7 +307,7 @@ export const AdminPage = () => {
     }
     setApprovalPage(1);
     setSelectedApprovals([]);
-  }, [approvalsSearchTerm]);
+  }, [approvalsSearchTerm, activeTab, loadApprovals]);
 
   const roleCounts = useMemo(() => {
     return users.reduce(
@@ -1515,7 +1515,7 @@ export const AdminPage = () => {
                 ) : (
                   <ul className="space-y-2 text-sm text-blue-600">
                     {errorAttachments.map((attachment) => {
-                      const href = (attachment as any).download_url ?? null;
+                      const href = (attachment as Attachment & { download_url?: string | null }).download_url ?? null;
                       const sizeKb = Math.max(1, Math.round(attachment.file_size / 1024));
                       return (
                         <li key={attachment.id}>
@@ -1550,7 +1550,7 @@ export const AdminPage = () => {
                   ) : (
                     errorNotes.map((note) => (
                       <div key={note.id} className="border border-gray-200 rounded-lg p-3">
-                        <p className="text-sm text-gray-900">{(note.details as any)?.note || 'Note added.'}</p>
+                        <p className="text-sm text-gray-900">{String((note.details as Record<string, unknown>)?.note || 'Note added.')}</p>
                         <p className="text-xs text-gray-500 mt-2">
                           {formatDateTime(note.created_at)} ({timeAgo(note.created_at)})
                         </p>

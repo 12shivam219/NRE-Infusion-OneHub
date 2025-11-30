@@ -2,8 +2,7 @@ import { supabase } from './supabase';
 
 export const reportError = async (
   error: Error,
-  userId?: string,
-  context?: Record<string, any>
+  userId?: string
 ): Promise<void> => {
   try {
     await supabase.from('error_reports').insert({
@@ -13,7 +12,7 @@ export const reportError = async (
       error_type: error.name,
       url: window.location.href,
       user_agent: navigator.userAgent,
-      resolved: false,
+      status: 'new',
     });
   } catch (reportingError) {
     console.error('Failed to report error:', reportingError);
@@ -24,20 +23,14 @@ export const setupGlobalErrorHandler = (userId?: string): void => {
   window.addEventListener('error', (event) => {
     reportError(
       new Error(event.message),
-      userId,
-      {
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-      }
+      userId
     );
   });
 
   window.addEventListener('unhandledrejection', (event) => {
     reportError(
       new Error(event.reason?.message || 'Unhandled promise rejection'),
-      userId,
-      { reason: event.reason }
+      userId
     );
   });
 };

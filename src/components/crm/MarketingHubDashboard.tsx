@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, Download, Plus, BarChart3 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { getRequirements } from '../../lib/api/requirements';
 import { getInterviews } from '../../lib/api/interviews';
 import { getConsultants } from '../../lib/api/consultants';
@@ -22,32 +22,30 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'requirements' | 'interviews' | 'consultants'>('requirements');
 
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) return;
+  const loadData = useCallback(async () => {
+    if (!user) return;
 
-      const [reqResult, intResult, conResult] = await Promise.all([
-        getRequirements(user.id),
-        getInterviews(user.id),
-        getConsultants(user.id),
-      ]);
+    const [reqResult, intResult, conResult] = await Promise.all([
+      getRequirements(user.id),
+      getInterviews(user.id),
+      getConsultants(user.id),
+    ]);
 
-      if (reqResult.success && reqResult.requirements) {
-        setRequirements(reqResult.requirements);
-      }
-      if (intResult.success && intResult.interviews) {
-        setInterviews(intResult.interviews);
-      }
-      if (conResult.success && conResult.consultants) {
-        setConsultants(conResult.consultants);
-      }
-      setLoading(false);
-    };
-
-    if (user) {
-      loadData();
+    if (reqResult.success && reqResult.requirements) {
+      setRequirements(reqResult.requirements);
     }
+    if (intResult.success && intResult.interviews) {
+      setInterviews(intResult.interviews);
+    }
+    if (conResult.success && conResult.consultants) {
+      setConsultants(conResult.consultants);
+    }
+    setLoading(false);
   }, [user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const getStats = () => {
     const activeRequirements = requirements.filter(r => r.status !== 'CLOSED' && r.status !== 'REJECTED');
