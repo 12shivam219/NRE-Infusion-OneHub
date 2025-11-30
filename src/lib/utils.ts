@@ -1,0 +1,68 @@
+export const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+};
+
+export const formatDate = (date: string | Date): string => {
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+export const formatDateTime = (date: string | Date): string => {
+  const d = new Date(date);
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+export const sanitizeFilename = (filename: string): string => {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+};
+
+export const truncateText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+};
+
+export const validateEmail = (email: string): boolean => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+};
+
+export const generateId = (): string => {
+  return crypto.randomUUID();
+};
+
+export const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): ((...args: Parameters<T>) => void) => {
+  let timeout: NodeJS.Timeout;
+
+  return function executedFunction(...args: Parameters<T>) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
+export const classNames = (...classes: (string | boolean | undefined)[]): string => {
+  return classes.filter(Boolean).join(' ');
+};
