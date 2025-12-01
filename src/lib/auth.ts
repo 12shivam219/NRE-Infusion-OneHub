@@ -18,14 +18,6 @@ export interface AuthResponse {
   requiresVerification?: boolean;
 }
 
-const hashPassword = async (password: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
-
 const parseUserAgent = (userAgent: string) => {
   const ua = userAgent.toLowerCase();
 
@@ -69,40 +61,55 @@ const fetchPublicIp = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * Register a new user using Supabase Auth (server-side password hashing)
+ * Password is hashed securely by Supabase with bcrypt + salt
+ */
 export const register = async (
   email: string,
   password: string,
   fullName: string
 ): Promise<AuthResponse> => {
   try {
-    const passwordHash = await hashPassword(password);
     const originIp = await fetchPublicIp();
 
-    const { data: existingUser } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
+    // Sign up with Supabase Auth (handles password hashing securely server-side)
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+        },
+      },
+    });
 
-    if (existingUser) {
-      return { success: false, error: 'Email already registered' };
+    if (signUpError) {
+      return { success: false, error: signUpError.message };
     }
 
-    const { data: user, error } = await supabase
+    if (!authData.user) {
+      return { success: false, error: 'User creation failed' };
+    }
+
+    // Create user profile in public users table
+    const { data: user, error: profileError } = await supabase
       .from('users')
       .insert({
+        id: authData.user.id,
         email,
-        password_hash: passwordHash,
         full_name: fullName,
         role: 'user',
         status: 'pending_verification',
         origin_ip: originIp,
+        email_verified: false,
       })
       .select()
       .single();
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (profileError) {
+      console.error('Profile creation error:', profileError);
+      return { success: false, error: 'Failed to create user profile' };
     }
 
     return {
@@ -118,162 +125,180 @@ export const register = async (
       },
       requiresVerification: true,
     };
-  } catch {
-    return { success: false, error: 'Registration failed' };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+    return { success: false, error: errorMessage };
   }
 };
 
+/**
+ * Login user with Supabase Auth (server-side password verification)
+ * Password verification is handled securely by Supabase
+ */
 export const login = async (
   email: string,
   password: string
 ): Promise<AuthResponse> => {
   try {
     const clientInfo = getClientInfo();
-    const passwordHash = await hashPassword(password);
     const clientIp = await fetchPublicIp();
 
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
+    // Authenticate with Supabase Auth (server-side password verification with bcrypt)
+    const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    const logLogin = async (success: boolean, userId?: string, reason?: string) => {
-      await supabase.from('login_history').insert({
-        user_id: userId || null,
-        ip_address: clientIp || 'client',
-        user_agent: clientInfo.userAgent,
-        browser: clientInfo.browser,
-        os: clientInfo.os,
-        device: clientInfo.device,
-        success,
-        failure_reason: reason,
-        suspicious: false,
-      });
-    };
-
-    if (userError || !user) {
-      await logLogin(false, undefined, 'User not found');
-      return { success: false, error: 'Invalid credentials' };
+    if (signInError) {
+      console.error('Supabase Auth Error:', signInError);
+      // Log failed login attempt
+      await logFailedLogin(email, clientIp, clientInfo, signInError.message || 'Invalid credentials');
+      return { success: false, error: signInError.message || 'Invalid credentials' };
     }
 
-    if (user.locked_until && new Date(user.locked_until) > new Date()) {
-      await logLogin(false, user.id, 'Account locked');
-      return { success: false, error: 'Account temporarily locked' };
+    if (!authData.user) {
+      await logFailedLogin(email, clientIp, clientInfo, 'Authentication failed');
+      return { success: false, error: 'Authentication failed' };
     }
 
-    if (user.password_hash !== passwordHash) {
-      const newAttempts = user.failed_login_attempts + 1;
-      const updates: { failed_login_attempts: number; locked_until?: string } = { failed_login_attempts: newAttempts };
-
-      if (newAttempts >= 5) {
-        const lockUntil = new Date();
-        lockUntil.setMinutes(lockUntil.getMinutes() + 30);
-        updates.locked_until = lockUntil.toISOString();
-      }
-
-      await supabase
+    // Get user profile (silently fail and continue if not found)
+    let user = null;
+    try {
+      const { data: userData, error: profileError } = await supabase
         .from('users')
-        .update(updates)
-        .eq('id', user.id);
+        .select('*')
+        .eq('id', authData.user.id)
+        .maybeSingle();
 
-      await logLogin(false, user.id, 'Invalid password');
-      return { success: false, error: 'Invalid credentials' };
+      if (!profileError && userData) {
+        user = userData;
+      }
+    } catch {
+      // Continue even if user profile lookup fails
     }
 
-    if (user.status !== 'approved') {
-      await logLogin(false, user.id, 'Account not approved');
+    // Check account status only if user profile exists
+    if (user && user.status && user.status !== 'approved' && user.status !== 'pending_verification') {
+      await logFailedLogin(authData.user.id, clientIp, clientInfo, `Account ${user.status}`);
       return {
         success: false,
         error: `Account ${user.status.replace('_', ' ')}`
       };
     }
 
-    await supabase
-      .from('users')
-      .update({
-        failed_login_attempts: 0,
-        locked_until: null,
-      })
-      .eq('id', user.id);
+    // Reset failed login attempts (silently fail if columns don't exist)
+    try {
+      await supabase
+        .from('users')
+        .update({
+          failed_login_attempts: 0,
+          locked_until: null,
+        })
+        .eq('id', authData.user.id);
+    } catch {
+      // Continue even if this fails - these columns might not exist
+    }
 
-    const accessToken = crypto.randomUUID();
-    const refreshToken = crypto.randomUUID();
+    // Log successful login (silently fail if table doesn't exist)
+    try {
+      await supabase.from('login_history').insert({
+        user_id: authData.user.id,
+        ip_address: clientIp || 'client',
+        user_agent: clientInfo.userAgent,
+        browser: clientInfo.browser,
+        os: clientInfo.os,
+        device: clientInfo.device,
+        success: true,
+        failure_reason: null,
+        suspicious: false,
+      });
+    } catch {
+      // Continue even if login_history doesn't exist or fails
+    }
 
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    // Log activity (silently fail if table doesn't exist)
+    try {
+      await supabase.from('activity_logs').insert({
+        user_id: authData.user.id,
+        action: 'login',
+        resource_type: 'auth',
+        ip_address: clientIp || 'client',
+      });
+    } catch {
+      // Continue even if activity_logs doesn't exist or fails
+    }
 
-    const { data: refreshTokenData } = await supabase
-      .from('refresh_tokens')
-      .insert({
-        user_id: user.id,
-        token: refreshToken,
-        expires_at: expiresAt.toISOString(),
-      })
-      .select()
-      .single();
+    // Store user data locally (Supabase session is managed automatically)
+    // Use auth user data if profile doesn't exist yet
+    const userData = user || {
+      id: authData.user.id,
+      email: authData.user.email || '',
+      full_name: authData.user.user_metadata?.full_name || '',
+      role: 'user',
+      status: 'pending_verification',
+      email_verified: authData.user.email_confirmed_at ? true : false,
+      origin_ip: clientIp || null,
+    };
 
-    await supabase.from('user_sessions').insert({
-      user_id: user.id,
-      access_token: accessToken,
-      refresh_token_id: refreshTokenData?.id,
-      ip_address: clientIp || 'client',
-      user_agent: clientInfo.userAgent,
-      browser: clientInfo.browser,
-      os: clientInfo.os,
-      device: clientInfo.device,
-    });
-
-    await logLogin(true, user.id);
-
-    await supabase.from('activity_logs').insert({
-      user_id: user.id,
-      action: 'login',
-      resource_type: 'auth',
-      ip_address: clientIp || 'client',
-    });
-
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('refresh_token', refreshToken);
     localStorage.setItem('user', JSON.stringify({
-      id: user.id,
-      email: user.email,
-      full_name: user.full_name,
-      role: user.role,
-      status: user.status,
-      email_verified: user.email_verified,
-      origin_ip: user.origin_ip,
+      id: userData.id,
+      email: userData.email,
+      full_name: userData.full_name,
+      role: userData.role,
+      status: userData.status,
+      email_verified: userData.email_verified,
+      origin_ip: userData.origin_ip,
     }));
 
     return {
       success: true,
       user: {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        role: user.role,
-        status: user.status,
-        email_verified: user.email_verified,
-        origin_ip: user.origin_ip,
+        id: userData.id,
+        email: userData.email,
+        full_name: userData.full_name,
+        role: userData.role,
+        status: userData.status,
+        email_verified: userData.email_verified,
+        origin_ip: userData.origin_ip,
       },
     };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Login failed';
+    return { success: false, error: errorMessage };
+  }
+};
+
+const logFailedLogin = async (
+  _email: string,
+  clientIp: string | null,
+  clientInfo: ReturnType<typeof getClientInfo>,
+  reason: string
+): Promise<void> => {
+  try {
+    await supabase.from('login_history').insert({
+      user_id: null,
+      ip_address: clientIp || 'client',
+      user_agent: clientInfo.userAgent,
+      browser: clientInfo.browser,
+      os: clientInfo.os,
+      device: clientInfo.device,
+      success: false,
+      failure_reason: reason,
+      suspicious: false,
+    });
   } catch {
-    return { success: false, error: 'Login failed' };
+    // Silently fail - don't interrupt login flow, table might not exist yet
   }
 };
 
 export const logout = async (): Promise<void> => {
-  const accessToken = localStorage.getItem('access_token');
-
-  if (accessToken) {
-    await supabase
-      .from('user_sessions')
-      .update({ revoked: true })
-      .eq('access_token', accessToken);
+  try {
+    // Sign out from Supabase (clears session)
+    await supabase.auth.signOut();
+  } catch {
+    // Continue with local cleanup even if Supabase signout fails
   }
 
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
   localStorage.removeItem('user');
 };
 
@@ -288,6 +313,59 @@ export const getCurrentUser = (): User | null => {
   }
 };
 
+/**
+ * Fetch fresh user data from database (bypasses cache)
+ * Use this to get updated role/status after admin changes
+ */
+export const getFreshUserData = async (): Promise<User | null> => {
+  try {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) return null;
+
+    // Fetch user profile from database
+    const { data: userData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (error || !userData) {
+      console.error('Error fetching fresh user data:', error);
+      return null;
+    }
+
+    // Update localStorage with fresh data
+    const user: User = {
+      id: userData.id,
+      email: userData.email,
+      full_name: userData.full_name,
+      role: userData.role,
+      status: userData.status,
+      email_verified: userData.email_verified,
+      origin_ip: userData.origin_ip,
+    };
+
+    localStorage.setItem('user', JSON.stringify(user));
+    return user;
+  } catch (error) {
+    console.error('Exception fetching fresh user data:', error);
+    return null;
+  }
+};
+
 export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('access_token');
+  return !!localStorage.getItem('user');
+};
+
+/**
+ * Get the current Supabase session
+ * Useful for getting access tokens for API calls
+ */
+export const getCurrentSession = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session;
+  } catch {
+    return null;
+  }
 };

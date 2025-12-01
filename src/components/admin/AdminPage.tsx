@@ -41,10 +41,23 @@ import { useAuth } from '../../hooks/useAuth';
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
-type UserSession = Database['public']['Tables']['user_sessions']['Row'];
 type ErrorReport = Database['public']['Tables']['error_reports']['Row'];
 type ActivityLog = Database['public']['Tables']['activity_logs']['Row'];
 type Attachment = Database['public']['Tables']['attachments']['Row'];
+
+// Placeholder type for user_sessions which does not exist in the current schema
+type UserSession = {
+  id: string;
+  user_id: string;
+  revoked: boolean;
+  last_activity: string;
+  created_at: string;
+  browser?: string | null;
+  os?: string | null;
+  device?: string | null;
+  ip_address?: string | null;
+  location?: string | null;
+};
 
 type TabType = 'dashboard' | 'approvals' | 'security' | 'errors';
 
@@ -131,8 +144,20 @@ const getUserOriginIp = (user: User) => {
 };
 
 export const AdminPage = () => {
-  const { user: currentAdmin } = useAuth();
+  const { user: currentAdmin, isAdmin } = useAuth();
   const adminId = currentAdmin?.id ?? null;
+
+  if (!isAdmin) {
+    return (
+      <div className="p-8">
+        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 text-center">
+          <h2 className="text-2xl font-semibold text-gray-900">Not authorized</h2>
+          <p className="text-gray-600 mt-2">You do not have permission to view the Admin Panel.</p>
+          <p className="text-gray-500 mt-4">Use the sidebar to access available sections for your role.</p>
+        </div>
+      </div>
+    );
+  }
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
@@ -435,11 +460,20 @@ export const AdminPage = () => {
   };
 
   const handleUserRoleChange = async (userId: string, role: UserRole) => {
-    const result = await updateUserRole(userId, role, { adminId: adminId ?? undefined });
-    if (!result.success && result.error) {
-      alert(result.error);
+    try {
+      console.log('[UI] handleUserRoleChange start', { userId, role, adminId });
+      const result = await updateUserRole(userId, role, { adminId: adminId ?? undefined });
+      console.log('[UI] updateUserRole result', { result });
+      if (!result.success && result.error) {
+        console.error('[UI] updateUserRole error', { error: result.error });
+        alert(result.error);
+      }
+    } catch (err) {
+      console.error('[UI] handleUserRoleChange exception', { err });
+      alert('Unexpected error updating role. See console for details.');
+    } finally {
+      await loadUsers();
     }
-    await loadUsers();
   };
 
   const handleUserStatusChange = async (userId: string, status: UserStatus, reason?: string) => {

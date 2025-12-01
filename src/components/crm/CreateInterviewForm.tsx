@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { createInterview } from '../../lib/api/interviews';
@@ -26,11 +26,77 @@ interface FormFieldProps {
   options?: FormFieldOption[];
 }
 
+// Create FormField component outside the parent component for stability
+const FormField = memo(function FormField({
+  label,
+  name,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  required = false,
+  readOnly = false,
+  options,
+}: FormFieldProps) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      {type === 'select' ? (
+        <select
+          name={name}
+          value={value}
+          onChange={onChange}
+          disabled={readOnly}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+        >
+          <option value="">Select {label.toLowerCase()}</option>
+          {options?.map((opt: FormFieldOption) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          rows={4}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+        />
+      ) : (
+        <input
+          type={type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          required={required}
+          readOnly={readOnly}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+        />
+      )}
+    </div>
+  );
+});
+
 interface CreateInterviewFormProps {
   onClose: () => void;
   onSuccess: () => void;
   requirementId?: string;
 }
+
+const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
+    <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
+    <div className="space-y-4">{children}</div>
+  </div>
+);
 
 export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: CreateInterviewFormProps) => {
   const { user } = useAuth();
@@ -61,6 +127,11 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
     job_description_excerpt: '',
     feedback_notes: '',
   });
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({ ...prevState, [name]: value }));
+  }, []);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -94,6 +165,16 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
       }
     }
   }, [formData.requirement_id, formData.scheduled_date, requirements]);
+
+  const requirementOptions = useMemo(
+    () => requirements.map(r => ({ label: `${r.title} - ${r.company}`, value: r.id })),
+    [requirements]
+  );
+
+  const consultantOptions = useMemo(
+    () => consultants.map(c => ({ label: c.name, value: c.id })),
+    [consultants]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,69 +212,6 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
     }
   };
 
-  const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-
-  const FormField = ({
-    label,
-    name,
-    type = 'text',
-    placeholder,
-    value,
-    onChange,
-    required = false,
-    readOnly = false,
-    options,
-  }: FormFieldProps) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
-      {type === 'select' ? (
-        <select
-          name={name}
-          value={value}
-          onChange={onChange}
-          disabled={readOnly}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-        >
-          <option value="">Select {label.toLowerCase()}</option>
-          {options?.map((opt: FormFieldOption) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          readOnly={readOnly}
-          rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent read-only:bg-gray-100"
-        />
-      ) : (
-        <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          required={required}
-          readOnly={readOnly}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent read-only:bg-gray-100"
-        />
-      )}
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -216,8 +234,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="requirement_id"
                 type="select"
                 value={formData.requirement_id}
-                onChange={(e) => setFormData({ ...formData, requirement_id: e.target.value })}
-                options={requirements.map(r => ({ label: `${r.title} - ${r.company}`, value: r.id }))}
+                onChange={handleChange}
+                options={requirementOptions}
                 required
               />
               <FormField
@@ -225,7 +243,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="scheduled_date"
                 type="date"
                 value={formData.scheduled_date}
-                onChange={(e) => setFormData({ ...formData, scheduled_date: e.target.value })}
+                onChange={handleChange}
                 required
               />
               <FormField
@@ -233,14 +251,14 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="scheduled_time"
                 type="time"
                 value={formData.scheduled_time}
-                onChange={(e) => setFormData({ ...formData, scheduled_time: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Timezone"
                 name="timezone"
                 type="select"
                 value={formData.timezone}
-                onChange={(e) => setFormData({ ...formData, timezone: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: 'UTC', value: 'UTC' },
                   { label: 'EST (UTC-5)', value: 'EST' },
@@ -261,7 +279,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="type"
                 type="select"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: 'Technical', value: 'Technical' },
                   { label: 'HR', value: 'HR' },
@@ -275,7 +293,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="status"
                 type="select"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: 'Scheduled', value: 'Scheduled' },
                   { label: 'Confirmed', value: 'Confirmed' },
@@ -290,29 +308,29 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="consultant_id"
                 type="select"
                 value={formData.consultant_id}
-                onChange={(e) => setFormData({ ...formData, consultant_id: e.target.value })}
-                options={consultants.map(c => ({ label: c.name, value: c.id }))}
+                onChange={handleChange}
+                options={consultantOptions}
               />
               <FormField
                 label="Vendor Company"
                 name="vendor_company"
                 placeholder="ABC Staffing"
                 value={formData.vendor_company}
-                onChange={(e) => setFormData({ ...formData, vendor_company: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Interview With"
                 name="interview_with"
                 placeholder="Candidate name"
                 value={formData.interview_with}
-                onChange={(e) => setFormData({ ...formData, interview_with: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Result (optional)"
                 name="result"
                 type="select"
                 value={formData.result}
-                onChange={(e) => setFormData({ ...formData, result: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: 'Positive', value: 'Positive' },
                   { label: 'Negative', value: 'Negative' },
@@ -331,7 +349,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="round"
                 type="select"
                 value={formData.round}
-                onChange={(e) => setFormData({ ...formData, round: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: '1st Round', value: '1st Round' },
                   { label: '2nd Round', value: '2nd Round' },
@@ -344,7 +362,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="mode"
                 type="select"
                 value={formData.mode}
-                onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: 'Video Call', value: 'Video Call' },
                   { label: 'Phone Call', value: 'Phone Call' },
@@ -357,7 +375,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="meeting_type"
                 type="select"
                 value={formData.meeting_type}
-                onChange={(e) => setFormData({ ...formData, meeting_type: e.target.value })}
+                onChange={handleChange}
                 options={[
                   { label: 'Scheduled', value: 'Scheduled' },
                   { label: 'Ad Hoc', value: 'Ad Hoc' },
@@ -370,7 +388,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 type="number"
                 placeholder="60"
                 value={formData.duration_minutes}
-                onChange={(e) => setFormData({ ...formData, duration_minutes: e.target.value })}
+                onChange={handleChange}
               />
             </div>
           </FormSection>
@@ -383,21 +401,21 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 name="subject_line"
                 placeholder="Will auto-generate based on requirement and date"
                 value={formData.subject_line}
-                onChange={(e) => setFormData({ ...formData, subject_line: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Interviewer"
                 name="interviewer"
                 placeholder="Interviewer name"
                 value={formData.interviewer}
-                onChange={(e) => setFormData({ ...formData, interviewer: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Interview Link or Location"
                 name="location"
                 placeholder="Zoom link, Meeting room, or Address"
                 value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                onChange={handleChange}
               />
             </div>
           </FormSection>
@@ -410,7 +428,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
               type="textarea"
               placeholder="Key areas to discuss, focus areas, etc."
               value={formData.interview_focus}
-              onChange={(e) => setFormData({ ...formData, interview_focus: e.target.value })}
+              onChange={handleChange}
             />
             <FormField
               label="Special Note"
@@ -418,7 +436,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
               type="textarea"
               placeholder="Any special instructions or notes"
               value={formData.special_note}
-              onChange={(e) => setFormData({ ...formData, special_note: e.target.value })}
+              onChange={handleChange}
             />
             <FormField
               label="Job Description excerpt"
@@ -426,7 +444,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
               type="textarea"
               placeholder="Key job requirements or description"
               value={formData.job_description_excerpt}
-              onChange={(e) => setFormData({ ...formData, job_description_excerpt: e.target.value })}
+              onChange={handleChange}
             />
             <FormField
               label="Feedback Notes"
@@ -434,7 +452,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
               type="textarea"
               placeholder="Post-interview feedback and observations"
               value={formData.feedback_notes}
-              onChange={(e) => setFormData({ ...formData, feedback_notes: e.target.value })}
+              onChange={handleChange}
             />
           </FormSection>
 

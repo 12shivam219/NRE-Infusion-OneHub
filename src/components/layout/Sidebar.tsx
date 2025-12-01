@@ -19,19 +19,19 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarProps) => {
-  const { user, isAdmin, isMarketing, logout } = useAuth();
+  const { user, logout } = useAuth();
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['user', 'marketing', 'admin'] },
-    { id: 'documents', label: 'Resume Editor', icon: FileText, roles: ['user', 'marketing', 'admin'] },
-    { id: 'crm', label: 'Marketing & CRM', icon: Briefcase, roles: ['marketing', 'admin'] },
+    { id: 'documents', label: 'Resume Editor', icon: FileText, roles: ['user', 'admin'] },
+    { id: 'crm', label: 'Marketing & CRM', icon: Briefcase, roles: ['user', 'marketing', 'admin'] },
     { id: 'admin', label: 'Admin Panel', icon: Shield, roles: ['admin'] },
   ];
 
   const filteredItems = menuItems.filter(item => {
-    if (item.roles.includes('admin') && !isAdmin) return false;
-    if (item.roles.includes('marketing') && !isMarketing && !isAdmin) return false;
-    return true;
+    // Check if the current user's role is in the item's allowed roles
+    const userRole = user?.role;
+    return item.roles.includes(userRole as string);
   });
 
   return (

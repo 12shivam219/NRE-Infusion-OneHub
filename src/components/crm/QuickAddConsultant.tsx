@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Plus } from 'lucide-react';
 
 interface QuickAddConsultantProps {
@@ -12,6 +12,19 @@ interface QuickAddConsultantProps {
   }) => void;
 }
 
+const StepIndicator = ({ completed }: { completed: boolean }) => (
+  <span
+    aria-hidden="true"
+    className={`flex items-center justify-center w-5 h-5 rounded border text-xs font-semibold transition-colors ${
+      completed
+        ? 'bg-blue-600 border-blue-600 text-white'
+        : 'border-gray-300 text-transparent'
+    }`}
+  >
+    ✓
+  </span>
+);
+
 export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProps) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -20,6 +33,11 @@ export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProp
     status: 'Active',
     skills: '',
   });
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,52 +59,56 @@ export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProp
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.name} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.name)} />
               <div>
                 <div className="font-medium text-gray-900">What's their name?</div>
                 <input
                   type="text"
+                  name="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={handleChange}
                   placeholder="Michael Johnson"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.email} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.email)} />
               <div>
                 <div className="font-medium text-gray-900">Email & phone?</div>
                 <input
                   type="email"
+                  name="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={handleChange}
                   placeholder="michael@email.com"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
                 <input
                   type="tel"
+                  name="phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={handleChange}
                   placeholder="555-0123"
                   className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.status} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.status)} />
               <div>
                 <div className="font-medium text-gray-900">Current status?</div>
                 <select
+                  name="status"
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 >
                   <option>Active</option>
@@ -94,23 +116,24 @@ export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProp
                   <option>Recently Placed</option>
                 </select>
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.skills} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.skills)} />
               <div>
                 <div className="font-medium text-gray-900">Key skill area?</div>
                 <input
                   type="text"
+                  name="skills"
                   value={formData.skills}
-                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
+                  onChange={handleChange}
                   placeholder="Full-Stack Developer"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">

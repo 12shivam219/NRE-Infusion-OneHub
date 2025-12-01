@@ -19,12 +19,9 @@ export interface Database {
         Row: {
           id: string;
           email: string;
-          password_hash: string;
           full_name: string;
           role: UserRole;
           status: UserStatus;
-          failed_login_attempts: number;
-          locked_until: string | null;
           email_verified: boolean;
           origin_ip: string | null;
           created_at: string;
@@ -33,12 +30,9 @@ export interface Database {
         Insert: {
           id?: string;
           email: string;
-          password_hash: string;
           full_name: string;
           role?: UserRole;
           status?: UserStatus;
-          failed_login_attempts?: number;
-          locked_until?: string | null;
           email_verified?: boolean;
           origin_ip?: string | null;
           created_at?: string;
@@ -47,86 +41,13 @@ export interface Database {
         Update: {
           id?: string;
           email?: string;
-          password_hash?: string;
           full_name?: string;
           role?: UserRole;
           status?: UserStatus;
-          failed_login_attempts?: number;
-          locked_until?: string | null;
           email_verified?: boolean;
           origin_ip?: string | null;
           created_at?: string;
           updated_at?: string;
-        };
-      };
-      refresh_tokens: {
-        Row: {
-          id: string;
-          user_id: string;
-          token: string;
-          expires_at: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          token: string;
-          expires_at: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          token?: string;
-          expires_at?: string;
-          created_at?: string;
-        };
-      };
-      user_sessions: {
-        Row: {
-          id: string;
-          user_id: string;
-          access_token: string;
-          refresh_token_id: string | null;
-          ip_address: string;
-          user_agent: string;
-          browser: string | null;
-          os: string | null;
-          device: string | null;
-          location: string | null;
-          last_activity: string;
-          created_at: string;
-          revoked: boolean;
-        };
-        Insert: {
-          id?: string;
-          user_id: string;
-          access_token: string;
-          refresh_token_id?: string | null;
-          ip_address: string;
-          user_agent: string;
-          browser?: string | null;
-          os?: string | null;
-          device?: string | null;
-          location?: string | null;
-          last_activity?: string;
-          created_at?: string;
-          revoked?: boolean;
-        };
-        Update: {
-          id?: string;
-          user_id?: string;
-          access_token?: string;
-          refresh_token_id?: string | null;
-          ip_address?: string;
-          user_agent?: string;
-          browser?: string | null;
-          os?: string | null;
-          device?: string | null;
-          location?: string | null;
-          last_activity?: string;
-          created_at?: string;
-          revoked?: boolean;
         };
       };
       login_history: {

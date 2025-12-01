@@ -3,14 +3,30 @@ import type { Database, UserStatus, UserRole, ErrorStatus } from '../database.ty
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
-type UserSession = Database['public']['Tables']['user_sessions']['Row'];
 type ActivityLog = Database['public']['Tables']['activity_logs']['Row'];
 type ErrorReport = Database['public']['Tables']['error_reports']['Row'];
 type Attachment = Database['public']['Tables']['attachments']['Row'];
 type ActivityLogInsert = Database['public']['Tables']['activity_logs']['Insert'];
 type UserUpdate = Database['public']['Tables']['users']['Update'];
-type SessionUpdate = Database['public']['Tables']['user_sessions']['Update'];
 type ErrorReportUpdate = Database['public']['Tables']['error_reports']['Update'];
+
+// Placeholder types for user_sessions table which does not exist in the current schema
+type UserSession = {
+  id: string;
+  user_id: string;
+  revoked: boolean;
+  last_activity: string;
+  created_at: string;
+  browser?: string | null;
+  os?: string | null;
+  device?: string | null;
+  ip_address?: string | null;
+  location?: string | null;
+};
+
+type SessionUpdate = {
+  revoked: boolean;
+};
 
 const DOCUMENTS_BUCKET = 'documents';
 const ATTACHMENT_URL_EXPIRY_SECONDS = 60 * 60;
@@ -78,7 +94,9 @@ const ensureAdminDemotionAllowed = async (
   userId: string,
   nextRole: UserRole
 ): Promise<{ allowed: boolean; error?: string }> => {
+  console.log('[RLS GUARD] ensureAdminDemotionAllowed start', { userId, nextRole });
   if (nextRole === 'admin') {
+    console.log('[RLS GUARD] nextRole is admin -> allowed');
     return { allowed: true };
   }
 
@@ -89,6 +107,7 @@ const ensureAdminDemotionAllowed = async (
     .maybeSingle();
 
   if (userError) {
+    console.error('[RLS GUARD] failed to lookup target user role', { userId, error: userError });
     return { allowed: false, error: userError.message };
   }
 
@@ -104,13 +123,16 @@ const ensureAdminDemotionAllowed = async (
     .eq('role', 'admin');
 
   if (countError) {
+    console.error('[RLS GUARD] failed to count admin users', { error: countError });
     return { allowed: false, error: countError.message };
   }
 
   if ((count ?? 0) <= 1) {
+    console.warn('[RLS GUARD] attempt to remove last admin blocked', { adminCount: count });
     return { allowed: false, error: 'Cannot remove the last remaining admin' };
   }
 
+  console.log('[RLS GUARD] demotion allowed');
   return { allowed: true };
 };
 
@@ -152,7 +174,11 @@ export const updateUserStatus = async (
       .eq('id', userId);
 
     if (error) {
-      console.error('[DB] Update user status error:', error);
+      console.error('[STATUS UPDATE] Full error:', {
+        message: error.message,
+        code: error.code,
+        details: (error as any).details,
+      });
       return { success: false, error: error.message };
     }
 
@@ -180,8 +206,11 @@ export const updateUserRole = async (
   options?: { adminId?: string }
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    console.log('[ROLE UPDATE] start', { userId, role, adminId: options?.adminId });
     const guard = await ensureAdminDemotionAllowed(userId, role);
+    console.log('[ROLE UPDATE] demotion guard result', { guard });
     if (!guard.allowed) {
+      console.error('[ROLE UPDATE] guard blocked role change', { userId, role, guard });
       return { success: false, error: guard.error || 'Admin safety check failed' };
     }
 
@@ -190,9 +219,19 @@ export const updateUserRole = async (
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('users').update(updatePayload).eq('id', userId);
+    const { data, error } = await supabase
+      .from('users')
+      .update(updatePayload)
+      .eq('id', userId);
+
+    console.log('[ROLE UPDATE] supabase update response', { data, error });
 
     if (error) {
+      console.error('[ROLE UPDATE] Full error:', {
+        message: error.message,
+        code: error.code,
+        details: (error as any).details,
+      });
       return { success: false, error: error.message };
     }
 
@@ -204,8 +243,11 @@ export const updateUserRole = async (
       details: { role },
     });
 
+    console.log('[ROLE UPDATE] completed successfully', { userId, role });
+
     return { success: true };
   } catch {
+    console.error('[ROLE UPDATE] exception thrown during update', { userId, role });
     return { success: false, error: 'Failed to update user role' };
   }
 };

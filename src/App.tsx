@@ -14,9 +14,13 @@ type AuthView = 'login' | 'register';
 type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
 
 const AppContent = () => {
-  const { user, isLoading, refreshUser } = useAuth();
+  const { user, isLoading, refreshUser, isAdmin, isMarketing } = useAuth();
   const [authView, setAuthView] = useState<AuthView>('login');
-  const [currentPage, setCurrentPage] = useState<AppPage>('dashboard');
+  const [currentPage, setCurrentPage] = useState<AppPage>(() => {
+    // Load page preference from localStorage
+    const saved = localStorage.getItem('currentPage');
+    return (saved as AppPage) || 'dashboard';
+  });
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     // Load sidebar preference from localStorage
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -25,14 +29,38 @@ const AppContent = () => {
 
   useEffect(() => {
     if (user) {
-      setCurrentPage('dashboard');
+      // Only set default page on first login, not on every user refresh
+      const savedPage = localStorage.getItem('currentPage');
+      if (!savedPage) {
+        // First login - set default landing page based on role
+        const role = (user as any).role;
+        if (role === 'marketing' || role === 'user') {
+          // Marketing and user roles land on CRM
+          setCurrentPage('crm');
+        } else {
+          // Admin lands on dashboard
+          setCurrentPage('dashboard');
+        }
+      }
     }
-  }, [user]);
+  }, [user?.id]); // Only run when user ID changes (login), not on every user refresh
+
+  // Save page preference to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('currentPage', currentPage);
+  }, [currentPage]);
 
   // Save sidebar preference to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarOpen));
   }, [sidebarOpen]);
+
+  // Prevent non-admin users from navigating to Admin page
+  useEffect(() => {
+    if (currentPage === 'admin' && !isAdmin) {
+      setCurrentPage(isMarketing ? 'crm' : 'dashboard');
+    }
+  }, [isAdmin, isMarketing]);
 
   if (isLoading) {
     return (

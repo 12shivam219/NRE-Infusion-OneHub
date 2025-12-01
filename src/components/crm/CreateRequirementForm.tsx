@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { createRequirement } from '../../lib/api/requirements';
@@ -23,104 +23,18 @@ interface FormFieldProps {
   options?: FormFieldOption[];
 }
 
-interface CreateRequirementFormProps {
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementFormProps) => {
-  const { user } = useAuth();
-  const [consultants, setConsultants] = useState<Consultant[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const [formData, setFormData] = useState({
-    title: '',
-    company: '',
-    status: 'NEW' as const,
-    consultant_id: '',
-    applied_for: '',
-    rate: '',
-    primary_tech_stack: '',
-    imp_name: '',
-    client_website: '',
-    imp_website: '',
-    vendor_company: '',
-    vendor_website: '',
-    vendor_person_name: '',
-    vendor_phone: '',
-    vendor_email: '',
-    description: '',
-    next_step: '',
-    remote: '',
-    duration: '',
-    location: '',
-  });
-
-  const loadConsultants = useCallback(async () => {
-    if (!user) return;
-    const result = await getConsultants(user.id);
-    if (result.success && result.consultants) {
-      setConsultants(result.consultants);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    loadConsultants();
-  }, [loadConsultants]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-
-    setLoading(true);
-    const result = await createRequirement({
-      user_id: user.id,
-      title: formData.title,
-      company: formData.company,
-      status: formData.status,
-      consultant_id: formData.consultant_id || null,
-      applied_for: formData.applied_for || null,
-      rate: formData.rate || null,
-      primary_tech_stack: formData.primary_tech_stack || null,
-      imp_name: formData.imp_name || null,
-      client_website: formData.client_website || null,
-      imp_website: formData.imp_website || null,
-      vendor_company: formData.vendor_company || null,
-      vendor_website: formData.vendor_website || null,
-      vendor_person_name: formData.vendor_person_name || null,
-      vendor_phone: formData.vendor_phone || null,
-      vendor_email: formData.vendor_email || null,
-      description: formData.description || null,
-      next_step: formData.next_step || null,
-      remote: formData.remote || null,
-      duration: formData.duration || null,
-      location: formData.location || null,
-      priority: 'medium',
-    });
-
-    setLoading(false);
-    if (result.success) {
-      onSuccess();
-    }
-  };
-
-  const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-
-  const FormField = ({
-    label,
-    name,
-    type = 'text',
-    placeholder,
-    value,
-    onChange,
-    required = false,
-    options,
-  }: FormFieldProps) => (
+// Create FormField component outside the parent component for stability
+const FormField = memo(function FormField({
+  label,
+  name,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  required = false,
+  options,
+}: FormFieldProps) {
+  return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
         {label}
@@ -162,6 +76,105 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
       )}
     </div>
   );
+});
+
+interface CreateRequirementFormProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
+    <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
+    <div className="space-y-4">{children}</div>
+  </div>
+);
+
+export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementFormProps) => {
+  const { user } = useAuth();
+  const [consultants, setConsultants] = useState<Consultant[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    title: '',
+    company: '',
+    status: 'NEW' as const,
+    consultant_id: '',
+    applied_for: '',
+    rate: '',
+    primary_tech_stack: '',
+    imp_name: '',
+    client_website: '',
+    imp_website: '',
+    vendor_company: '',
+    vendor_website: '',
+    vendor_person_name: '',
+    vendor_phone: '',
+    vendor_email: '',
+    description: '',
+    next_step: '',
+    remote: '',
+    duration: '',
+    location: '',
+  });
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({ ...prevState, [name]: value }));
+  }, []);
+
+  const loadConsultants = useCallback(async () => {
+    if (!user) return;
+    const result = await getConsultants(user.id);
+    if (result.success && result.consultants) {
+      setConsultants(result.consultants);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadConsultants();
+  }, [loadConsultants]);
+
+  const consultantOptions = useMemo(
+    () => consultants.map(c => ({ label: c.name, value: c.id })),
+    [consultants]
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setLoading(true);
+    const result = await createRequirement({
+      user_id: user.id,
+      title: formData.title,
+      company: formData.company,
+      status: formData.status,
+      consultant_id: formData.consultant_id || null,
+      applied_for: formData.applied_for || null,
+      rate: formData.rate || null,
+      primary_tech_stack: formData.primary_tech_stack || null,
+      imp_name: formData.imp_name || null,
+      client_website: formData.client_website || null,
+      imp_website: formData.imp_website || null,
+      vendor_company: formData.vendor_company || null,
+      vendor_website: formData.vendor_website || null,
+      vendor_person_name: formData.vendor_person_name || null,
+      vendor_phone: formData.vendor_phone || null,
+      vendor_email: formData.vendor_email || null,
+      description: formData.description || null,
+      next_step: formData.next_step || null,
+      remote: formData.remote || null,
+      duration: formData.duration || null,
+      location: formData.location || null,
+      priority: 'medium',
+    });
+
+    setLoading(false);
+    if (result.success) {
+      onSuccess();
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -185,7 +198,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="title"
                 placeholder="Senior Java Developer"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={handleChange}
                 required
               />
               <FormField
@@ -193,7 +206,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="company"
                 placeholder="TechCorp Inc"
                 value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                onChange={handleChange}
                 required
               />
               <FormField
@@ -201,7 +214,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="status"
                 type="select"
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as typeof formData.status })}
+                onChange={handleChange}
                 options={[
                   { label: 'New', value: 'NEW' },
                   { label: 'In Progress', value: 'IN_PROGRESS' },
@@ -216,15 +229,15 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="consultant_id"
                 type="select"
                 value={formData.consultant_id}
-                onChange={(e) => setFormData({ ...formData, consultant_id: e.target.value })}
-                options={consultants.map(c => ({ label: c.name, value: c.id }))}
+                onChange={handleChange}
+                options={consultantOptions}
               />
               <FormField
                 label="What's the next action needed?"
                 name="next_step"
                 placeholder="Send profile, Confirm interview, Follow up, etc."
                 value={formData.next_step}
-                onChange={(e) => setFormData({ ...formData, next_step: e.target.value })}
+                onChange={handleChange}
               />
             </div>
           </FormSection>
@@ -237,28 +250,28 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="primary_tech_stack"
                 placeholder="Java, Spring Boot, AWS"
                 value={formData.primary_tech_stack}
-                onChange={(e) => setFormData({ ...formData, primary_tech_stack: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the target rate or range?"
                 name="rate"
                 placeholder="$80k - $120k"
                 value={formData.rate}
-                onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the work location type?"
                 name="remote"
                 placeholder="Remote, Hybrid, or Onsite"
                 value={formData.remote}
-                onChange={(e) => setFormData({ ...formData, remote: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the contract duration or timeline?"
                 name="duration"
                 placeholder="6 months, Full-time, etc."
                 value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                onChange={handleChange}
               />
             </div>
           </FormSection>
@@ -271,14 +284,14 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="imp_name"
                 placeholder="John Smith"
                 value={formData.imp_name}
-                onChange={(e) => setFormData({ ...formData, imp_name: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Where was it submitted?"
                 name="applied_for"
                 placeholder="LinkedIn, Direct, Referral, etc."
                 value={formData.applied_for}
-                onChange={(e) => setFormData({ ...formData, applied_for: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the client's website?"
@@ -286,7 +299,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 type="url"
                 placeholder="https://example.com"
                 value={formData.client_website}
-                onChange={(e) => setFormData({ ...formData, client_website: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's your partner/support website?"
@@ -294,7 +307,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 type="url"
                 placeholder="https://partner.com"
                 value={formData.imp_website}
-                onChange={(e) => setFormData({ ...formData, imp_website: e.target.value })}
+                onChange={handleChange}
               />
             </div>
           </FormSection>
@@ -307,7 +320,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 name="vendor_company"
                 placeholder="ABC Staffing"
                 value={formData.vendor_company}
-                onChange={(e) => setFormData({ ...formData, vendor_company: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the vendor's website?"
@@ -315,14 +328,14 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 type="url"
                 placeholder="https://vendor.com"
                 value={formData.vendor_website}
-                onChange={(e) => setFormData({ ...formData, vendor_website: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="Who's your primary vendor contact?"
                 name="vendor_person_name"
                 placeholder="Jane Doe"
                 value={formData.vendor_person_name}
-                onChange={(e) => setFormData({ ...formData, vendor_person_name: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the vendor's phone number?"
@@ -330,7 +343,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 type="tel"
                 placeholder="(555) 123-4567"
                 value={formData.vendor_phone}
-                onChange={(e) => setFormData({ ...formData, vendor_phone: e.target.value })}
+                onChange={handleChange}
               />
               <FormField
                 label="What's the vendor's email?"
@@ -338,7 +351,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 type="email"
                 placeholder="vendor@example.com"
                 value={formData.vendor_email}
-                onChange={(e) => setFormData({ ...formData, vendor_email: e.target.value })}
+                onChange={handleChange}
               />
             </div>
           </FormSection>
@@ -351,7 +364,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               type="textarea"
               placeholder="Full job description and key responsibilities..."
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={handleChange}
             />
           </FormSection>
 
@@ -362,7 +375,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               name="location"
               placeholder="123 Main St, New York, NY"
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              onChange={handleChange}
             />
           </FormSection>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X, Plus } from 'lucide-react';
 
 interface QuickAddInterviewProps {
@@ -12,6 +12,19 @@ interface QuickAddInterviewProps {
   }) => void;
 }
 
+const StepIndicator = ({ completed }: { completed: boolean }) => (
+  <span
+    aria-hidden="true"
+    className={`flex items-center justify-center w-5 h-5 rounded border text-xs font-semibold transition-colors ${
+      completed
+        ? 'bg-blue-600 border-blue-600 text-white'
+        : 'border-gray-300 text-transparent'
+    }`}
+  >
+    ✓
+  </span>
+);
+
 export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps) => {
   const [formData, setFormData] = useState({
     requirementId: '',
@@ -20,6 +33,11 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
     mode: 'phone',
     interviewer: '',
   });
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,60 +59,64 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.requirementId} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.requirementId)} />
               <div>
                 <div className="font-medium text-gray-900">Which requirement?</div>
                 <input
                   type="text"
+                  name="requirementId"
                   value={formData.requirementId}
-                  onChange={(e) => setFormData({ ...formData, requirementId: e.target.value })}
+                  onChange={handleChange}
                   placeholder="Senior Java Developer - TechCorp"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.consultantName} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.consultantName)} />
               <div>
                 <div className="font-medium text-gray-900">Which consultant?</div>
                 <input
                   type="text"
+                  name="consultantName"
                   value={formData.consultantName}
-                  onChange={(e) => setFormData({ ...formData, consultantName: e.target.value })}
+                  onChange={handleChange}
                   placeholder="Sarah Chen"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.dateTime} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.dateTime)} />
               <div>
                 <div className="font-medium text-gray-900">When? (date & time)</div>
                 <input
                   type="datetime-local"
+                  name="dateTime"
                   value={formData.dateTime}
-                  onChange={(e) => setFormData({ ...formData, dateTime: e.target.value })}
+                  onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.mode} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.mode)} />
               <div>
                 <div className="font-medium text-gray-900">How are we meeting?</div>
                 <select
+                  name="mode"
                   value={formData.mode}
-                  onChange={(e) => setFormData({ ...formData, mode: e.target.value })}
+                  onChange={handleChange}
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 >
                   <option value="phone">Phone Call</option>
@@ -102,23 +124,24 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
                   <option value="inperson">In-Person</option>
                 </select>
               </div>
-            </label>
+            </div>
           </div>
 
           <div>
-            <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5" checked={!!formData.interviewer} readOnly />
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+              <StepIndicator completed={Boolean(formData.interviewer)} />
               <div>
                 <div className="font-medium text-gray-900">Who's interviewing?</div>
                 <input
                   type="text"
+                  name="interviewer"
                   value={formData.interviewer}
-                  onChange={(e) => setFormData({ ...formData, interviewer: e.target.value })}
+                  onChange={handleChange}
                   placeholder="John Smith"
                   className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
               </div>
-            </label>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-4">
