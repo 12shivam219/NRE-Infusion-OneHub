@@ -20,7 +20,7 @@ export const uploadDocument = async (
 
 
     if (uploadError) {
-      console.error('[UPLOAD] Upload error:', uploadError);
+      if (import.meta.env.DEV) console.error('[UPLOAD] Upload error:', uploadError);
       return { success: false, error: uploadError.message };
     }
 
@@ -40,13 +40,13 @@ export const uploadDocument = async (
       .single();
 
     if (dbError) {
-      console.error('[UPLOAD] DB error:', dbError);
+      if (import.meta.env.DEV) console.error('[UPLOAD] DB error:', dbError);
       return { success: false, error: dbError.message };
     }
 
     return { success: true, document };
   } catch (error) {
-    console.error('[UPLOAD] Exception:', error);
+    if (import.meta.env.DEV) console.error('[UPLOAD] Exception:', error);
     return { success: false, error: 'Upload failed' };
   }
 };
@@ -62,13 +62,13 @@ export const getDocuments = async (
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('[FETCH] Error:', error);
+      if (import.meta.env.DEV) console.error('[FETCH] Error:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true, documents: data || [] };
   } catch (error) {
-    console.error('[FETCH] Exception:', error);
+    if (import.meta.env.DEV) console.error('[FETCH] Exception:', error);
     return { success: false, error: 'Failed to fetch documents' };
   }
 };

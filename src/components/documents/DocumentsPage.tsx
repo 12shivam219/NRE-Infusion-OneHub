@@ -3,16 +3,23 @@ import { Upload, FileText, Download, Trash2, Edit, Grid2X2, Grid3X3 } from 'luci
 import { useAuth } from '../../hooks/useAuth';
 import { getDocuments, uploadDocument, deleteDocument, downloadDocument } from '../../lib/api/documents';
 import type { Database } from '../../lib/database.types';
+import { formatFileSize } from '../../lib/utils';
+import { useToast } from '../../contexts/ToastContext';
+import { DocumentEditor } from './DocumentEditor';
+
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
 export const DocumentsPage = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [editorLayout, setEditorLayout] = useState<'single' | '2x2' | '3x3'>('single');
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [documentsToEdit, setDocumentsToEdit] = useState<Document[]>([]);
 
   const loadDocuments = useCallback(async () => {
     if (!user) return;
@@ -20,9 +27,11 @@ export const DocumentsPage = () => {
     const result = await getDocuments(user.id);
     if (result.success && result.documents) {
       setDocuments(result.documents);
+    } else if (result.error) {
+      showToast({ type: 'error', title: 'Failed to load documents', message: result.error });
     }
     setLoading(false);
-  }, [user]);
+  }, [user, showToast]);
 
   useEffect(() => {
     loadDocuments();
@@ -40,12 +49,16 @@ export const DocumentsPage = () => {
         file.type === 'application/msword' ||
         file.type === 'application/pdf'
       ) {
-        await uploadDocument(file, user.id);
+        const result = await uploadDocument(file, user.id);
+        if (!result.success && result.error) {
+          showToast({ type: 'error', title: 'Upload failed', message: result.error });
+        }
       }
     }
 
     await loadDocuments();
     setUploading(false);
+    showToast({ type: 'success', title: 'Upload complete', message: 'Your document(s) have been uploaded.' });
   };
 
   const handleDelete = async (documentId: string) => {
@@ -54,6 +67,9 @@ export const DocumentsPage = () => {
     const result = await deleteDocument(documentId);
     if (result.success) {
       loadDocuments();
+      showToast({ type: 'success', title: 'Document deleted', message: 'The document has been removed.' });
+    } else if (result.error) {
+      showToast({ type: 'error', title: 'Failed to delete document', message: result.error });
     }
   };
 
@@ -61,6 +77,8 @@ export const DocumentsPage = () => {
     const result = await downloadDocument(document.storage_path);
     if (result.success && result.url) {
       window.open(result.url, '_blank');
+    } else if (result.error) {
+      showToast({ type: 'error', title: 'Failed to download document', message: result.error });
     }
   };
 
@@ -72,15 +90,28 @@ export const DocumentsPage = () => {
 
   const openEditor = () => {
     if (selectedDocs.length === 0) {
-      alert('Please select at least one document to edit');
+      showToast({
+        type: 'info',
+        title: 'No documents selected',
+        message: 'Please select at least one document to edit.',
+      });
       return;
     }
 
     const maxDocs = editorLayout === 'single' ? 1 : editorLayout === '2x2' ? 4 : 9;
     if (selectedDocs.length > maxDocs) {
-      alert(`Maximum ${maxDocs} documents can be edited in ${editorLayout} layout`);
+      showToast({
+        type: 'warning',
+        title: 'Too many documents selected',
+        message: `Maximum ${maxDocs} documents can be edited in ${editorLayout} layout.`,
+      });
       return;
     }
+
+    // Get the documents to edit
+    const docsToEdit = documents.filter((doc) => selectedDocs.includes(doc.id));
+    setDocumentsToEdit(docsToEdit);
+    setIsEditorOpen(true);
   };
 
   if (loading) {
@@ -207,7 +238,7 @@ export const DocumentsPage = () => {
                 Version {doc.version}
               </p>
               <p className="text-xs sm:text-sm text-gray-500 mb-4">
-                {(doc.file_size / 1024).toFixed(2)} KB
+                {formatFileSize(doc.file_size)}
               </p>
               <p className="text-xs text-gray-400 mb-4">
                 {new Date(doc.created_at).toLocaleDateString()}
@@ -237,6 +268,24 @@ export const DocumentsPage = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Document Editor Modal */}
+      {isEditorOpen && (
+        <DocumentEditor
+          documents={documentsToEdit}
+          layout={editorLayout}
+          onClose={() => {
+            setIsEditorOpen(false);
+            setSelectedDocs([]);
+            loadDocuments();
+          }}
+          onSave={async () => {
+            setIsEditorOpen(false);
+            setSelectedDocs([]);
+            await loadDocuments();
+          }}
+        />
       )}
     </div>
   );

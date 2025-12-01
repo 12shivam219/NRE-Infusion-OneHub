@@ -100,7 +100,7 @@ const AppContent = () => {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} currentPage={currentPage} />
 
         <main className="flex-1 overflow-y-auto">
           {currentPage === 'dashboard' && <Dashboard />}

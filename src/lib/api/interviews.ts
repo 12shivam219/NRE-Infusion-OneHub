@@ -4,9 +4,14 @@ import type { Database } from '../database.types';
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type InterviewInsert = Database['public']['Tables']['interviews']['Insert'];
 
+export interface InterviewWithLogs extends Interview {
+  created_by?: { id: string; full_name: string; email: string } | null;
+  updated_by?: { id: string; full_name: string; email: string } | null;
+}
+
 export const getInterviews = async (
   userId?: string
-): Promise<{ success: boolean; interviews?: Interview[]; error?: string }> => {
+): Promise<{ success: boolean; interviews?: InterviewWithLogs[]; error?: string }> => {
   try {
     let query = supabase
       .from('interviews')
@@ -29,13 +34,40 @@ export const getInterviews = async (
   }
 };
 
-export const createInterview = async (
-  interview: InterviewInsert
+export const getInterviewById = async (
+  id: string
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
     const { data, error } = await supabase
       .from('interviews')
-      .insert(interview)
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, interview: data };
+  } catch {
+    return { success: false, error: 'Failed to fetch interview' };
+  }
+};
+
+export const createInterview = async (
+  interview: InterviewInsert,
+  userId?: string
+): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
+  try {
+    const dataToInsert = {
+      ...interview,
+      created_by: userId || null,
+      updated_by: userId || null,
+    };
+
+    const { data, error } = await supabase
+      .from('interviews')
+      .insert(dataToInsert)
       .select()
       .single();
 
@@ -51,12 +83,19 @@ export const createInterview = async (
 
 export const updateInterview = async (
   id: string,
-  updates: Partial<InterviewInsert>
+  updates: Partial<InterviewInsert>,
+  userId?: string
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
+    const dataToUpdate = {
+      ...updates,
+      updated_at: new Date().toISOString(),
+      updated_by: userId || null,
+    };
+
     const { data, error } = await supabase
       .from('interviews')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(dataToUpdate)
       .eq('id', id)
       .select()
       .single();

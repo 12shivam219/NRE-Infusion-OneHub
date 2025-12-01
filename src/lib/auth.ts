@@ -108,7 +108,7 @@ export const register = async (
       .single();
 
     if (profileError) {
-      console.error('Profile creation error:', profileError);
+      if (import.meta.env.DEV) console.error('Profile creation error:', profileError);
       return { success: false, error: 'Failed to create user profile' };
     }
 
@@ -150,7 +150,7 @@ export const login = async (
     });
 
     if (signInError) {
-      console.error('Supabase Auth Error:', signInError);
+      if (import.meta.env.DEV) console.error('Supabase Auth Error:', signInError);
       // Log failed login attempt
       await logFailedLogin(email, clientIp, clientInfo, signInError.message || 'Invalid credentials');
       return { success: false, error: signInError.message || 'Invalid credentials' };
@@ -330,7 +330,7 @@ export const getFreshUserData = async (): Promise<User | null> => {
       .single();
 
     if (error || !userData) {
-      console.error('Error fetching fresh user data:', error);
+      if (import.meta.env.DEV) console.error('Error fetching fresh user data:', error);
       return null;
     }
 
@@ -348,7 +348,7 @@ export const getFreshUserData = async (): Promise<User | null> => {
     localStorage.setItem('user', JSON.stringify(user));
     return user;
   } catch (error) {
-    console.error('Exception fetching fresh user data:', error);
+    if (import.meta.env.DEV) console.error('Exception fetching fresh user data:', error);
     return null;
   }
 };

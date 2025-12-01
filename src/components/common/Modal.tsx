@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -10,6 +10,17 @@ interface ModalProps {
 }
 
 export const Modal = ({ isOpen, onClose, title, children, size = 'md' }: ModalProps) => {
+  useEffect(() => {
+    if (isOpen) {
+      // Lock scroll when modal is open
+      document.body.style.overflow = 'hidden';
+      return () => {
+        // Unlock scroll when modal closes
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const sizeClasses = {

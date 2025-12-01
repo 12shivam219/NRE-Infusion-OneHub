@@ -82,11 +82,11 @@ const logAdminAction = async (
 
     const { error } = await supabase.from('activity_logs').insert(payload as ActivityLogInsert);
     if (error) {
-      console.error('Activity log error:', error);
+      if (import.meta.env.DEV) console.error('Activity log error:', error);
     }
   } catch (error) {
     // Logging failures should not interrupt primary flows
-    console.error('Activity log exception:', error);
+    if (import.meta.env.DEV) console.error('Activity log exception:', error);
   }
 };
 
@@ -94,9 +94,9 @@ const ensureAdminDemotionAllowed = async (
   userId: string,
   nextRole: UserRole
 ): Promise<{ allowed: boolean; error?: string }> => {
-  console.log('[RLS GUARD] ensureAdminDemotionAllowed start', { userId, nextRole });
+  if (import.meta.env.DEV) console.log('[RLS GUARD] ensureAdminDemotionAllowed start', { userId, nextRole });
   if (nextRole === 'admin') {
-    console.log('[RLS GUARD] nextRole is admin -> allowed');
+    if (import.meta.env.DEV) console.log('[RLS GUARD] nextRole is admin -> allowed');
     return { allowed: true };
   }
 
@@ -107,7 +107,7 @@ const ensureAdminDemotionAllowed = async (
     .maybeSingle();
 
   if (userError) {
-    console.error('[RLS GUARD] failed to lookup target user role', { userId, error: userError });
+    if (import.meta.env.DEV) console.error('[RLS GUARD] failed to lookup target user role', { userId, error: userError });
     return { allowed: false, error: userError.message };
   }
 
@@ -123,16 +123,16 @@ const ensureAdminDemotionAllowed = async (
     .eq('role', 'admin');
 
   if (countError) {
-    console.error('[RLS GUARD] failed to count admin users', { error: countError });
+    if (import.meta.env.DEV) console.error('[RLS GUARD] failed to count admin users', { error: countError });
     return { allowed: false, error: countError.message };
   }
 
   if ((count ?? 0) <= 1) {
-    console.warn('[RLS GUARD] attempt to remove last admin blocked', { adminCount: count });
+    if (import.meta.env.DEV) console.warn('[RLS GUARD] attempt to remove last admin blocked', { adminCount: count });
     return { allowed: false, error: 'Cannot remove the last remaining admin' };
   }
 
-  console.log('[RLS GUARD] demotion allowed');
+  if (import.meta.env.DEV) console.log('[RLS GUARD] demotion allowed');
   return { allowed: true };
 };
 
@@ -174,7 +174,7 @@ export const updateUserStatus = async (
       .eq('id', userId);
 
     if (error) {
-      console.error('[STATUS UPDATE] Full error:', {
+      if (import.meta.env.DEV) console.error('[STATUS UPDATE] Full error:', {
         message: error.message,
         code: error.code,
         details: (error as any).details,
@@ -195,7 +195,7 @@ export const updateUserStatus = async (
 
     return { success: true };
   } catch (error) {
-    console.error('[DB] Update user status exception:', error);
+    if (import.meta.env.DEV) console.error('[DB] Update user status exception:', error);
     return { success: false, error: 'Failed to update user status' };
   }
 };
@@ -206,11 +206,11 @@ export const updateUserRole = async (
   options?: { adminId?: string }
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    console.log('[ROLE UPDATE] start', { userId, role, adminId: options?.adminId });
+    if (import.meta.env.DEV) console.log('[ROLE UPDATE] start', { userId, role, adminId: options?.adminId });
     const guard = await ensureAdminDemotionAllowed(userId, role);
-    console.log('[ROLE UPDATE] demotion guard result', { guard });
+    if (import.meta.env.DEV) console.log('[ROLE UPDATE] demotion guard result', { guard });
     if (!guard.allowed) {
-      console.error('[ROLE UPDATE] guard blocked role change', { userId, role, guard });
+      if (import.meta.env.DEV) console.error('[ROLE UPDATE] guard blocked role change', { userId, role, guard });
       return { success: false, error: guard.error || 'Admin safety check failed' };
     }
 
@@ -224,10 +224,10 @@ export const updateUserRole = async (
       .update(updatePayload)
       .eq('id', userId);
 
-    console.log('[ROLE UPDATE] supabase update response', { data, error });
+    if (import.meta.env.DEV) console.log('[ROLE UPDATE] supabase update response', { data, error });
 
     if (error) {
-      console.error('[ROLE UPDATE] Full error:', {
+      if (import.meta.env.DEV) console.error('[ROLE UPDATE] Full error:', {
         message: error.message,
         code: error.code,
         details: (error as any).details,
@@ -243,11 +243,11 @@ export const updateUserRole = async (
       details: { role },
     });
 
-    console.log('[ROLE UPDATE] completed successfully', { userId, role });
+    if (import.meta.env.DEV) console.log('[ROLE UPDATE] completed successfully', { userId, role });
 
     return { success: true };
   } catch {
-    console.error('[ROLE UPDATE] exception thrown during update', { userId, role });
+    if (import.meta.env.DEV) console.error('[ROLE UPDATE] exception thrown during update', { userId, role });
     return { success: false, error: 'Failed to update user role' };
   }
 };

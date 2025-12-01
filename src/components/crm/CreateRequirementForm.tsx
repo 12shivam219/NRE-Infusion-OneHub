@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { createRequirement } from '../../lib/api/requirements';
+import { createRequirement, getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
+import { findSimilarRequirements } from '../../lib/requirementUtils';
 import type { Database } from '../../lib/database.types';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
@@ -93,12 +94,15 @@ const FormSection = ({ title, children }: { title: string; children: React.React
 export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementFormProps) => {
   const { user } = useAuth();
   const [consultants, setConsultants] = useState<Consultant[]>([]);
+  const [allRequirements, setAllRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [loading, setLoading] = useState(false);
+  const [similarRequirements, setSimilarRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
 
   const [formData, setFormData] = useState({
     title: '',
     company: '',
     status: 'NEW' as const,
+    priority: 'medium' as const,
     consultant_id: '',
     applied_for: '',
     rate: '',
@@ -121,7 +125,16 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prevState => ({ ...prevState, [name]: value }));
-  }, []);
+    
+    // Check for similar requirements whenever company or tech stack changes
+    if (name === 'company' || name === 'primary_tech_stack' || name === 'title') {
+      const similar = findSimilarRequirements(
+        { title: formData.title, company: formData.company, primary_tech_stack: formData.primary_tech_stack },
+        allRequirements
+      );
+      setSimilarRequirements(similar);
+    }
+  }, [formData, allRequirements]);
 
   const loadConsultants = useCallback(async () => {
     if (!user) return;
@@ -131,9 +144,18 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
     }
   }, [user]);
 
+  const loadRequirements = useCallback(async () => {
+    if (!user) return;
+    const result = await getRequirements(user.id);
+    if (result.success && result.requirements) {
+      setAllRequirements(result.requirements);
+    }
+  }, [user]);
+
   useEffect(() => {
     loadConsultants();
-  }, [loadConsultants]);
+    loadRequirements();
+  }, [loadConsultants, loadRequirements]);
 
   const consultantOptions = useMemo(
     () => consultants.map(c => ({ label: c.name, value: c.id })),
@@ -150,6 +172,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
       title: formData.title,
       company: formData.company,
       status: formData.status,
+      priority: formData.priority,
       consultant_id: formData.consultant_id || null,
       applied_for: formData.applied_for || null,
       rate: formData.rate || null,
@@ -167,7 +190,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
       remote: formData.remote || null,
       duration: formData.duration || null,
       location: formData.location || null,
-      priority: 'medium',
     });
 
     setLoading(false);
@@ -190,6 +212,19 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {/* Similar Requirements Warning */}
+          {similarRequirements.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-900 mb-1">Similar Requirements Found</p>
+                <p className="text-sm text-yellow-800">
+                  We found {similarRequirements.length} similar requirement(s) already in your system. Consider reviewing them before creating a new one.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Core Details */}
           <FormSection title="Core Details">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -222,6 +257,18 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                   { label: 'Interview', value: 'INTERVIEW' },
                   { label: 'Offer', value: 'OFFER' },
                   { label: 'Closed', value: 'CLOSED' },
+                ]}
+              />
+              <FormField
+                label="What's the priority level?"
+                name="priority"
+                type="select"
+                value={formData.priority}
+                onChange={handleChange}
+                options={[
+                  { label: '🔴 High', value: 'high' },
+                  { label: '🟡 Medium', value: 'medium' },
+                  { label: '🟢 Low', value: 'low' },
                 ]}
               />
               <FormField

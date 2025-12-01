@@ -38,6 +38,7 @@ import {
 } from '../../lib/api/admin';
 import type { Database, UserRole, UserStatus, ErrorStatus } from '../../lib/database.types';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../contexts/ToastContext';
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -146,6 +147,7 @@ const getUserOriginIp = (user: User) => {
 export const AdminPage = () => {
   const { user: currentAdmin, isAdmin } = useAuth();
   const adminId = currentAdmin?.id ?? null;
+  const { showToast } = useToast();
 
   if (!isAdmin) {
     return (
@@ -209,7 +211,7 @@ export const AdminPage = () => {
     if (result.success && result.users) {
       setUsers(result.users);
     } else if (result.error) {
-      alert(`Failed to load users: ${result.error}`);
+      showToast({ type: 'error', title: 'Failed to load users', message: result.error });
     }
     setUsersLoading(false);
   }, []);
@@ -224,7 +226,11 @@ export const AdminPage = () => {
     if (queueResult.success && queueResult.users) {
       setApprovals(queueResult.users);
     } else if (queueResult.error) {
-      alert(`Failed to load pending approvals: ${queueResult.error}`);
+      showToast({
+        type: 'error',
+        title: 'Failed to load pending approvals',
+        message: queueResult.error,
+      });
     }
 
     if (statsResult.success && statsResult.stats) {
@@ -242,7 +248,11 @@ export const AdminPage = () => {
     if (result.success && result.events) {
       setSecurityEvents(result.events);
     } else if (result.error) {
-      alert(`Failed to load security events: ${result.error}`);
+      showToast({
+        type: 'error',
+        title: 'Failed to load security events',
+        message: result.error,
+      });
     }
     setSecurityLoading(false);
   }, []);
@@ -256,6 +266,11 @@ export const AdminPage = () => {
     } else if (result.error) {
       setErrors([]);
       setErrorsError(result.error);
+      showToast({
+        type: 'error',
+        title: 'Failed to load error reports',
+        message: result.error,
+      });
     }
     setErrorsLoading(false);
   }, []);
@@ -298,13 +313,21 @@ export const AdminPage = () => {
     if (sessionsResult.success && sessionsResult.sessions) {
       setUserSessions(sessionsResult.sessions);
     } else if (sessionsResult.error) {
-      alert(`Failed to load user sessions: ${sessionsResult.error}`);
+      showToast({
+        type: 'error',
+        title: 'Failed to load user sessions',
+        message: sessionsResult.error,
+      });
     }
 
     if (historyResult.success && historyResult.history) {
       setUserLoginHistory(historyResult.history);
     } else if (historyResult.error) {
-      alert(`Failed to load user login history: ${historyResult.error}`);
+      showToast({
+        type: 'error',
+        title: 'Failed to load user login history',
+        message: historyResult.error,
+      });
     }
 
     setUserDetailLoading(false);
@@ -466,7 +489,7 @@ export const AdminPage = () => {
       console.log('[UI] updateUserRole result', { result });
       if (!result.success && result.error) {
         console.error('[UI] updateUserRole error', { error: result.error });
-        alert(result.error);
+        showToast({ type: 'error', title: 'Failed to update role', message: result.error });
       }
     } catch (err) {
       console.error('[UI] handleUserRoleChange exception', { err });
@@ -485,9 +508,10 @@ export const AdminPage = () => {
     console.log(`[APPROVAL] Result:`, result);
     if (!result.success && result.error) {
       console.error(`[APPROVAL] Error occurred:`, result.error);
-      alert(result.error);
+      showToast({ type: 'error', title: 'Failed to update user status', message: result.error });
     } else if (result.success) {
-      console.log(`[APPROVAL] Success! User approved.`);
+      console.log(`[APPROVAL] Success! User approval updated.`);
+      showToast({ type: 'success', title: 'User status updated', message: `Status set to ${status.replace('_', ' ')}` });
     }
     await loadUsers();
     if (activeTab === 'approvals') {
@@ -513,7 +537,17 @@ export const AdminPage = () => {
     );
     const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error);
     if (failures.length > 0) {
-      alert(`Some approvals failed:\n${failures.join('\n')}`);
+      showToast({
+        type: 'error',
+        title: 'Some approvals failed',
+        message: failures.join('\n'),
+      });
+    } else if (selectedApprovals.length > 0) {
+      showToast({
+        type: 'success',
+        title: 'Users approved',
+        message: `${selectedApprovals.length} account(s) approved`,
+      });
     }
     setSelectedApprovals([]);
     await loadUsers();
@@ -533,7 +567,17 @@ export const AdminPage = () => {
     );
     const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error);
     if (failures.length > 0) {
-      alert(`Some rejections failed:\n${failures.join('\n')}`);
+      showToast({
+        type: 'error',
+        title: 'Some rejections failed',
+        message: failures.join('\n'),
+      });
+    } else if (selectedApprovals.length > 0) {
+      showToast({
+        type: 'success',
+        title: 'Users rejected',
+        message: `${selectedApprovals.length} account(s) rejected`,
+      });
     }
     setSelectedApprovals([]);
     await loadUsers();
@@ -561,7 +605,9 @@ export const AdminPage = () => {
       targetUserId: userId,
     });
     if (!result.success && result.error) {
-      alert(result.error);
+      showToast({ type: 'error', title: 'Failed to revoke session', message: result.error });
+    } else {
+      showToast({ type: 'success', title: 'Session revoked', message: 'The selected session was revoked.' });
     }
     if (selectedUser) {
       await loadUserContext(selectedUser);
@@ -575,7 +621,9 @@ export const AdminPage = () => {
     setForceLogoutLoading(true);
     const result = await forceLogoutUserSessions(selectedUser.id, { adminId: adminId ?? undefined });
     if (!result.success && result.error) {
-      alert(result.error);
+      showToast({ type: 'error', title: 'Failed to force logout', message: result.error });
+    } else {
+      showToast({ type: 'success', title: 'User logged out', message: 'All active sessions were revoked.' });
     }
     await loadUserContext(selectedUser);
     setForceLogoutLoading(false);
@@ -585,7 +633,7 @@ export const AdminPage = () => {
     if (!userId) return;
     const user = userMap.get(userId);
     if (!user) {
-      alert('User record not available.');
+      showToast({ type: 'error', title: 'User not found', message: 'User record not available for this event.' });
       return;
     }
     await handleOpenUser(user, loginId);
@@ -606,7 +654,9 @@ export const AdminPage = () => {
   const handleUpdateErrorStatus = async (errorId: string, status: ErrorStatus) => {
     const result = await updateErrorStatus(errorId, status, { adminId: adminId ?? undefined });
     if (!result.success && result.error) {
-      alert(result.error);
+      showToast({ type: 'error', title: 'Failed to update error status', message: result.error });
+    } else {
+      showToast({ type: 'success', title: 'Error status updated', message: `Status set to ${status}` });
     }
     await loadErrors();
     await loadErrorDetails(errorId);
@@ -618,7 +668,9 @@ export const AdminPage = () => {
       adminId: adminId ?? undefined,
     });
     if (!result.success && result.error) {
-      alert(result.error);
+      showToast({ type: 'error', title: 'Failed to add note', message: result.error });
+    } else {
+      showToast({ type: 'success', title: 'Note added', message: 'Your note was added to the error.' });
     }
     setErrorNoteDraft('');
     await loadErrorDetails(selectedError.id);
@@ -628,9 +680,13 @@ export const AdminPage = () => {
     if (!selectedError) return;
     const result = await retryErrorAction(selectedError.id, { adminId: adminId ?? undefined });
     if (!result.success && result.error) {
-      alert(result.error);
+      showToast({ type: 'error', title: 'Failed to trigger retry', message: result.error });
     } else {
-      alert('Retry triggered. Monitor logs for updates.');
+      showToast({
+        type: 'info',
+        title: 'Retry triggered',
+        message: 'A retry was requested. Monitor logs or error status for updates.',
+      });
     }
   };
 
@@ -650,8 +706,10 @@ export const AdminPage = () => {
     });
     if (!result.success && result.error) {
       setAttachmentUploadError(result.error);
+      showToast({ type: 'error', title: 'Failed to upload attachment', message: result.error });
     } else {
       await loadErrorDetails(selectedError.id);
+      showToast({ type: 'success', title: 'Attachment uploaded', message: 'Your file was attached to the error.' });
     }
     setAttachmentUploading(false);
     event.target.value = '';

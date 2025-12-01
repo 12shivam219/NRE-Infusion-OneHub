@@ -1,31 +1,45 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Trash2, Plus } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getInterviews, updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import type { Database } from '../../lib/database.types';
+import { useToast } from '../../contexts/ToastContext';
+import InterviewCard from './InterviewCard';
+import { InterviewDetailModal } from './InterviewDetailModal';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 
-const interviewStatusColors: Record<string, string> = {
-  'Confirmed': 'bg-green-100 text-green-800',
-  'Pending': 'bg-yellow-100 text-yellow-800',
-  'Completed': 'bg-blue-100 text-blue-800',
-  'Cancelled': 'bg-red-100 text-red-800',
-  'Re-Scheduled': 'bg-purple-100 text-purple-800',
+const interviewStatusColors: Record<string, { badge: string; dot: string }> = {
+  'Confirmed': { badge: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
+  'Pending': { badge: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
+  'Scheduled': { badge: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
+  'Completed': { badge: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
+  'Cancelled': { badge: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
+  'Re-Scheduled': { badge: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
 };
+
+const ITEMS_PER_PAGE = 12;
 
 interface InterviewTrackingProps {
   onQuickAdd?: () => void;
 }
 
 export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const { showToast } = useToast();
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
+  const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
+  const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -33,30 +47,62 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
     const interviewsResult = await getInterviews(user.id);
     if (interviewsResult.success && interviewsResult.interviews) {
       setInterviews(interviewsResult.interviews);
+    } else if (interviewsResult.error) {
+      showToast({ type: 'error', title: 'Failed to load interviews', message: interviewsResult.error });
     }
     
     const reqResult = await getRequirements(user.id);
     if (reqResult.success && reqResult.requirements) {
       setRequirements(reqResult.requirements);
+    } else if (reqResult.error) {
+      showToast({ type: 'error', title: 'Failed to load requirements', message: reqResult.error });
     }
     setLoading(false);
-  }, [user]);
+    setCurrentPage(1);
+  }, [user, showToast]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (confirm('Are you sure you want to delete this interview?')) {
-      await deleteInterview(id);
-      await loadData();
+    if (!isAdmin) {
+      showToast({
+        type: 'error',
+        title: 'Permission denied',
+        message: 'Only admins can delete interviews.',
+      });
+      return;
     }
-  }, [loadData]);
+
+    if (confirm('Are you sure you want to delete this interview?')) {
+      const result = await deleteInterview(id);
+      if (result.success) {
+        await loadData();
+        showToast({ type: 'success', title: 'Interview deleted', message: 'The interview has been removed.' });
+      } else if (result.error) {
+        showToast({ type: 'error', title: 'Failed to delete interview', message: result.error });
+      }
+    }
+  }, [loadData, isAdmin, showToast]);
 
   const handleStatusChange = useCallback(async (id: string, status: string) => {
-    await updateInterview(id, { status });
-    await loadData();
-  }, [loadData]);
+    if (!user) return;
+    const result = await updateInterview(id, { status }, user.id);
+    if (result.success) {
+      await loadData();
+      showToast({ type: 'success', title: 'Status updated', message: `Interview marked as ${status}` });
+    } else if (result.error) {
+      showToast({ type: 'error', title: 'Failed to update interview', message: result.error });
+    }
+  }, [loadData, user, showToast]);
+
+  const handleViewDetails = (interview: Interview) => {
+    setSelectedInterview(interview);
+    // These fields will be added when database is updated
+    setSelectedCreatedBy((interview as unknown as { created_by?: string }).created_by || null);
+    setSelectedUpdatedBy((interview as unknown as { updated_by?: string }).updated_by || null);
+  };
 
   const getRequirementTitle = (requirementId: string) => {
     const req = requirements.find(r => r.id === requirementId);
@@ -64,18 +110,72 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
   };
 
   const filterInterviews = (status: string) => {
-    if (status === 'all') return interviews;
-    return interviews.filter(i => {
-      const lowerStatus = i.status.toLowerCase();
-      return lowerStatus.includes(status.toLowerCase());
-    });
+    let filtered = status === 'all' 
+      ? interviews 
+      : interviews.filter(i => {
+          const lowerStatus = i.status.toLowerCase();
+          return lowerStatus.includes(status.toLowerCase());
+        });
+
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(i => {
+        const candidateName = i.interview_with?.toLowerCase() || '';
+        const requirementInfo = getRequirementTitle(i.requirement_id).toLowerCase();
+        const company = requirementInfo.split(' - ')[1]?.toLowerCase() || '';
+        return candidateName.includes(term) || requirementInfo.includes(term) || company.includes(term);
+      });
+    }
+
+    if (filterDateFrom || filterDateTo) {
+      filtered = filtered.filter(i => {
+        const interviewDate = new Date(i.scheduled_date).getTime();
+        const fromDate = filterDateFrom ? new Date(filterDateFrom).getTime() : 0;
+        const toDate = filterDateTo ? new Date(filterDateTo).getTime() + 86400000 : Infinity;
+        return interviewDate >= fromDate && interviewDate <= toDate;
+      });
+    }
+
+    return filtered;
+  };
+
+  const filteredInterviews = filterInterviews(activeTab);
+  const totalPages = Math.ceil(filteredInterviews.length / ITEMS_PER_PAGE);
+  const paginatedInterviews = filteredInterviews.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading interviews...</div>;
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <p className="text-gray-500">Loading interviews...</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-sm overflow-hidden animate-pulse h-96">
+              <div className="h-24 bg-gradient-to-r from-gray-300 to-gray-200" />
+              <div className="p-4 space-y-3">
+                <div className="h-3 bg-gray-200 rounded w-3/4" />
+                <div className="h-3 bg-gray-200 rounded w-1/2" />
+                <div className="h-20 bg-gray-100 rounded" />
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded" />
+                  <div className="h-3 bg-gray-200 rounded w-5/6" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
-
-  const filteredInterviews = filterInterviews(activeTab);
 
   const tabs = [
     { id: 'all', label: 'All Interviews', count: interviews.length },
@@ -98,13 +198,77 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
         </button>
       </div>
 
-      {/* Tabs */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search Candidate or Company</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={(e) => {
+                setFilterDateFrom(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={(e) => {
+                setFilterDateTo(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {(searchTerm || filterDateFrom || filterDateTo) && (
+          <button
+            onClick={() => {
+              setSearchTerm('');
+              setFilterDateFrom('');
+              setFilterDateTo('');
+              setCurrentPage(1);
+            }}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition"
+          >
+            <X className="w-4 h-4" />
+            Clear Filters
+          </button>
+        )}
+      </div>
+
       <div className="border-b border-gray-200 overflow-x-auto">
         <div className="flex gap-4 sm:gap-8 min-w-full sm:min-w-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setCurrentPage(1);
+              }}
               className={`py-3 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition ${
                 activeTab === tab.id
                   ? 'border-blue-600 text-blue-600'
@@ -118,122 +282,84 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
         </div>
       </div>
 
-      {/* Interviews List */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {filteredInterviews.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No interviews found in this category</p>
+          <div className="text-center py-8 sm:py-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+            <p className="text-sm sm:text-base text-gray-500 font-medium">No interviews found in this category</p>
           </div>
         ) : (
-          filteredInterviews.map(interview => (
-            <div
-              key={interview.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-md transition"
-            >
-              <div className="flex flex-col sm:flex-row items-start justify-between mb-4 gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
-                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
-                      {getRequirementTitle(interview.requirement_id)}
-                    </h3>
-                    <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap ${interviewStatusColors[interview.status] || 'bg-gray-100 text-gray-800'}`}>
-                      {interview.status}
-                    </span>
-                  </div>
-                  {interview.subject_line && (
-                    <p className="text-xs sm:text-sm text-gray-600 truncate">{interview.subject_line}</p>
-                  )}
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+              {paginatedInterviews.map(interview => (
+                <div key={interview.id} onClick={() => handleViewDetails(interview)} className="cursor-pointer">
+                  <InterviewCard
+                    interview={interview}
+                    requirementTitle={getRequirementTitle(interview.requirement_id)}
+                    statusColor={interviewStatusColors[interview.status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                  />
                 </div>
-
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <select
-                    value={interview.status}
-                    onChange={(e) => handleStatusChange(interview.id, e.target.value)}
-                    className="flex-1 sm:flex-none px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg"
-                  >
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="Re-Scheduled">Re-Scheduled</option>
-                  </select>
-                  <button
-                    onClick={() => handleDelete(interview.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Date/Time and Meeting Details */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 py-4 border-t border-b border-gray-100">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Date & Time</p>
-                  <p className="text-xs sm:text-sm font-medium text-gray-900">
-                    {new Date(interview.scheduled_date).toLocaleDateString()} 
-                    {interview.scheduled_time && ` at ${interview.scheduled_time}`}
-                  </p>
-                  {interview.timezone && <p className="text-xs text-gray-500 mt-1">{interview.timezone}</p>}
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Interview Details</p>
-                  <p className="text-xs sm:text-sm font-medium text-gray-900">
-                    {interview.round || 'Round'} • {interview.mode || 'Mode'} • {interview.type || 'Type'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide">Duration</p>
-                  <p className="text-xs sm:text-sm font-medium text-gray-900">{interview.duration_minutes || 60} mins</p>
-                </div>
-              </div>
-
-              {/* Participants & Location */}
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4 py-4 border-b border-gray-100">
-                {interview.interviewer && (
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Interviewer</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{interview.interviewer}</p>
-                  </div>
-                )}
-                {interview.interview_with && (
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Interview With</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{interview.interview_with}</p>
-                  </div>
-                )}
-                {interview.location && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide">Location / Link</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 break-all">{interview.location}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Additional Info */}
-              <div className="mt-4 space-y-2">
-                {interview.vendor_company && (
-                  <p className="text-xs sm:text-sm text-gray-600 truncate">Vendor: <span className="font-medium">{interview.vendor_company}</span></p>
-                )}
-                {interview.result && (
-                  <p className="text-xs sm:text-sm text-gray-600 truncate">Result: <span className="font-medium">{interview.result}</span></p>
-                )}
-                {interview.interview_focus && (
-                  <p className="text-xs sm:text-sm text-gray-600 truncate">Focus: <span className="font-medium">{interview.interview_focus}</span></p>
-                )}
-              </div>
-
-              {/* Feedback Notes */}
-              {interview.feedback_notes && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                  <p className="text-xs text-blue-700 uppercase tracking-wide font-medium mb-1">Feedback Notes</p>
-                  <p className="text-xs sm:text-sm text-blue-900 line-clamp-2">{interview.feedback_notes}</p>
-                </div>
-              )}
+              ))}
             </div>
-          ))
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm font-semibold border border-gray-300 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    const page = currentPage <= 3 ? i + 1 : currentPage - 2 + i;
+                    if (page > totalPages) return null;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg font-semibold transition ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-300 bg-white hover:bg-gray-50 text-gray-900'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm font-semibold border border-gray-300 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+
+            {totalPages > 1 && (
+              <div className="text-center text-xs sm:text-sm text-gray-600 mt-4">
+                Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredInterviews.length)} of {filteredInterviews.length} interviews ({totalPages} page{totalPages !== 1 ? 's' : ''})
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      <InterviewDetailModal
+        isOpen={selectedInterview !== null}
+        interview={selectedInterview}
+        onClose={() => setSelectedInterview(null)}
+        onUpdate={loadData}
+        createdBy={selectedCreatedBy}
+        updatedBy={selectedUpdatedBy}
+      />
     </div>
   );
 };

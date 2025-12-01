@@ -1,48 +1,40 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { Bell, Menu } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getNotifications, getUnreadCount, markAsRead } from '../../lib/api/notifications';
-import type { Database } from '../../lib/database.types';
+import { useNotifications } from '../../hooks/useNotifications';
 
-type Notification = Database['public']['Tables']['notifications']['Row'];
+type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
 
 interface HeaderProps {
   onMenuClick?: () => void;
+  currentPage?: AppPage;
 }
 
-export const Header = ({ onMenuClick }: HeaderProps) => {
+const getPageTitle = (page?: AppPage) => {
+  switch (page) {
+    case 'documents':
+      return 'Resume Editor';
+    case 'crm':
+      return 'Marketing & CRM';
+    case 'admin':
+      return 'Admin Panel';
+    case 'dashboard':
+    default:
+      return 'Dashboard';
+  }
+};
+
+export const Header = ({ onMenuClick, currentPage }: HeaderProps) => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { notifications, unreadCount, markAsRead } = useNotifications();
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const loadNotifications = useCallback(async () => {
-    if (!user) return;
-    const result = await getNotifications(user.id);
-    if (result.success && result.notifications) {
-      setNotifications(result.notifications.slice(0, 5));
-    }
-  }, [user]);
+  const title = getPageTitle(currentPage);
 
-  const loadUnreadCount = useCallback(async () => {
-    if (!user) return;
-    const result = await getUnreadCount(user.id);
-    if (result.success && result.count !== undefined) {
-      setUnreadCount(result.count);
+  const handleNotificationClick = (notificationId: string, alreadyRead: boolean) => {
+    if (!alreadyRead) {
+      void markAsRead(notificationId);
     }
-  }, [user]);
-
-  useEffect(() => {
-    if (user) {
-      loadNotifications();
-      loadUnreadCount();
-    }
-  }, [user, loadNotifications, loadUnreadCount]);
-
-  const handleMarkAsRead = async (notificationId: string) => {
-    await markAsRead(notificationId);
-    loadNotifications();
-    loadUnreadCount();
   };
 
   return (
@@ -56,7 +48,14 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           >
             <Menu className="w-6 h-6 text-gray-600" />
           </button>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h2>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
+            {user && (
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                Signed in as <span className="font-medium">{user.full_name}</span>
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
@@ -85,14 +84,10 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                       No notifications
                     </div>
                   ) : (
-                    notifications.map((notification) => (
+                    notifications.slice(0, 5).map((notification) => (
                       <div
                         key={notification.id}
-                        onClick={() => {
-                          if (!notification.read) {
-                            handleMarkAsRead(notification.id);
-                          }
-                        }}
+                        onClick={() => handleNotificationClick(notification.id, notification.read)}
                         className={`p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition ${
                           !notification.read ? 'bg-blue-50' : ''
                         }`}
@@ -102,7 +97,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                             {notification.title}
                           </h4>
                           {!notification.read && (
-                            <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1"></span>
+                            <span className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1" />
                           )}
                         </div>
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../contexts/ToastContext';
 import { createInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
+import { validateInterviewForm, getAllInterviewStatuses } from '../../lib/interviewValidation';
 import type { Database } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -37,7 +39,8 @@ const FormField = memo(function FormField({
   required = false,
   readOnly = false,
   options,
-}: FormFieldProps) {
+  error,
+}: FormFieldProps & { error?: string }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -50,7 +53,9 @@ const FormField = memo(function FormField({
           value={value}
           onChange={onChange}
           disabled={readOnly}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
+            error ? 'border-red-500' : 'border-gray-300'
+          }`}
         >
           <option value="">Select {label.toLowerCase()}</option>
           {options?.map((opt: FormFieldOption) => (
@@ -67,7 +72,9 @@ const FormField = memo(function FormField({
           placeholder={placeholder}
           readOnly={readOnly}
           rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
+            error ? 'border-red-500' : 'border-gray-300'
+          }`}
         />
       ) : (
         <input
@@ -78,8 +85,16 @@ const FormField = memo(function FormField({
           placeholder={placeholder}
           required={required}
           readOnly={readOnly}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
+            error ? 'border-red-500' : 'border-gray-300'
+          }`}
         />
+      )}
+      {error && (
+        <div className="flex items-center gap-2 mt-1 text-red-600 text-sm">
+          <AlertCircle className="w-4 h-4" />
+          <span>{error}</span>
+        </div>
       )}
     </div>
   );
@@ -100,9 +115,11 @@ const FormSection = ({ title, children }: { title: string; children: React.React
 
 export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: CreateInterviewFormProps) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     requirement_id: requirementId || '',
@@ -180,6 +197,25 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
     e.preventDefault();
     if (!user) return;
 
+    // Validate form data
+    const validation = validateInterviewForm({
+      requirement_id: formData.requirement_id,
+      scheduled_date: formData.scheduled_date,
+      scheduled_time: formData.scheduled_time,
+      interview_with: formData.interview_with,
+    });
+
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      showToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please fix the errors below',
+      });
+      return;
+    }
+
+    setFormErrors({});
     setLoading(true);
     const result = await createInterview({
       user_id: user.id,
@@ -208,7 +244,18 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
 
     setLoading(false);
     if (result.success) {
+      showToast({
+        type: 'success',
+        title: 'Interview Scheduled',
+        message: 'The interview has been created successfully',
+      });
       onSuccess();
+    } else if (result.error) {
+      showToast({
+        type: 'error',
+        title: 'Failed to Schedule',
+        message: result.error,
+      });
     }
   };
 
@@ -237,6 +284,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 onChange={handleChange}
                 options={requirementOptions}
                 required
+                error={formErrors.requirement_id}
               />
               <FormField
                 label="Interview Date"
@@ -245,6 +293,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 value={formData.scheduled_date}
                 onChange={handleChange}
                 required
+                error={formErrors.scheduled_date}
               />
               <FormField
                 label="Interview Time"
@@ -294,14 +343,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 type="select"
                 value={formData.status}
                 onChange={handleChange}
-                options={[
-                  { label: 'Scheduled', value: 'Scheduled' },
-                  { label: 'Confirmed', value: 'Confirmed' },
-                  { label: 'Completed', value: 'Completed' },
-                  { label: 'Cancelled', value: 'Cancelled' },
-                  { label: 'Rescheduled', value: 'Rescheduled' },
-                  { label: 'No Show', value: 'No Show' },
-                ]}
+                options={getAllInterviewStatuses()}
               />
               <FormField
                 label="Consultant"
@@ -324,6 +366,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 placeholder="Candidate name"
                 value={formData.interview_with}
                 onChange={handleChange}
+                error={formErrors.interview_with}
               />
               <FormField
                 label="Result (optional)"

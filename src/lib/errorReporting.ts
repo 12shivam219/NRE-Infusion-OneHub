@@ -1,10 +1,28 @@
 import { supabase } from './supabase';
 
+// Simple client-side rate limiting so a single bug cannot spam the error_reports table.
+const ERROR_RATE_LIMIT = 10; // max errors per window per tab
+const ERROR_WINDOW_MS = 60_000; // 1 minute
+const errorTimestamps: number[] = [];
+
 export const reportError = async (
   error: Error,
   userId?: string
 ): Promise<void> => {
   try {
+    const now = Date.now();
+    // Keep only timestamps within the current window
+    const recent = errorTimestamps.filter((ts) => now - ts < ERROR_WINDOW_MS);
+    recent.push(now);
+    errorTimestamps.length = 0;
+    errorTimestamps.push(...recent);
+
+    if (recent.length > ERROR_RATE_LIMIT) {
+      // Too many errors in a short time; log locally but skip remote insert.
+      if (import.meta.env.DEV) console.warn('Error reporting throttled to protect backend');
+      return;
+    }
+
     await supabase.from('error_reports').insert({
       user_id: userId || null,
       error_message: error.message,
@@ -15,7 +33,7 @@ export const reportError = async (
       status: 'new',
     });
   } catch (reportingError) {
-    console.error('Failed to report error:', reportingError);
+    if (import.meta.env.DEV) console.error('Failed to report error:', reportingError);
   }
 };
 
