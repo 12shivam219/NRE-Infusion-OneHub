@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { X, AlertCircle, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { createInterview } from '../../lib/api/interviews';
@@ -26,6 +26,7 @@ interface FormFieldProps {
   required?: boolean;
   readOnly?: boolean;
   options?: FormFieldOption[];
+  error?: string;
 }
 
 // Create FormField component outside the parent component for stability
@@ -40,7 +41,7 @@ const FormField = memo(function FormField({
   readOnly = false,
   options,
   error,
-}: FormFieldProps & { error?: string }) {
+}: FormFieldProps) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -54,7 +55,7 @@ const FormField = memo(function FormField({
           onChange={onChange}
           disabled={readOnly}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-            error ? 'border-red-500' : 'border-gray-300'
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
           }`}
         >
           <option value="">Select {label.toLowerCase()}</option>
@@ -71,9 +72,9 @@ const FormField = memo(function FormField({
           onChange={onChange}
           placeholder={placeholder}
           readOnly={readOnly}
-          rows={4}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-            error ? 'border-red-500' : 'border-gray-300'
+          rows={3}
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 resize-none ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
           }`}
         />
       ) : (
@@ -86,13 +87,13 @@ const FormField = memo(function FormField({
           required={required}
           readOnly={readOnly}
           className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-            error ? 'border-red-500' : 'border-gray-300'
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
           }`}
         />
       )}
       {error && (
-        <div className="flex items-center gap-2 mt-1 text-red-600 text-sm">
-          <AlertCircle className="w-4 h-4" />
+        <div className="flex items-center gap-2 mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
@@ -106,12 +107,26 @@ interface CreateInterviewFormProps {
   requirementId?: string;
 }
 
-const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
-    <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
-    <div className="space-y-4">{children}</div>
-  </div>
-);
+const AccordionSection = ({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between font-semibold text-gray-900 transition text-sm"
+      >
+        <span>{title}</span>
+        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-4 border-t border-gray-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: CreateInterviewFormProps) => {
   const { user } = useAuth();
@@ -260,24 +275,24 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Schedule Interview</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-2xl sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto flex flex-col">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between gap-2">
+          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Schedule Interview</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600 flex-shrink-0"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
-          {/* Basic Information */}
-          <FormSection title="Basic Information">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-8 space-y-4 overflow-y-auto flex-1">
+          {/* Required Information Accordion - Open by default */}
+          <AccordionSection title="✓ Basic Information (Required)" defaultOpen={true}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <FormField
-                label="Requirement ID (read-only display)"
+                label="Requirement"
                 name="requirement_id"
                 type="select"
                 value={formData.requirement_id}
@@ -296,10 +311,104 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 error={formErrors.scheduled_date}
               />
               <FormField
+                label="Candidate Name"
+                name="interview_with"
+                placeholder="Candidate name"
+                value={formData.interview_with}
+                onChange={handleChange}
+                required
+                error={formErrors.interview_with}
+              />
+              <FormField
                 label="Interview Time"
                 name="scheduled_time"
                 type="time"
                 value={formData.scheduled_time}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+              <AlertCircle className="w-4 h-4 inline mr-2" />
+              These fields must be filled to create an interview.
+            </div>
+          </AccordionSection>
+
+          {/* Interview Details */}
+          <AccordionSection title="Interview Details" defaultOpen={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <FormField
+                label="Interview Type"
+                name="type"
+                type="select"
+                value={formData.type}
+                onChange={handleChange}
+                options={[
+                  { label: 'Technical', value: 'Technical' },
+                  { label: 'HR', value: 'HR' },
+                  { label: 'Behavioral', value: 'Behavioral' },
+                  { label: 'Final Round', value: 'Final Round' },
+                  { label: 'Screening', value: 'Screening' },
+                ]}
+              />
+              <FormField
+                label="Round"
+                name="round"
+                type="select"
+                value={formData.round}
+                onChange={handleChange}
+                options={[
+                  { label: '1st Round', value: '1st Round' },
+                  { label: '2nd Round', value: '2nd Round' },
+                  { label: '3rd Round', value: '3rd Round' },
+                  { label: 'Final Round', value: 'Final Round' },
+                ]}
+              />
+              <FormField
+                label="Status"
+                name="status"
+                type="select"
+                value={formData.status}
+                onChange={handleChange}
+                options={getAllInterviewStatuses()}
+              />
+              <FormField
+                label="Result (optional)"
+                name="result"
+                type="select"
+                value={formData.result}
+                onChange={handleChange}
+                options={[
+                  { label: 'Positive', value: 'Positive' },
+                  { label: 'Negative', value: 'Negative' },
+                  { label: 'On Hold', value: 'On Hold' },
+                  { label: 'Pending', value: 'Pending' },
+                ]}
+              />
+            </div>
+          </AccordionSection>
+
+          {/* Meeting Configuration */}
+          <AccordionSection title="Meeting Configuration" defaultOpen={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <FormField
+                label="Mode"
+                name="mode"
+                type="select"
+                value={formData.mode}
+                onChange={handleChange}
+                options={[
+                  { label: 'Video Call', value: 'Video Call' },
+                  { label: 'Phone Call', value: 'Phone Call' },
+                  { label: 'In Person', value: 'In Person' },
+                  { label: 'Panel Interview', value: 'Panel Interview' },
+                ]}
+              />
+              <FormField
+                label="Duration (minutes)"
+                name="duration_minutes"
+                type="number"
+                placeholder="60"
+                value={formData.duration_minutes}
                 onChange={handleChange}
               />
               <FormField
@@ -317,34 +426,32 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                   { label: 'IST (UTC+5:30)', value: 'IST' },
                 ]}
               />
-            </div>
-          </FormSection>
-
-          {/* Interview Details */}
-          <FormSection title="Interview Details">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
-                label="Interview Type"
-                name="type"
+                label="Platform"
+                name="meeting_type"
                 type="select"
-                value={formData.type}
+                value={formData.meeting_type}
                 onChange={handleChange}
                 options={[
-                  { label: 'Technical', value: 'Technical' },
-                  { label: 'HR', value: 'HR' },
-                  { label: 'Behavioral', value: 'Behavioral' },
-                  { label: 'Final Round', value: 'Final Round' },
-                  { label: 'Screening', value: 'Screening' },
+                  { label: 'GMeet', value: 'GMeet' },
+                  { label: 'Zoom', value: 'Zoom' },
+                  { label: 'Webex', value: 'Webex' },
+                  { label: 'MS Teams', value: 'MS Teams' },
                 ]}
               />
               <FormField
-                label="Status"
-                name="status"
-                type="select"
-                value={formData.status}
+                label="Meeting Link or Location"
+                name="location"
+                placeholder="Zoom link, Meeting room, or Address"
+                value={formData.location}
                 onChange={handleChange}
-                options={getAllInterviewStatuses()}
               />
+            </div>
+          </AccordionSection>
+
+          {/* Participants */}
+          <AccordionSection title="Participants & Interviewer" defaultOpen={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <FormField
                 label="Consultant"
                 name="consultant_id"
@@ -354,99 +461,6 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 options={consultantOptions}
               />
               <FormField
-                label="Vendor Company"
-                name="vendor_company"
-                placeholder="ABC Staffing"
-                value={formData.vendor_company}
-                onChange={handleChange}
-              />
-              <FormField
-                label="Interview With"
-                name="interview_with"
-                placeholder="Candidate name"
-                value={formData.interview_with}
-                onChange={handleChange}
-                error={formErrors.interview_with}
-              />
-              <FormField
-                label="Result (optional)"
-                name="result"
-                type="select"
-                value={formData.result}
-                onChange={handleChange}
-                options={[
-                  { label: 'Positive', value: 'Positive' },
-                  { label: 'Negative', value: 'Negative' },
-                  { label: 'On Hold', value: 'On Hold' },
-                  { label: 'Pending', value: 'Pending' },
-                ]}
-              />
-            </div>
-          </FormSection>
-
-          {/* Meeting Configuration */}
-          <FormSection title="Meeting Configuration">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                label="Round"
-                name="round"
-                type="select"
-                value={formData.round}
-                onChange={handleChange}
-                options={[
-                  { label: '1st Round', value: '1st Round' },
-                  { label: '2nd Round', value: '2nd Round' },
-                  { label: '3rd Round', value: '3rd Round' },
-                  { label: 'Final Round', value: 'Final Round' },
-                ]}
-              />
-              <FormField
-                label="Mode"
-                name="mode"
-                type="select"
-                value={formData.mode}
-                onChange={handleChange}
-                options={[
-                  { label: 'Video Call', value: 'Video Call' },
-                  { label: 'Phone Call', value: 'Phone Call' },
-                  { label: 'In Person', value: 'In Person' },
-                  { label: 'Panel Interview', value: 'Panel Interview' },
-                ]}
-              />
-              <FormField
-                label="Meeting Type"
-                name="meeting_type"
-                type="select"
-                value={formData.meeting_type}
-                onChange={handleChange}
-                options={[
-                  { label: 'Scheduled', value: 'Scheduled' },
-                  { label: 'Ad Hoc', value: 'Ad Hoc' },
-                  { label: 'Follow-up', value: 'Follow-up' },
-                ]}
-              />
-              <FormField
-                label="Duration (minutes)"
-                name="duration_minutes"
-                type="number"
-                placeholder="60"
-                value={formData.duration_minutes}
-                onChange={handleChange}
-              />
-            </div>
-          </FormSection>
-
-          {/* Interview Participants & Location */}
-          <FormSection title="Participants & Location">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                label="Subject Line (auto-generated/editable)"
-                name="subject_line"
-                placeholder="Will auto-generate based on requirement and date"
-                value={formData.subject_line}
-                onChange={handleChange}
-              />
-              <FormField
                 label="Interviewer"
                 name="interviewer"
                 placeholder="Interviewer name"
@@ -454,64 +468,73 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 onChange={handleChange}
               />
               <FormField
-                label="Interview Link or Location"
-                name="location"
-                placeholder="Zoom link, Meeting room, or Address"
-                value={formData.location}
+                label="Vendor Company"
+                name="vendor_company"
+                placeholder="ABC Staffing"
+                value={formData.vendor_company}
+                onChange={handleChange}
+              />
+              <FormField
+                label="Subject Line (auto-generated/editable)"
+                name="subject_line"
+                placeholder="Will auto-generate based on requirement and date"
+                value={formData.subject_line}
                 onChange={handleChange}
               />
             </div>
-          </FormSection>
+          </AccordionSection>
 
           {/* Interview Notes & Feedback */}
-          <FormSection title="Interview Notes & Feedback">
-            <FormField
-              label="Interview Focus (optional notes)"
-              name="interview_focus"
-              type="textarea"
-              placeholder="Key areas to discuss, focus areas, etc."
-              value={formData.interview_focus}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Special Note"
-              name="special_note"
-              type="textarea"
-              placeholder="Any special instructions or notes"
-              value={formData.special_note}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Job Description excerpt"
-              name="job_description_excerpt"
-              type="textarea"
-              placeholder="Key job requirements or description"
-              value={formData.job_description_excerpt}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Feedback Notes"
-              name="feedback_notes"
-              type="textarea"
-              placeholder="Post-interview feedback and observations"
-              value={formData.feedback_notes}
-              onChange={handleChange}
-            />
-          </FormSection>
+          <AccordionSection title="Notes & Feedback" defaultOpen={false}>
+            <div className="space-y-4">
+              <FormField
+                label="Interview Focus (optional notes)"
+                name="interview_focus"
+                type="textarea"
+                placeholder="Key areas to discuss, focus areas, etc."
+                value={formData.interview_focus}
+                onChange={handleChange}
+              />
+              <FormField
+                label="Special Note"
+                name="special_note"
+                type="textarea"
+                placeholder="Any special instructions or notes"
+                value={formData.special_note}
+                onChange={handleChange}
+              />
+              <FormField
+                label="Job Description excerpt"
+                name="job_description_excerpt"
+                type="textarea"
+                placeholder="Key job requirements or description"
+                value={formData.job_description_excerpt}
+                onChange={handleChange}
+              />
+              <FormField
+                label="Feedback Notes"
+                name="feedback_notes"
+                type="textarea"
+                placeholder="Post-interview feedback and observations"
+                value={formData.feedback_notes}
+                onChange={handleChange}
+              />
+            </div>
+          </AccordionSection>
 
           {/* Form Actions */}
-          <div className="flex gap-3 pt-6 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-6 border-t border-gray-200">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition"
+              className="px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition"
             >
               {loading ? 'Scheduling...' : 'Schedule Interview'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+              className="px-4 sm:px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
             >
               Cancel
             </button>

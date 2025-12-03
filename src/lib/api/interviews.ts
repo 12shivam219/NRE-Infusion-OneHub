@@ -55,19 +55,12 @@ export const getInterviewById = async (
 };
 
 export const createInterview = async (
-  interview: InterviewInsert,
-  userId?: string
+  interview: InterviewInsert
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
-    const dataToInsert = {
-      ...interview,
-      created_by: userId || null,
-      updated_by: userId || null,
-    };
-
     const { data, error } = await supabase
       .from('interviews')
-      .insert(dataToInsert)
+      .insert(interview)
       .select()
       .single();
 
@@ -83,14 +76,12 @@ export const createInterview = async (
 
 export const updateInterview = async (
   id: string,
-  updates: Partial<InterviewInsert>,
-  userId?: string
+  updates: Partial<InterviewInsert>
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
     const dataToUpdate = {
       ...updates,
       updated_at: new Date().toISOString(),
-      updated_by: userId || null,
     };
 
     const { data, error } = await supabase

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Loader } from 'lucide-react';
+import { X, Edit2, Trash2, Loader, ExternalLink, Clock, MapPin, ChevronDown } from 'lucide-react';
+import { isValidUrl, isMeetingLink, extractDomainFromUrl } from '../../lib/interviewValidation';
 import { useAuth } from '../../hooks/useAuth';
 import { updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { useToast } from '../../contexts/ToastContext';
@@ -16,6 +17,43 @@ interface InterviewDetailModalProps {
   createdBy?: string | null;
   updatedBy?: string | null;
 }
+
+const EditableField = ({ label, value, isEditing, children }: { 
+  label: string; 
+  value: string | number | null | undefined; 
+  isEditing: boolean;
+  children?: React.ReactNode;
+}) => (
+  <div>
+    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">{label}</p>
+    {isEditing && children ? (
+      children
+    ) : (
+      <p className="text-sm text-gray-900 font-medium">{value || '-'}</p>
+    )}
+  </div>
+);
+
+const AccordionSection = ({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between font-semibold text-gray-900 transition text-sm"
+      >
+        <span>{title}</span>
+        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="px-4 py-4 space-y-4 border-t border-gray-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const InterviewDetailModal = ({
   isOpen,
@@ -34,12 +72,21 @@ export const InterviewDetailModal = ({
 
   useEffect(() => {
     if (interview) {
-      setFormData(interview);
-      setIsEditing(false);
+      // Update form data with fresh interview data when not editing
+      if (!isEditing) {
+        setFormData(interview);
+      }
     }
-  }, [interview, isOpen]);
+  }, [interview, isEditing]);
 
   if (!isOpen || !interview || !formData) return null;
+
+  // Get valid status options
+  const getValidStatuses = () => {
+    // When editing, allow changing to any status
+    const allStatuses = ['Pending', 'Scheduled', 'Confirmed', 'Completed', 'Cancelled', 'Re-Scheduled', 'No Show'];
+    return allStatuses;
+  };
 
   const handleFieldChange = (key: keyof Interview, value: unknown) => {
     setFormData(prev => prev ? { ...prev, [key]: value } : null);
@@ -51,8 +98,7 @@ export const InterviewDetailModal = ({
 
     const result = await updateInterview(
       interview.id,
-      formData as Partial<Interview>,
-      user.id
+      formData as Partial<Interview>
     );
 
     if (result.success) {
@@ -108,209 +154,285 @@ export const InterviewDetailModal = ({
     setIsDeleting(false);
   };
 
+  // Meeting link detection and join handler
+  const isMeetingUrl = formData.location ? isValidUrl(formData.location as string) && isMeetingLink(formData.location as string) : false;
+  const domainName = formData.location ? extractDomainFromUrl(formData.location as string) : null;
+  const getMeetingProvider = (url?: string) => {
+    if (!url) return null;
+    const s = url.toLowerCase();
+    if (s.includes('meet.google.com') || s.includes('google.com')) return 'Google Meet';
+    if (s.includes('teams.microsoft.com') || s.includes('microsoft.com') || s.includes('/l/meetup-join')) return 'Microsoft Teams';
+    if (s.includes('zoom.us') || s.includes('zoom')) return 'Zoom';
+    if (s.includes('webex')) return 'Webex';
+    if (s.includes('bluejeans')) return 'BlueJeans';
+    return domainName || 'Meeting';
+  };
+  const meetingProvider = getMeetingProvider(formData.location as string | undefined);
+
+  const handleJoinCall = () => {
+    if (isMeetingUrl && formData.location) {
+      window.open(formData.location as string, '_blank', 'noopener,noreferrer');
+      showToast({ type: 'success', title: 'Joining Call', message: `Opening ${meetingProvider}` });
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
-            {isEditing ? 'Edit Interview' : 'Interview Details'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto flex flex-col">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <div className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 text-white font-bold text-xs sm:text-base flex-shrink-0">
+              {formData.interview_with?.charAt(0)?.toUpperCase() || 'A'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">{formData.interview_with || 'Interview'}</h2>
+              <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><Clock className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{formData.scheduled_date || '-'} • {formData.scheduled_time || '-'}</span></p>
+            </div>
+          </div>
+
+          <button onClick={() => {
+            setIsEditing(false);
+            onClose();
+          }} className="text-gray-400 hover:text-gray-600 flex-shrink-0" aria-label="Close">
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              {isEditing ? (
-                <select
-                  value={formData.status || 'Scheduled'}
-                  onChange={(e) => handleFieldChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Scheduled">Scheduled</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
-                  <option value="Re-Scheduled">Re-Scheduled</option>
-                </select>
-              ) : (
-                <p className="text-gray-900 font-medium">{formData.status || '-'}</p>
-              )}
+        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+          {/* Schedule Information - Always Visible */}
+          <AccordionSection title="Schedule & Status" defaultOpen={true}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Date</p>
+                <p className="text-sm text-gray-900 font-medium truncate">{formData.scheduled_date || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Time</p>
+                <p className="text-sm text-gray-900 font-medium truncate">{formData.scheduled_time || '-'} {formData.timezone && `(${formData.timezone})`}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-semibold text-gray-600 uppercase mb-2 block">Status</label>
+                {isEditing ? (
+                  <select
+                    value={formData.status || 'Scheduled'}
+                    onChange={(e) => handleFieldChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  >
+                    {getValidStatuses().map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900 font-medium">{formData.status || '-'}</p>
+                  </div>
+                )}
+              </div>
             </div>
+          </AccordionSection>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Scheduled Date
-              </label>
-              {isEditing ? (
-                <input
-                  type="date"
-                  value={formData.scheduled_date || ''}
-                  onChange={(e) => handleFieldChange('scheduled_date', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.scheduled_date || '-'}</p>
-              )}
+          {/* Meeting Link */}
+          {formData.location && (
+            <div className="flex items-start gap-2 sm:gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Meeting Link</p>
+                {isMeetingUrl ? (
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-blue-900 truncate">{meetingProvider}</p>
+                    <button
+                      onClick={handleJoinCall}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 flex items-center gap-2 flex-shrink-0"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Join
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-blue-900 truncate">{formData.location}</p>
+                )}
+              </div>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Scheduled Time
-              </label>
-              {isEditing ? (
-                <input
-                  type="time"
-                  value={formData.scheduled_time || ''}
-                  onChange={(e) => handleFieldChange('scheduled_time', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.scheduled_time || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Duration (minutes)
-              </label>
-              {isEditing ? (
-                <input
-                  type="number"
-                  value={formData.duration_minutes || ''}
-                  onChange={(e) => handleFieldChange('duration_minutes', parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.duration_minutes || '-'} minutes</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Interview With
-              </label>
-              {isEditing ? (
+          {/* Interview Details */}
+          <AccordionSection title="Interview Details" defaultOpen={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <EditableField 
+                label="Candidate Name" 
+                value={formData.interview_with}
+                isEditing={isEditing}
+              >
                 <input
                   type="text"
                   value={formData.interview_with || ''}
                   onChange={(e) => handleFieldChange('interview_with', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 />
-              ) : (
-                <p className="text-gray-600">{formData.interview_with || '-'}</p>
-              )}
-            </div>
+              </EditableField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Interviewer
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.interviewer || ''}
-                  onChange={(e) => handleFieldChange('interviewer', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.interviewer || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Type
-              </label>
-              {isEditing ? (
+              <EditableField 
+                label="Interview Type" 
+                value={formData.type}
+                isEditing={isEditing}
+              >
                 <input
                   type="text"
                   value={formData.type || ''}
                   onChange={(e) => handleFieldChange('type', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 />
-              ) : (
-                <p className="text-gray-600">{formData.type || '-'}</p>
-              )}
-            </div>
+              </EditableField>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Round
-              </label>
-              {isEditing ? (
+              <EditableField 
+                label="Round" 
+                value={formData.round}
+                isEditing={isEditing}
+              >
                 <input
                   type="text"
                   value={formData.round || ''}
                   onChange={(e) => handleFieldChange('round', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                 />
-              ) : (
-                <p className="text-gray-600">{formData.round || '-'}</p>
-              )}
-            </div>
+              </EditableField>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Feedback Notes
-              </label>
-              {isEditing ? (
+              <EditableField 
+                label="Result" 
+                value={formData.result}
+                isEditing={isEditing}
+              >
+                <input
+                  type="text"
+                  value={formData.result || ''}
+                  onChange={(e) => handleFieldChange('result', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </EditableField>
+
+              <EditableField 
+                label="Duration (minutes)" 
+                value={formData.duration_minutes}
+                isEditing={isEditing}
+              >
+                <input
+                  type="number"
+                  value={formData.duration_minutes || ''}
+                  onChange={(e) => handleFieldChange('duration_minutes', parseInt(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </EditableField>
+
+              <EditableField 
+                label="Mode" 
+                value={formData.mode}
+                isEditing={isEditing}
+              >
+                <input
+                  type="text"
+                  value={formData.mode || ''}
+                  onChange={(e) => handleFieldChange('mode', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </EditableField>
+            </div>
+          </AccordionSection>
+
+          {/* Participants */}
+          <AccordionSection title="Participants" defaultOpen={false}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <EditableField 
+                label="Interviewer" 
+                value={formData.interviewer}
+                isEditing={isEditing}
+              >
+                <input
+                  type="text"
+                  value={formData.interviewer || ''}
+                  onChange={(e) => handleFieldChange('interviewer', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </EditableField>
+
+              <EditableField 
+                label="Vendor Company" 
+                value={formData.vendor_company}
+                isEditing={isEditing}
+              >
+                <input
+                  type="text"
+                  value={formData.vendor_company || ''}
+                  onChange={(e) => handleFieldChange('vendor_company', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                />
+              </EditableField>
+            </div>
+          </AccordionSection>
+
+          {/* Notes & Feedback */}
+          <AccordionSection title="Notes & Feedback" defaultOpen={false}>
+            <div className="space-y-4">
+              <EditableField 
+                label="Interview Focus" 
+                value={formData.interview_focus}
+                isEditing={isEditing}
+              >
+                <textarea
+                  value={formData.interview_focus || ''}
+                  onChange={(e) => handleFieldChange('interview_focus', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  rows={2}
+                />
+              </EditableField>
+
+              <EditableField 
+                label="Feedback Notes" 
+                value={formData.feedback_notes}
+                isEditing={isEditing}
+              >
                 <textarea
                   value={formData.feedback_notes || ''}
                   onChange={(e) => handleFieldChange('feedback_notes', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                />
-              ) : (
-                <p className="text-gray-600">{formData.feedback_notes || '-'}</p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes
-              </label>
-              {isEditing ? (
-                <textarea
-                  value={formData.notes || ''}
-                  onChange={(e) => handleFieldChange('notes', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
                   rows={2}
                 />
-              ) : (
-                <p className="text-gray-600">{formData.notes || '-'}</p>
-              )}
+              </EditableField>
+
+              <EditableField 
+                label="Special Notes" 
+                value={formData.notes}
+                isEditing={isEditing}
+              >
+                <textarea
+                  value={(formData as any).notes || ''}
+                  onChange={(e) => handleFieldChange('notes' as any, e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  rows={2}
+                />
+              </EditableField>
             </div>
-          </div>
+          </AccordionSection>
 
           {/* Audit Log - Admin Only */}
           {isAdmin && (
-            <AuditLog
-              createdAt={interview.created_at}
-              createdBy={createdBy}
-              updatedAt={interview.updated_at}
-              updatedBy={updatedBy}
-              showToNonAdmins={true}
-            />
+            <AccordionSection title="Audit Information" defaultOpen={false}>
+              <AuditLog
+                createdAt={interview.created_at}
+                createdBy={createdBy}
+                updatedAt={interview.updated_at}
+                updatedBy={updatedBy}
+                showToNonAdmins={true}
+              />
+            </AccordionSection>
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200 sticky bottom-0 bg-white">
             {isEditing ? (
               <>
                 <button
                   onClick={handleSave}
                   disabled={isLoading}
-                  className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
                 >
                   {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Save Changes'}
                 </button>
@@ -319,7 +441,7 @@ export const InterviewDetailModal = ({
                     setFormData(interview);
                     setIsEditing(false);
                   }}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                  className="flex-1 px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 text-sm"
                 >
                   Cancel
                 </button>
@@ -328,28 +450,31 @@ export const InterviewDetailModal = ({
               <>
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2 text-sm"
                 >
                   <Edit2 className="w-4 h-4" />
-                  Edit
+                  <span className="hidden sm:inline">Edit</span>
                 </button>
                 {isAdmin && (
                   <button
                     onClick={handleDelete}
                     disabled={isDeleting}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
                   >
                     {isDeleting ? (
                       <Loader className="w-4 h-4 animate-spin" />
                     ) : (
                       <Trash2 className="w-4 h-4" />
                     )}
-                    Delete
+                    <span className="hidden sm:inline">Delete</span>
                   </button>
                 )}
                 <button
-                  onClick={onClose}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                  onClick={() => {
+                    setIsEditing(false);
+                    onClose();
+                  }}
+                  className="flex-1 px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 text-sm"
                 >
                   Close
                 </button>
@@ -361,3 +486,4 @@ export const InterviewDetailModal = ({
     </div>
   );
 };
+

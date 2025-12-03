@@ -40,6 +40,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
+  const [jumpToPageInput, setJumpToPageInput] = useState('');
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -47,6 +48,15 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
     const interviewsResult = await getInterviews(user.id);
     if (interviewsResult.success && interviewsResult.interviews) {
       setInterviews(interviewsResult.interviews);
+      
+      // Update the selected interview if it exists with the new data
+      setSelectedInterview(prev => {
+        if (prev && interviewsResult.interviews) {
+          const updatedInterview = interviewsResult.interviews.find(i => i.id === prev.id);
+          return updatedInterview || prev;
+        }
+        return null;
+      });
     } else if (interviewsResult.error) {
       showToast({ type: 'error', title: 'Failed to load interviews', message: interviewsResult.error });
     }
@@ -88,7 +98,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
 
   const handleStatusChange = useCallback(async (id: string, status: string) => {
     if (!user) return;
-    const result = await updateInterview(id, { status }, user.id);
+    const result = await updateInterview(id, { status });
     if (result.success) {
       await loadData();
       showToast({ type: 'success', title: 'Status updated', message: `Interview marked as ${status}` });
@@ -291,20 +301,20 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
               {paginatedInterviews.map(interview => (
-                <div key={interview.id} onClick={() => handleViewDetails(interview)} className="cursor-pointer">
-                  <InterviewCard
-                    interview={interview}
-                    requirementTitle={getRequirementTitle(interview.requirement_id)}
-                    statusColor={interviewStatusColors[interview.status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
-                    onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
-                  />
-                </div>
+                <InterviewCard
+                  key={interview.id}
+                  interview={interview}
+                  requirementTitle={getRequirementTitle(interview.requirement_id)}
+                  statusColor={interviewStatusColors[interview.status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
+                  onStatusChange={handleStatusChange}
+                  onDelete={handleDelete}
+                  onViewDetails={handleViewDetails}
+                />
               ))}
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8">
+              <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8 flex-wrap">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
@@ -332,6 +342,29 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
                     );
                   })}
                 </div>
+
+                {/* Jump to page input - visible on larger screens or when there are many pages */}
+                {totalPages > 5 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">|</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max={totalPages}
+                      value={jumpToPageInput}
+                      onChange={(e) => setJumpToPageInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const page = parseInt(jumpToPageInput) || currentPage;
+                          handlePageChange(page);
+                          setJumpToPageInput('');
+                        }
+                      }}
+                      placeholder="Go to..."
+                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-center"
+                    />
+                  </div>
+                )}
 
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Upload, FileText, Download, Trash2, Edit, Grid2X2, Grid3X3 } from 'lucide-react';
+import { Upload, FileText, Download, Trash2, Edit, Grid2X2, Grid3X3, Cloud } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getDocuments, uploadDocument, deleteDocument, downloadDocument } from '../../lib/api/documents';
 import type { Database } from '../../lib/database.types';
 import { formatFileSize } from '../../lib/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { DocumentEditor } from './DocumentEditor';
+import { GoogleDrivePicker } from './GoogleDrivePicker';
 
 
 type Document = Database['public']['Tables']['documents']['Row'];
@@ -20,6 +21,7 @@ export const DocumentsPage = () => {
   const [editorLayout, setEditorLayout] = useState<'single' | '2x2' | '3x3'>('single');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [documentsToEdit, setDocumentsToEdit] = useState<Document[]>([]);
+  const [showGoogleDrive, setShowGoogleDrive] = useState(false);
 
   const loadDocuments = useCallback(async () => {
     if (!user) return;
@@ -161,6 +163,15 @@ export const DocumentsPage = () => {
             </button>
           </div>
 
+          <button
+            onClick={() => setShowGoogleDrive(true)}
+            className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center justify-center gap-2 text-sm sm:text-base"
+            title="Import from Google Drive"
+          >
+            <Cloud className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Google Drive</span>
+          </button>
+
           <label className="w-full sm:w-auto px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition cursor-pointer flex items-center justify-center gap-2 text-sm sm:text-base">
             <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
             {uploading ? 'Uploading...' : 'Upload'}
@@ -285,6 +296,22 @@ export const DocumentsPage = () => {
             setSelectedDocs([]);
             await loadDocuments();
           }}
+        />
+      )}
+
+      {/* Google Drive Picker Modal */}
+      {showGoogleDrive && (
+        <GoogleDrivePicker
+          onFilesImported={(docs) => {
+            setShowGoogleDrive(false);
+            loadDocuments();
+            showToast({
+              type: 'success',
+              title: 'Documents imported',
+              message: `${docs.length} document(s) imported from Google Drive successfully.`
+            });
+          }}
+          onClose={() => setShowGoogleDrive(false)}
         />
       )}
     </div>

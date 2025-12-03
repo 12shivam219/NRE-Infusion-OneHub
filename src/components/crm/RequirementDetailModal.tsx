@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Loader } from 'lucide-react';
+import { X, Edit2, Trash2, Loader, Mail } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateRequirement, deleteRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import { AuditLog } from '../common/AuditLog';
+import { EmailThreading } from './EmailThreading';
 import type { Database } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -31,6 +32,7 @@ export const RequirementDetailModal = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Requirement> | null>(null);
+  const [activeTab, setActiveTab] = useState<'details' | 'emails'>('details');
 
   useEffect(() => {
     if (requirement) {
@@ -123,7 +125,35 @@ export const RequirementDetailModal = ({
           </button>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200 bg-gray-50 px-6 flex gap-0">
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`py-3 px-4 font-medium border-b-2 transition ${
+              activeTab === 'details'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Details
+          </button>
+          <button
+            onClick={() => setActiveTab('emails')}
+            className={`py-3 px-4 font-medium border-b-2 transition flex items-center gap-2 ${
+              activeTab === 'emails'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            Emails
+          </button>
+        </div>
+
         <div className="p-6 space-y-6">
+          {/* Details Tab */}
+          {activeTab === 'details' && (
+            <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -273,10 +303,22 @@ export const RequirementDetailModal = ({
               showToNonAdmins={true}
             />
           )}
+            </>
+          )}
+
+          {/* Emails Tab */}
+          {activeTab === 'emails' && (
+            <div className="min-h-[400px]">
+              <EmailThreading
+                requirementId={requirement.id}
+                onClose={() => setActiveTab('details')}
+              />
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-gray-200">
-            {isEditing ? (
+            {isEditing && activeTab === 'details' ? (
               <>
                 <button
                   onClick={handleSave}

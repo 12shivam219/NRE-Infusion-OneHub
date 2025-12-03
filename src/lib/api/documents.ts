@@ -1,8 +1,12 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
+import { logger, handleApiError, retryAsync } from '../errorHandler';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
+/**
+ * Upload a document with retry logic and comprehensive error handling
+ */
 export const uploadDocument = async (
   file: File,
   userId: string,
@@ -11,88 +15,157 @@ export const uploadDocument = async (
 ): Promise<{ success: boolean; document?: Document; error?: string }> => {
   try {
     const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    // Use the userId from your app's users table for the storage path
     const storagePath = `${userId}/${Date.now()}_${sanitizedFilename}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(storagePath, file);
-
+    // Retry storage upload with exponential backoff
+    const { error: uploadError } = await retryAsync(
+      async () =>
+        supabase.storage.from('documents').upload(storagePath, file),
+      {
+        maxAttempts: 3,
+        initialDelayMs: 200,
+        onRetry: (attempt) =>
+          logger.warn(`Upload retry attempt ${attempt}`, {
+            component: 'uploadDocument',
+            resource: file.name,
+          }),
+      }
+    );
 
     if (uploadError) {
-      if (import.meta.env.DEV) console.error('[UPLOAD] Upload error:', uploadError);
-      return { success: false, error: uploadError.message };
+      const appError = handleApiError(uploadError, {
+        component: 'uploadDocument',
+        action: 'storage_upload',
+        resource: file.name,
+      });
+      return { success: false, error: appError.message };
     }
 
-    const { data: document, error: dbError } = await supabase
-      .from('documents')
-      .insert({
-        user_id: userId,
-        filename: sanitizedFilename,
-        original_filename: file.name,
-        file_size: file.size,
-        mime_type: file.type,
-        storage_path: storagePath,
-        source,
-        google_drive_id: googleDriveId,
-      })
-      .select()
-      .single();
+    // Insert into database with retry
+    const { data: document, error: dbError } = await retryAsync(
+      async () =>
+        supabase
+          .from('documents')
+          .insert({
+            user_id: userId,
+            filename: sanitizedFilename,
+            original_filename: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+            storage_path: storagePath,
+            source,
+            google_drive_id: googleDriveId,
+          })
+          .select()
+          .single(),
+      {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      }
+    );
 
     if (dbError) {
-      if (import.meta.env.DEV) console.error('[UPLOAD] DB error:', dbError);
-      return { success: false, error: dbError.message };
+      const appError = handleApiError(dbError, {
+        component: 'uploadDocument',
+        action: 'db_insert',
+        resource: file.name,
+      });
+      return { success: false, error: appError.message };
     }
 
+    logger.info('Document uploaded successfully', {
+      component: 'uploadDocument',
+      resource: file.name,
+    });
     return { success: true, document };
   } catch (error) {
-    if (import.meta.env.DEV) console.error('[UPLOAD] Exception:', error);
-    return { success: false, error: 'Upload failed' };
+    const appError = handleApiError(error, {
+      component: 'uploadDocument',
+      action: 'upload_failed',
+    });
+    return { success: false, error: appError.message };
   }
 };
 
+/**
+ * Fetch all documents for a user with retry logic
+ */
 export const getDocuments = async (
   userId: string
 ): Promise<{ success: boolean; documents?: Document[]; error?: string }> => {
   try {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const { data, error } = await retryAsync(
+      async () =>
+        supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false }),
+      {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      }
+    );
 
     if (error) {
-      if (import.meta.env.DEV) console.error('[FETCH] Error:', error);
-      return { success: false, error: error.message };
+      const appError = handleApiError(error, {
+        component: 'getDocuments',
+        action: 'fetch_all',
+        userId,
+      });
+      return { success: false, error: appError.message };
     }
 
     return { success: true, documents: data || [] };
   } catch (error) {
-    if (import.meta.env.DEV) console.error('[FETCH] Exception:', error);
-    return { success: false, error: 'Failed to fetch documents' };
+    const appError = handleApiError(error, {
+      component: 'getDocuments',
+    });
+    return { success: false, error: appError.message };
   }
 };
 
+/**
+ * Fetch a single document by ID
+ */
 export const getDocument = async (
   documentId: string
 ): Promise<{ success: boolean; document?: Document; error?: string }> => {
   try {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('id', documentId)
-      .single();
+    const { data, error } = await retryAsync(
+      async () =>
+        supabase
+          .from('documents')
+          .select('*')
+          .eq('id', documentId)
+          .single(),
+      {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      }
+    );
 
     if (error) {
-      return { success: false, error: error.message };
+      const appError = handleApiError(error, {
+        component: 'getDocument',
+        resource: documentId,
+      });
+      return { success: false, error: appError.message };
     }
 
     return { success: true, document: data };
-  } catch {
-    return { success: false, error: 'Failed to fetch document' };
+  } catch (error) {
+    const appError = handleApiError(error, {
+      component: 'getDocument',
+      resource: documentId,
+    });
+    return { success: false, error: appError.message };
   }
 };
 
+/**
+ * Delete a document and its storage file
+ */
 export const deleteDocument = async (
   documentId: string
 ): Promise<{ success: boolean; error?: string }> => {
@@ -104,7 +177,17 @@ export const deleteDocument = async (
       .single();
 
     if (document) {
-      await supabase.storage.from('documents').remove([document.storage_path]);
+      try {
+        await supabase.storage
+          .from('documents')
+          .remove([document.storage_path]);
+      } catch (storageError) {
+        logger.warn('Failed to delete storage file', {
+          component: 'deleteDocument',
+          resource: documentId,
+        });
+        // Continue with database deletion even if storage deletion fails
+      }
     }
 
     const { error } = await supabase
@@ -113,29 +196,64 @@ export const deleteDocument = async (
       .eq('id', documentId);
 
     if (error) {
-      return { success: false, error: error.message };
+      const appError = handleApiError(error, {
+        component: 'deleteDocument',
+        resource: documentId,
+      });
+      return { success: false, error: appError.message };
     }
 
+    logger.info('Document deleted successfully', {
+      component: 'deleteDocument',
+      resource: documentId,
+    });
     return { success: true };
-  } catch {
-    return { success: false, error: 'Failed to delete document' };
+  } catch (error) {
+    const appError = handleApiError(error, {
+      component: 'deleteDocument',
+      resource: documentId,
+    });
+    return { success: false, error: appError.message };
   }
 };
 
+/**
+ * Download a document with a signed URL and retry logic
+ */
 export const downloadDocument = async (
   storagePath: string
 ): Promise<{ success: boolean; url?: string; error?: string }> => {
   try {
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(storagePath, 60);
+    const { data, error } = await retryAsync(
+      async () =>
+        supabase.storage
+          .from('documents')
+          .createSignedUrl(storagePath, 60 * 60), // 1 hour expiry
+      {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      }
+    );
 
     if (error) {
-      return { success: false, error: error.message };
+      const appError = handleApiError(error, {
+        component: 'downloadDocument',
+        action: 'create_signed_url',
+        resource: storagePath,
+      });
+      return { success: false, error: appError.message };
     }
 
+    logger.debug('Download URL created', {
+      component: 'downloadDocument',
+      resource: storagePath,
+    });
     return { success: true, url: data.signedUrl };
-  } catch {
-    return { success: false, error: 'Failed to download document' };
+  } catch (error) {
+    const appError = handleApiError(error, {
+      component: 'downloadDocument',
+      resource: storagePath,
+    });
+    return { success: false, error: appError.message };
   }
 };
