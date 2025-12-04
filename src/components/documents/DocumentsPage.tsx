@@ -43,24 +43,74 @@ export const DocumentsPage = () => {
     const files = e.target.files;
     if (!files || !user) return;
 
-    setUploading(true);
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const validFiles: File[] = [];
+    let hasErrors = false;
 
+    // Validate files before uploading
     for (const file of Array.from(files)) {
-      if (
+      const isValidType =
         file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
         file.type === 'application/msword' ||
-        file.type === 'application/pdf'
-      ) {
-        const result = await uploadDocument(file, user.id);
-        if (!result.success && result.error) {
-          showToast({ type: 'error', title: 'Upload failed', message: result.error });
-        }
+        file.type === 'application/pdf';
+
+      if (!isValidType) {
+        showToast({
+          type: 'error',
+          title: 'Invalid file type',
+          message: `${file.name}: Only .docx, .doc, and .pdf files are supported`,
+        });
+        hasErrors = true;
+        continue;
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        showToast({
+          type: 'error',
+          title: 'File too large',
+          message: `${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB exceeds 5MB limit`,
+        });
+        hasErrors = true;
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      if (hasErrors) {
+        showToast({
+          type: 'warning',
+          title: 'No valid files',
+          message: 'Please check file sizes and types',
+        });
+      }
+      return;
+    }
+
+    setUploading(true);
+
+    // Upload valid files
+    let successCount = 0;
+    for (const file of validFiles) {
+      const result = await uploadDocument(file, user.id);
+      if (result.success) {
+        successCount++;
+      } else if (result.error) {
+        showToast({ type: 'error', title: 'Upload failed', message: `${file.name}: ${result.error}` });
       }
     }
 
     await loadDocuments();
     setUploading(false);
-    showToast({ type: 'success', title: 'Upload complete', message: 'Your document(s) have been uploaded.' });
+
+    if (successCount > 0) {
+      showToast({
+        type: 'success',
+        title: 'Upload complete',
+        message: `${successCount} document${successCount !== 1 ? 's' : ''} uploaded successfully`,
+      });
+    }
   };
 
   const handleDelete = async (documentId: string) => {
