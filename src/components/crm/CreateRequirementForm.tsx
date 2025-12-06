@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../contexts/ToastContext';
 import { createRequirement, getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
 import { findSimilarRequirements } from '../../lib/requirementUtils';
+import { validateRequirementForm } from '../../lib/formValidation';
+import { ErrorAlert } from '../common/ErrorAlert';
 import type { Database } from '../../lib/database.types';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
@@ -22,6 +25,7 @@ interface FormFieldProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   required?: boolean;
   options?: FormFieldOption[];
+  error?: string;
 }
 
 // Create FormField component outside the parent component for stability
@@ -34,6 +38,7 @@ const FormField = memo(function FormField({
   onChange,
   required = false,
   options,
+  error,
 }: FormFieldProps) {
   return (
     <div>
@@ -46,7 +51,9 @@ const FormField = memo(function FormField({
           name={name}
           value={value}
           onChange={onChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
+          }`}
         >
           <option value="">Select {label.toLowerCase()}</option>
           {options?.map((opt: FormFieldOption) => (
@@ -62,7 +69,9 @@ const FormField = memo(function FormField({
           onChange={onChange}
           placeholder={placeholder}
           rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
+          }`}
         />
       ) : (
         <input
@@ -72,8 +81,16 @@ const FormField = memo(function FormField({
           onChange={onChange}
           placeholder={placeholder}
           required={required}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
+          }`}
         />
+      )}
+      {error && (
+        <div className="flex items-center gap-2 mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
       )}
     </div>
   );
@@ -93,16 +110,18 @@ const FormSection = ({ title, children }: { title: string; children: React.React
 
 export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementFormProps) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [allRequirements, setAllRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [loading, setLoading] = useState(false);
   const [similarRequirements, setSimilarRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
     company: '',
     status: 'NEW' as const,
-    priority: 'medium' as const,
     consultant_id: '',
     applied_for: '',
     rate: '',
@@ -166,35 +185,81 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
     e.preventDefault();
     if (!user) return;
 
-    setLoading(true);
-    const result = await createRequirement({
-      user_id: user.id,
+    // Validate form
+    const validation = validateRequirementForm({
       title: formData.title,
       company: formData.company,
-      status: formData.status,
-      priority: formData.priority,
-      consultant_id: formData.consultant_id || null,
-      applied_for: formData.applied_for || null,
-      rate: formData.rate || null,
-      primary_tech_stack: formData.primary_tech_stack || null,
-      imp_name: formData.imp_name || null,
-      client_website: formData.client_website || null,
-      imp_website: formData.imp_website || null,
-      vendor_company: formData.vendor_company || null,
-      vendor_website: formData.vendor_website || null,
-      vendor_person_name: formData.vendor_person_name || null,
-      vendor_phone: formData.vendor_phone || null,
-      vendor_email: formData.vendor_email || null,
-      description: formData.description || null,
-      next_step: formData.next_step || null,
-      remote: formData.remote || null,
-      duration: formData.duration || null,
-      location: formData.location || null,
+      vendor_email: formData.vendor_email,
+      client_website: formData.client_website,
+      imp_website: formData.imp_website,
+      vendor_website: formData.vendor_website,
+      rate: formData.rate,
     });
 
-    setLoading(false);
-    if (result.success) {
-      onSuccess();
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      showToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please fix the errors below',
+      });
+      return;
+    }
+
+    setFormErrors({});
+    setSubmitError(null);
+    setLoading(true);
+
+    try {
+      const result = await createRequirement({
+        user_id: user.id,
+        title: formData.title,
+        company: formData.company,
+        status: formData.status,
+        consultant_id: formData.consultant_id || null,
+        applied_for: formData.applied_for || null,
+        rate: formData.rate || null,
+        primary_tech_stack: formData.primary_tech_stack || null,
+        imp_name: formData.imp_name || null,
+        client_website: formData.client_website || null,
+        imp_website: formData.imp_website || null,
+        vendor_company: formData.vendor_company || null,
+        vendor_website: formData.vendor_website || null,
+        vendor_person_name: formData.vendor_person_name || null,
+        vendor_phone: formData.vendor_phone || null,
+        vendor_email: formData.vendor_email || null,
+        description: formData.description || null,
+        next_step: formData.next_step || null,
+        remote: formData.remote || null,
+        duration: formData.duration || null,
+        location: formData.location || null,
+      });
+
+      setLoading(false);
+      if (result.success) {
+        showToast({
+          type: 'success',
+          title: 'Requirement Created',
+          message: 'New requirement has been successfully created',
+        });
+        onSuccess();
+      } else {
+        setSubmitError(result.error || 'Failed to create requirement');
+        showToast({
+          type: 'error',
+          title: 'Failed',
+          message: result.error || 'Failed to create requirement',
+        });
+      }
+    } catch (error) {
+      setLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setSubmitError(errorMessage);
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage,
+      });
     }
   };
 
@@ -212,6 +277,16 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {/* Submit Error Alert */}
+          {submitError && (
+            <ErrorAlert
+              title="Failed to Create Requirement"
+              message={submitError}
+              onDismiss={() => setSubmitError(null)}
+              retryLabel="Try Again"
+            />
+          )}
+
           {/* Similar Requirements Warning */}
           {similarRequirements.length > 0 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
@@ -235,6 +310,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 value={formData.title}
                 onChange={handleChange}
                 required
+                error={formErrors.title}
               />
               <FormField
                 label="Which company is hiring?"
@@ -243,6 +319,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 value={formData.company}
                 onChange={handleChange}
                 required
+                error={formErrors.company}
               />
               <FormField
                 label="What's the current status?"
@@ -257,18 +334,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                   { label: 'Interview', value: 'INTERVIEW' },
                   { label: 'Offer', value: 'OFFER' },
                   { label: 'Closed', value: 'CLOSED' },
-                ]}
-              />
-              <FormField
-                label="What's the priority level?"
-                name="priority"
-                type="select"
-                value={formData.priority}
-                onChange={handleChange}
-                options={[
-                  { label: '🔴 High', value: 'high' },
-                  { label: '🟡 Medium', value: 'medium' },
-                  { label: '🟢 Low', value: 'low' },
                 ]}
               />
               <FormField
@@ -305,6 +370,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 placeholder="$80k - $120k"
                 value={formData.rate}
                 onChange={handleChange}
+                error={formErrors.rate}
               />
               <FormField
                 label="What's the work location type?"
@@ -376,6 +442,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 placeholder="https://vendor.com"
                 value={formData.vendor_website}
                 onChange={handleChange}
+                error={formErrors.vendor_website}
               />
               <FormField
                 label="Who's your primary vendor contact?"
@@ -399,6 +466,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 placeholder="vendor@example.com"
                 value={formData.vendor_email}
                 onChange={handleChange}
+                error={formErrors.vendor_email}
               />
             </div>
           </FormSection>

@@ -211,7 +211,6 @@ export interface Database {
           description: string | null;
           location: string | null;
           status: RequirementStatus;
-          priority: string | null;
           consultant_id: string | null;
           applied_for: string | null;
           rate: string | null;
@@ -227,6 +226,8 @@ export interface Database {
           next_step: string | null;
           remote: string | null;
           duration: string | null;
+          created_by: string | null;
+          updated_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -238,7 +239,6 @@ export interface Database {
           description?: string | null;
           location?: string | null;
           status?: RequirementStatus;
-          priority?: string | null;
           consultant_id?: string | null;
           applied_for?: string | null;
           rate?: string | null;
@@ -254,6 +254,8 @@ export interface Database {
           next_step?: string | null;
           remote?: string | null;
           duration?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -265,7 +267,6 @@ export interface Database {
           description?: string | null;
           location?: string | null;
           status?: RequirementStatus;
-          priority?: string | null;
           consultant_id?: string | null;
           applied_for?: string | null;
           rate?: string | null;
@@ -281,6 +282,8 @@ export interface Database {
           next_step?: string | null;
           remote?: string | null;
           duration?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };

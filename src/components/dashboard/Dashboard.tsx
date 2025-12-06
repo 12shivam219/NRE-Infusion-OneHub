@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Briefcase, Users, TrendingUp } from 'lucide-react';
+import { FileText, Briefcase, Users, TrendingUp, Upload, Plus, Calendar } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getDocuments } from '../../lib/api/documents';
 import { getRequirements } from '../../lib/api/requirements';
@@ -12,20 +12,15 @@ export const Dashboard = () => {
 
   const loadStats = useCallback(async () => {
     if (!user) return;
-
     const [docsResult, reqsResult] = await Promise.all([
       getDocuments(user.id),
       getRequirements(user.id),
     ]);
 
-    if (docsResult.success && docsResult.documents) {
+    if (docsResult.success && docsResult.documents)
       setDocumentCount(docsResult.documents.length);
-    }
-
-    if (reqsResult.success && reqsResult.requirements) {
+    if (reqsResult.success && reqsResult.requirements)
       setRequirementCount(reqsResult.requirements.length);
-    }
-
     setLoading(false);
   }, [user]);
 
@@ -34,92 +29,98 @@ export const Dashboard = () => {
   }, [loadStats]);
 
   const stats = [
-    {
-      label: 'Total Documents',
-      value: documentCount,
-      icon: FileText,
-      color: 'bg-blue-500',
-    },
-    {
-      label: 'Active Requirements',
-      value: requirementCount,
-      icon: Briefcase,
-      color: 'bg-green-500',
-    },
-    {
-      label: 'Interviews',
-      value: 0,
-      icon: Users,
-      color: 'bg-orange-500',
-    },
-    {
-      label: 'Success Rate',
-      value: '0%',
-      icon: TrendingUp,
-      color: 'bg-purple-500',
-    },
+    { label: 'Total Documents', value: documentCount, icon: FileText, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Active Requirements', value: requirementCount, icon: Briefcase, color: 'text-green-600 bg-green-50' },
+    { label: 'Interviews', value: 0, icon: Users, color: 'text-orange-600 bg-orange-50' },
+    { label: 'Success Rate', value: '0%', icon: TrendingUp, color: 'text-purple-600 bg-purple-50' },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome back, {user?.full_name}!</h1>
-        <p className="text-gray-600 mt-2 text-sm sm:text-base">Here's your resume management overview</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-6 md:p-10">
+      {/* Header */}
+      <header className="mb-8">
+        <h1 className="text-3xl font-semibold text-gray-900">
+          Welcome back, {user?.full_name} 👋
+        </h1>
+        <p className="text-gray-500 mt-1">
+          Here’s your updated resume management overview
+        </p>
+      </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
+      {/* Stats Section */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-pulse">
+          {[...Array(4)].map((_, i) => (
             <div
-              key={stat.label}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition"
+              key={i}
+              className="h-28 bg-white rounded-xl shadow-sm border border-gray-200"
+            ></div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          {stats.map(({ label, value, icon: Icon, color }) => (
+            <div
+              key={label}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:-translate-y-0.5 transition-transform"
             >
               <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm text-gray-600 mb-1">{stat.label}</p>
-                  <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</p>
+                <div>
+                  <p className="text-sm text-gray-500">{label}</p>
+                  <p className="text-3xl font-semibold text-gray-900 mt-1">{value}</p>
                 </div>
-                <div className={`${stat.color} w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ml-2`}>
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <div className={`p-3 rounded-lg ${color}`}>
+                  <Icon className="w-6 h-6" />
                 </div>
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Recent Activity</h2>
-          <div className="text-gray-500 text-center py-8">
+      {/* Activity + Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activity */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
+          <div className="text-gray-500 text-center py-10 italic">
             No recent activity to display
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+        {/* Quick Actions */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
           <div className="space-y-3">
-            <button className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium text-sm sm:text-base hover:bg-blue-700 transition">
-              Upload New Resume
-            </button>
-            <button className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-medium text-sm sm:text-base hover:bg-green-700 transition">
-              Create Requirement
-            </button>
-            <button className="w-full px-4 py-3 bg-orange-600 text-white rounded-lg font-medium text-sm sm:text-base hover:bg-orange-700 transition">
-              Schedule Interview
-            </button>
+            <ActionButton color="blue" icon={<Upload className="w-4 h-4" />} label="Upload New Resume" />
+            <ActionButton color="green" icon={<Plus className="w-4 h-4" />} label="Create Requirement" />
+            <ActionButton color="orange" icon={<Calendar className="w-4 h-4" />} label="Schedule Interview" />
           </div>
         </div>
       </div>
     </div>
+  );
+};
+
+/* --- Reusable Quick Action Button --- */
+interface ActionButtonProps {
+  color: 'blue' | 'green' | 'orange';
+  icon: React.ReactNode;
+  label: string;
+}
+
+const ActionButton = ({ color, icon, label }: ActionButtonProps) => {
+  const colorClasses: Record<string, string> = {
+    blue: 'bg-blue-600 hover:bg-blue-700',
+    green: 'bg-green-600 hover:bg-green-700',
+    orange: 'bg-orange-600 hover:bg-orange-700',
+  };
+  return (
+    <button
+      className={`w-full flex items-center justify-center space-x-2 text-white font-medium py-3 rounded-lg transition ${colorClasses[color]}`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 };

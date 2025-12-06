@@ -3,13 +3,17 @@ import { Plus, Search, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getInterviews, updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
+import { subscribeToInterviews } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 import InterviewCard from './InterviewCard';
 import { InterviewDetailModal } from './InterviewDetailModal';
+import ErrorAlert from '../common/ErrorAlert';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type Requirement = Database['public']['Tables']['requirements']['Row'];
+
+type RealtimeUpdate<T> = { type: 'INSERT' | 'UPDATE' | 'DELETE'; record: T };
 
 const interviewStatusColors: Record<string, { badge: string; dot: string }> = {
   'Confirmed': { badge: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
@@ -32,6 +36,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,35 +50,64 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
   const loadData = useCallback(async () => {
     if (!user) return;
     
-    const interviewsResult = await getInterviews(user.id);
-    if (interviewsResult.success && interviewsResult.interviews) {
-      setInterviews(interviewsResult.interviews);
+    try {
+      setError(null);
+      const interviewsResult = await getInterviews(user.id);
+      if (interviewsResult.success && interviewsResult.interviews) {
+        setInterviews(interviewsResult.interviews);
+        
+        // Update the selected interview if it exists with the new data
+        setSelectedInterview(prev => {
+          if (prev && interviewsResult.interviews) {
+            const updatedInterview = interviewsResult.interviews.find(i => i.id === prev.id);
+            return updatedInterview || prev;
+          }
+          return null;
+        });
+      } else if (interviewsResult.error) {
+        setError({ title: 'Failed to load interviews', message: interviewsResult.error });
+      }
       
-      // Update the selected interview if it exists with the new data
-      setSelectedInterview(prev => {
-        if (prev && interviewsResult.interviews) {
-          const updatedInterview = interviewsResult.interviews.find(i => i.id === prev.id);
-          return updatedInterview || prev;
-        }
-        return null;
-      });
-    } else if (interviewsResult.error) {
-      showToast({ type: 'error', title: 'Failed to load interviews', message: interviewsResult.error });
+      const reqResult = await getRequirements(user.id);
+      if (reqResult.success && reqResult.requirements) {
+        setRequirements(reqResult.requirements);
+      } else if (reqResult.error) {
+        setError({ title: 'Failed to load requirements', message: reqResult.error });
+      }
+    } catch {
+      setError({ title: 'Error loading data', message: 'An unexpected error occurred' });
+    } finally {
+      setLoading(false);
+      setCurrentPage(1);
     }
-    
-    const reqResult = await getRequirements(user.id);
-    if (reqResult.success && reqResult.requirements) {
-      setRequirements(reqResult.requirements);
-    } else if (reqResult.error) {
-      showToast({ type: 'error', title: 'Failed to load requirements', message: reqResult.error });
-    }
-    setLoading(false);
-    setCurrentPage(1);
-  }, [user, showToast]);
+  }, [user]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    let unsubscribe: (() => void) | undefined;
+    if (user) {
+      unsubscribe = subscribeToInterviews(user.id, (update: RealtimeUpdate<Interview>) => {
+        if (update.type === 'INSERT') {
+          setInterviews(prev => [update.record, ...prev]);
+        } else if (update.type === 'UPDATE') {
+          setInterviews(prev =>
+            prev.map(i => (i.id === update.record.id ? update.record : i))
+          );
+          // Update selected interview if it matches
+          setSelectedInterview(prev =>
+            prev?.id === update.record.id ? update.record : prev
+          );
+        } else if (update.type === 'DELETE') {
+          setInterviews(prev => prev.filter(i => i.id !== update.record.id));
+          // Clear selected interview if it was deleted
+          if (selectedInterview?.id === update.record.id) {
+            setSelectedInterview(null);
+          }
+        }
+      });
+    }
+    return () => { unsubscribe?.(); };
+  }, [loadData, user, selectedInterview?.id]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!isAdmin) {
@@ -86,12 +120,16 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
     }
 
     if (confirm('Are you sure you want to delete this interview?')) {
-      const result = await deleteInterview(id);
-      if (result.success) {
-        await loadData();
-        showToast({ type: 'success', title: 'Interview deleted', message: 'The interview has been removed.' });
-      } else if (result.error) {
-        showToast({ type: 'error', title: 'Failed to delete interview', message: result.error });
+      try {
+        const result = await deleteInterview(id);
+        if (result.success) {
+          showToast({ type: 'success', title: 'Interview deleted', message: 'The interview has been removed.' });
+          await loadData();
+        } else if (result.error) {
+          setError({ title: 'Failed to delete', message: result.error });
+        }
+      } catch {
+        setError({ title: 'Error', message: 'Failed to delete interview' });
       }
     }
   }, [loadData, isAdmin, showToast]);
@@ -197,6 +235,16 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <ErrorAlert
+          title={error.title}
+          message={error.message}
+          onRetry={loadData}
+          onDismiss={() => setError(null)}
+        />
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Interview Tracking</h2>
         <button

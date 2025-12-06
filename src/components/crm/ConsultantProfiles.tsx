@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Mail, Phone } from 'lucide-react';
+import { Search, Plus, Mail, Phone, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getConsultants, updateConsultant } from '../../lib/api/consultants';
+import { getConsultants, updateConsultant, deleteConsultant } from '../../lib/api/consultants';
+import { subscribeToConsultants } from '../../lib/api/realtimeSync';
 import { debounce } from '../../lib/utils';
 import { SkeletonCard } from '../common/SkeletonCard';
 import { ConsultantDetailModal } from './ConsultantDetailModal';
+import ErrorAlert from '../common/ErrorAlert';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
+
+type RealtimeUpdate<T> = { type: 'INSERT' | 'UPDATE' | 'DELETE'; record: T };
 
 const statusColors: Record<string, string> = {
   'Active': 'bg-green-100 text-green-800',
@@ -21,10 +25,11 @@ interface ConsultantProfilesProps {
 }
 
 export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedValue, setDebouncedValue] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -44,26 +49,92 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
 
   const loadConsultants = useCallback(async () => {
     if (!user) return;
-    const result = await getConsultants(user.id);
-    if (result.success && result.consultants) {
-      setConsultants(result.consultants);
-    } else if (result.error) {
-      showToast({ type: 'error', title: 'Failed to load consultants', message: result.error });
+    try {
+      setError(null);
+      const result = await getConsultants(user.id);
+      if (result.success && result.consultants) {
+        setConsultants(result.consultants);
+        // Update selected consultant if it exists with new data
+        setSelectedConsultant(prev => {
+          if (prev && result.consultants) {
+            const updated = result.consultants.find(c => c.id === prev.id);
+            return updated || prev;
+          }
+          return null;
+        });
+      } else if (result.error) {
+        setError({ title: 'Failed to load consultants', message: result.error });
+      }
+    } catch {
+      setError({ title: 'Error loading consultants', message: 'An unexpected error occurred' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [user, showToast]);
+  }, [user]);
 
   useEffect(() => {
     loadConsultants();
-  }, [loadConsultants]);
+    let unsubscribe: (() => void) | undefined;
+    if (user) {
+      unsubscribe = subscribeToConsultants(user.id, (update: RealtimeUpdate<Consultant>) => {
+        if (update.type === 'INSERT') {
+          setConsultants(prev => [update.record, ...prev]);
+        } else if (update.type === 'UPDATE') {
+          setConsultants(prev =>
+            prev.map(c => (c.id === update.record.id ? update.record : c))
+          );
+          // Update selected consultant if it matches
+          setSelectedConsultant(prev =>
+            prev?.id === update.record.id ? update.record : prev
+          );
+        } else if (update.type === 'DELETE') {
+          setConsultants(prev => prev.filter(c => c.id !== update.record.id));
+          // Clear selected consultant if it was deleted
+          if (selectedConsultant?.id === update.record.id) {
+            setSelectedConsultant(null);
+          }
+        }
+      });
+    }
+    return () => { unsubscribe?.(); };
+  }, [loadConsultants, user, selectedConsultant?.id]);
+
+  const handleDelete = useCallback(async (id: string) => {
+    if (!isAdmin) {
+      showToast({
+        type: 'error',
+        title: 'Permission denied',
+        message: 'Only admins can delete consultants.',
+      });
+      return;
+    }
+
+    if (confirm('Are you sure you want to delete this consultant?')) {
+      try {
+        const result = await deleteConsultant(id);
+        if (result.success) {
+          showToast({ type: 'success', title: 'Consultant deleted', message: 'The consultant has been removed.' });
+          await loadConsultants();
+        } else if (result.error) {
+          setError({ title: 'Failed to delete', message: result.error });
+        }
+      } catch {
+        setError({ title: 'Error', message: 'Failed to delete consultant' });
+      }
+    }
+  }, [loadConsultants, isAdmin, showToast]);
 
   const handleStatusChange = useCallback(async (id: string, newStatus: string) => {
-    const result = await updateConsultant(id, { status: newStatus }, user?.id);
-    if (result.success) {
-      await loadConsultants();
-      showToast({ type: 'success', title: 'Status updated', message: `Consultant marked as ${newStatus}` });
-    } else if (result.error) {
-      showToast({ type: 'error', title: 'Failed to update consultant', message: result.error });
+    try {
+      const result = await updateConsultant(id, { status: newStatus }, user?.id);
+      if (result.success) {
+        await loadConsultants();
+        showToast({ type: 'success', title: 'Status updated', message: `Consultant marked as ${newStatus}` });
+      } else if (result.error) {
+        setError({ title: 'Failed to update', message: result.error });
+      }
+    } catch {
+      setError({ title: 'Error', message: 'Failed to update consultant' });
     }
   }, [loadConsultants, showToast, user?.id]);
 
@@ -104,6 +175,16 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Error Alert */}
+      {error && (
+        <ErrorAlert
+          title={error.title}
+          message={error.message}
+          onRetry={loadConsultants}
+          onDismiss={() => setError(null)}
+        />
+      )}
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Consultant Profiles</h2>
         <button
@@ -272,6 +353,19 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
                   <option>Not Active</option>
                   <option>Recently Placed</option>
                 </select>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(consultant.id);
+                    }}
+                    className="px-3 py-2 text-xs sm:text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-1"
+                    title="Delete consultant"
+                  >
+                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden xs:inline">Delete</span>
+                  </button>
+                )}
               </div>
             </div>
           ))

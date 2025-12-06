@@ -1,7 +1,10 @@
 import { useState, useCallback, memo } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../contexts/ToastContext';
 import { createConsultant } from '../../lib/api/consultants';
+import { validateConsultantForm } from '../../lib/formValidation';
+import { ErrorAlert } from '../common/ErrorAlert';
 
 type Project = {
   id: string;
@@ -29,6 +32,7 @@ interface FormFieldProps {
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   required?: boolean;
   options?: FormFieldOption[];
+  error?: string;
 }
 
 // Create FormField component outside the parent component for stability
@@ -41,6 +45,7 @@ const FormField = memo(function FormField({
   onChange,
   required = false,
   options,
+  error,
 }: FormFieldProps) {
   return (
     <div>
@@ -53,7 +58,9 @@ const FormField = memo(function FormField({
           name={name}
           value={value}
           onChange={onChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
+          }`}
         >
           <option value="">Select {label.toLowerCase()}</option>
           {options?.map((opt: FormFieldOption) => (
@@ -69,7 +76,9 @@ const FormField = memo(function FormField({
           onChange={onChange}
           placeholder={placeholder}
           rows={4}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
+          }`}
         />
       ) : (
         <input
@@ -79,8 +88,15 @@ const FormField = memo(function FormField({
           onChange={onChange}
           placeholder={placeholder}
           required={required}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
+          }`}
         />
+      )}
+      {error && (
+        <div className="flex items-center gap-2 mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">
+          <span>{error}</span>
+        </div>
       )}
     </div>
   );
@@ -100,9 +116,12 @@ const FormSection = ({ title, children }: { title: string; children: React.React
 
 export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFormProps) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [showProjectForm, setShowProjectForm] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     status: 'Active',
@@ -164,44 +183,89 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
     e.preventDefault();
     if (!user) return;
 
-    setLoading(true);
-    const result = await createConsultant({
-      user_id: user.id,
-      status: formData.status,
+    // Validate form
+    const validation = validateConsultantForm({
       name: formData.name,
-      email: formData.email || null,
-      phone: formData.phone || null,
-      location: formData.location || null,
-      primary_skills: formData.primary_skills || null,
-      secondary_skills: formData.secondary_skills || null,
-      total_experience: formData.total_experience || null,
-      linkedin_profile: formData.linkedin_profile || null,
-      portfolio_link: formData.portfolio_link || null,
-      availability: formData.availability || null,
-      visa_status: formData.visa_status || null,
-      date_of_birth: formData.date_of_birth || null,
-      address: formData.address || null,
-      timezone: formData.timezone || null,
-      degree_name: formData.degree_name || null,
-      university: formData.university || null,
-      year_of_passing: formData.year_of_passing || null,
-      ssn: formData.ssn || null,
-      how_got_visa: formData.how_got_visa || null,
-      year_came_to_us: formData.year_came_to_us || null,
-      country_of_origin: formData.country_of_origin || null,
-      why_looking_for_job: formData.why_looking_for_job || null,
-      preferred_work_location: formData.preferred_work_location || null,
-      preferred_work_type: formData.preferred_work_type || null,
-      expected_rate: formData.expected_rate || null,
-      payroll_company: formData.payroll_company || null,
-      payroll_contact_info: formData.payroll_contact_info || null,
-      projects: projects.length > 0 ? projects : null,
-      company: null,
+      email: formData.email,
+      phone: formData.phone,
+      date_of_birth: formData.date_of_birth,
+      expected_rate: formData.expected_rate,
     });
 
-    setLoading(false);
-    if (result.success) {
-      onSuccess();
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      showToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please fix the errors below',
+      });
+      return;
+    }
+
+    setFormErrors({});
+    setSubmitError(null);
+    setLoading(true);
+
+    try {
+      const result = await createConsultant({
+        user_id: user.id,
+        status: formData.status,
+        name: formData.name,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        location: formData.location || null,
+        primary_skills: formData.primary_skills || null,
+        secondary_skills: formData.secondary_skills || null,
+        total_experience: formData.total_experience || null,
+        linkedin_profile: formData.linkedin_profile || null,
+        portfolio_link: formData.portfolio_link || null,
+        availability: formData.availability || null,
+        visa_status: formData.visa_status || null,
+        date_of_birth: formData.date_of_birth || null,
+        address: formData.address || null,
+        timezone: formData.timezone || null,
+        degree_name: formData.degree_name || null,
+        university: formData.university || null,
+        year_of_passing: formData.year_of_passing || null,
+        ssn: formData.ssn || null,
+        how_got_visa: formData.how_got_visa || null,
+        year_came_to_us: formData.year_came_to_us || null,
+        country_of_origin: formData.country_of_origin || null,
+        why_looking_for_job: formData.why_looking_for_job || null,
+        preferred_work_location: formData.preferred_work_location || null,
+        preferred_work_type: formData.preferred_work_type || null,
+        expected_rate: formData.expected_rate || null,
+        payroll_company: formData.payroll_company || null,
+        payroll_contact_info: formData.payroll_contact_info || null,
+        projects: projects.length > 0 ? projects : null,
+        company: null,
+      });
+
+      setLoading(false);
+      if (result.success) {
+        showToast({
+          type: 'success',
+          title: 'Consultant Added',
+          message: 'New consultant has been successfully added',
+        });
+        onSuccess();
+      } else {
+        setSubmitError(result.error || 'Failed to add consultant');
+        showToast({
+          type: 'error',
+          title: 'Failed',
+          message: result.error || 'Failed to add consultant',
+        });
+      }
+    } catch (error) {
+      setLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      setSubmitError(errorMessage);
+      showToast({
+        type: 'error',
+        title: 'Error',
+        message: errorMessage,
+      });
     }
   };
 
@@ -246,6 +310,16 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          {/* Submit Error Alert */}
+          {submitError && (
+            <ErrorAlert
+              title="Failed to Add Consultant"
+              message={submitError}
+              onDismiss={() => setSubmitError(null)}
+              retryLabel="Try Again"
+            />
+          )}
+
           {/* Basic Information */}
           <FormSection title="Basic Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -270,6 +344,7 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
                 value={formData.name}
                 onChange={handleChange}
                 required
+                error={formErrors.name}
               />
               <FormField
                 label="What's your email address?"
@@ -278,6 +353,7 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
                 placeholder="john@example.com"
                 value={formData.email}
                 onChange={handleChange}
+                error={formErrors.email}
               />
               <FormField
                 label="What's your phone number?"
@@ -286,6 +362,7 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
                 placeholder="(555) 123-4567"
                 value={formData.phone}
                 onChange={handleChange}
+                error={formErrors.phone}
               />
             </div>
           </FormSection>
@@ -464,6 +541,7 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
                 type="date"
                 value={formData.date_of_birth}
                 onChange={handleChange}
+                error={formErrors.date_of_birth}
               />
               <FormField
                 label="What's your SSN (last 4 digits)?"
@@ -510,6 +588,7 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
                 placeholder="$80-120/hr or $100k-150k/year"
                 value={formData.expected_rate}
                 onChange={handleChange}
+                error={formErrors.expected_rate}
               />
               <FormField
                 label="Why are you looking for a new opportunity?"

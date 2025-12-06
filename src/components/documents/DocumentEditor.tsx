@@ -490,7 +490,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             });
 
             // Handle initialization errors
-            superdoc.on('error', (err: any) => {
+            superdoc.on('error', (err: Error) => {
               console.error(`SuperDoc error for ${doc.original_filename}:`, err);
               console.error('Error details:', err.message, err.stack);
               if (isMounted) {
@@ -807,8 +807,8 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                       ) : (
                         <div
                           id={`superdoc-container-${index}`}
-                          className="flex-1 overflow-auto min-h-[400px]"
-                          style={{ minHeight: '400px' }}
+                            className="flex-1 overflow-auto min-h-[400px] bg-white shadow-lg rounded-lg"
+                            style={{ minHeight: '400px', maxWidth: '850px' }}
                         />
                       )}
                     </div>
@@ -818,7 +818,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             )}
           </div>
 
-          <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
             <p className="text-sm text-gray-600">
               {editedCount > 0 ? (
                 <>
@@ -829,18 +829,18 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                 'No changes made'
               )}
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 w-full sm:w-auto">
               <button
                 onClick={handleCloseWithConfirm}
                 disabled={saving}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-100 transition disabled:opacity-50"
+                className="flex-1 sm:flex-none px-4 py-2 text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-100 transition disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveAll}
                 disabled={saving || editedCount === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+                className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving && <Loader className="w-4 h-4 animate-spin" />}
                 {saving ? 'Saving...' : `Save & Download (${editedCount})`}

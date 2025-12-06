@@ -4,10 +4,7 @@ import type { Database } from '../database.types';
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type RequirementInsert = Database['public']['Tables']['requirements']['Insert'];
 
-export interface RequirementWithLogs extends Requirement {
-  created_by?: { id: string; full_name: string; email: string } | null;
-  updated_by?: { id: string; full_name: string; email: string } | null;
-}
+export type RequirementWithLogs = Requirement;
 
 export const getRequirements = async (
   userId?: string

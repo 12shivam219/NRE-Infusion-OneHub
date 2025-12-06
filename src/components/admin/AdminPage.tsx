@@ -149,17 +149,7 @@ export const AdminPage = () => {
   const adminId = currentAdmin?.id ?? null;
   const { showToast } = useToast();
 
-  if (!isAdmin) {
-    return (
-      <div className="p-8">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 text-center">
-          <h2 className="text-2xl font-semibold text-gray-900">Not authorized</h2>
-          <p className="text-gray-600 mt-2">You do not have permission to view the Admin Panel.</p>
-          <p className="text-gray-500 mt-4">Use the sidebar to access available sections for your role.</p>
-        </div>
-      </div>
-    );
-  }
+  // --- MOVED: Hooks declared here (before any conditional return) ---
 
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
 
@@ -206,6 +196,7 @@ export const AdminPage = () => {
   const pageSize = 10;
 
   const loadUsers = useCallback(async () => {
+    if (!isAdmin) return; // Guard clause added here
     setUsersLoading(true);
     const result = await getAllUsers();
     if (result.success && result.users) {
@@ -214,9 +205,10 @@ export const AdminPage = () => {
       showToast({ type: 'error', title: 'Failed to load users', message: result.error });
     }
     setUsersLoading(false);
-  }, []);
+  }, [isAdmin, showToast]);
 
   const loadApprovals = useCallback(async () => {
+    if (!isAdmin) return;
     setApprovalsLoading(true);
     const [queueResult, statsResult] = await Promise.all([
       getPendingApprovals(approvalsSearchTerm || undefined),
@@ -236,13 +228,15 @@ export const AdminPage = () => {
     if (statsResult.success && statsResult.stats) {
       setApprovalStats(statsResult.stats);
     } else if (statsResult.error) {
-      alert(`Failed to load approval statistics: ${statsResult.error}`);
+      // Use toast instead of alert for consistency
+      console.error(`Failed to load approval statistics: ${statsResult.error}`);
     }
 
     setApprovalsLoading(false);
-  }, [approvalsSearchTerm]);
+  }, [approvalsSearchTerm, isAdmin, showToast]);
 
   const loadSecurityEvents = useCallback(async () => {
+    if (!isAdmin) return;
     setSecurityLoading(true);
     const result = await getSuspiciousLogins();
     if (result.success && result.events) {
@@ -255,9 +249,10 @@ export const AdminPage = () => {
       });
     }
     setSecurityLoading(false);
-  }, []);
+  }, [isAdmin, showToast]);
 
   const loadErrors = useCallback(async () => {
+    if (!isAdmin) return;
     setErrorsLoading(true);
     setErrorsError(null);
     const result = await getErrorReports();
@@ -273,7 +268,7 @@ export const AdminPage = () => {
       });
     }
     setErrorsLoading(false);
-  }, []);
+  }, [isAdmin, showToast]);
 
   const loadErrorDetails = async (errorId: string) => {
     setErrorDetailLoading(true);
@@ -334,10 +329,13 @@ export const AdminPage = () => {
   };
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    if (isAdmin) {
+      loadUsers();
+    }
+  }, [loadUsers, isAdmin]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     if (activeTab === 'dashboard') {
       loadUsers();
     } else if (activeTab === 'approvals') {
@@ -347,15 +345,16 @@ export const AdminPage = () => {
     } else if (activeTab === 'errors') {
       loadErrors();
     }
-  }, [activeTab, loadUsers, loadApprovals, loadSecurityEvents, loadErrors]);
+  }, [activeTab, loadUsers, loadApprovals, loadSecurityEvents, loadErrors, isAdmin]);
 
   useEffect(() => {
+    if (!isAdmin) return;
     if (activeTab === 'approvals') {
       loadApprovals();
     }
     setApprovalPage(1);
     setSelectedApprovals([]);
-  }, [approvalsSearchTerm, activeTab, loadApprovals]);
+  }, [approvalsSearchTerm, activeTab, loadApprovals, isAdmin]);
 
   const roleCounts = useMemo(() => {
     return users.reduce(
@@ -721,6 +720,19 @@ export const AdminPage = () => {
     { id: 'security' as TabType, label: 'Security Watch', icon: ShieldAlert },
     { id: 'errors' as TabType, label: 'Error Reports', icon: Bug },
   ];
+
+  // --- MOVED: Conditional check is now AFTER all hooks ---
+  if (!isAdmin) {
+    return (
+      <div className="p-8">
+        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 text-center">
+          <h2 className="text-2xl font-semibold text-gray-900">Not authorized</h2>
+          <p className="text-gray-600 mt-2">You do not have permission to view the Admin Panel.</p>
+          <p className="text-gray-500 mt-4">Use the sidebar to access available sections for your role.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6">

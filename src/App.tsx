@@ -33,7 +33,7 @@ const AppContent = () => {
       const savedPage = localStorage.getItem('currentPage');
       if (!savedPage) {
         // First login - set default landing page based on role
-        const role = (user as any).role;
+        const role = (user as { role?: string }).role;
         if (role === 'marketing' || role === 'user') {
           // Marketing and user roles land on CRM
           setCurrentPage('crm');
@@ -43,7 +43,7 @@ const AppContent = () => {
         }
       }
     }
-  }, [user?.id]); // Only run when user ID changes (login), not on every user refresh
+  }, [user]); // Only run when user changes (login), not on every user refresh
 
   // Save page preference to localStorage whenever it changes
   useEffect(() => {
@@ -60,7 +60,7 @@ const AppContent = () => {
     if (currentPage === 'admin' && !isAdmin) {
       setCurrentPage(isMarketing ? 'crm' : 'dashboard');
     }
-  }, [isAdmin, isMarketing]);
+  }, [currentPage, isAdmin, isMarketing]);
 
   if (isLoading) {
     return (
