@@ -1,0 +1,22 @@
+{
+  "name": "loster-email-server",
+  "version": "1.0.0",
+  "description": "Email server for Loster CRM",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test-all-scenarios.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "nodemailer": "^6.10.1"
+  },
+  "devDependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}

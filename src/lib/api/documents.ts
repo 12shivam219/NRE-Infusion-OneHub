@@ -181,7 +181,7 @@ export const deleteDocument = async (
         await supabase.storage
           .from('documents')
           .remove([document.storage_path]);
-      } catch (storageError) {
+      } catch {
         logger.warn('Failed to delete storage file', {
           component: 'deleteDocument',
           resource: documentId,

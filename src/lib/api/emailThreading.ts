@@ -98,7 +98,7 @@ export const getEmailThread = async (
 };
 
 /**
- * Create a new email thread
+ * Create a new email thread and send the email
  */
 export const createEmailThread = async (
   userId: string,
@@ -111,6 +111,40 @@ export const createEmailThread = async (
   try {
     const threadId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    // First, try to send the actual email via the email server
+    const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+    const sendEmailResponse = await fetch(`${emailServerUrl}/api/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: toEmail,
+        subject: subject,
+        body: body,
+        from: fromEmail,
+      }),
+    });
+
+    if (!sendEmailResponse.ok) {
+      const errorData = await sendEmailResponse.json();
+      logger.error('Failed to send email via server', {
+        component: 'createEmailThread',
+        error: errorData.error,
+      });
+      return {
+        success: false,
+        error: `Email service error: ${errorData.error || 'Failed to send email'}`,
+      };
+    }
+
+    const emailSendResult = await sendEmailResponse.json();
+    logger.info('Email sent successfully', {
+      component: 'createEmailThread',
+      messageId: emailSendResult.messageId,
+    });
+
+    // Now save the thread to database
     const { data, error } = await retryAsync(
       async () =>
         supabase
@@ -142,7 +176,7 @@ export const createEmailThread = async (
       return { success: false, error: appError.message };
     }
 
-    logger.info('Email thread created', {
+    logger.info('Email thread created and saved to database', {
       component: 'createEmailThread',
       resource: subject,
     });
@@ -157,7 +191,7 @@ export const createEmailThread = async (
 };
 
 /**
- * Add a reply to an existing email thread
+ * Add a reply to an existing email thread and send it
  */
 export const replyToEmailThread = async (
   userId: string,
@@ -176,6 +210,42 @@ export const replyToEmailThread = async (
       .limit(1)
       .single();
 
+    const replySubject = originalThread?.subject ? `Re: ${originalThread.subject}` : 'Reply';
+
+    // First, try to send the actual email reply via the email server
+    const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+    const sendEmailResponse = await fetch(`${emailServerUrl}/api/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: toEmail,
+        subject: replySubject,
+        body: body,
+        from: fromEmail,
+      }),
+    });
+
+    if (!sendEmailResponse.ok) {
+      const errorData = await sendEmailResponse.json();
+      logger.error('Failed to send email reply via server', {
+        component: 'replyToEmailThread',
+        error: errorData.error,
+      });
+      return {
+        success: false,
+        error: `Email service error: ${errorData.error || 'Failed to send reply'}`,
+      };
+    }
+
+    const emailSendResult = await sendEmailResponse.json();
+    logger.info('Email reply sent successfully', {
+      component: 'replyToEmailThread',
+      messageId: emailSendResult.messageId,
+    });
+
+    // Now save the reply to database
     const { data, error } = await retryAsync(
       async () =>
         supabase
@@ -183,7 +253,7 @@ export const replyToEmailThread = async (
           .insert({
             user_id: userId,
             requirement_id: originalThread?.requirement_id || null,
-            subject: originalThread?.subject ? `Re: ${originalThread.subject}` : 'Reply',
+            subject: replySubject,
             from_email: fromEmail,
             to_email: toEmail,
             body,
@@ -207,7 +277,7 @@ export const replyToEmailThread = async (
       return { success: false, error: appError.message };
     }
 
-    logger.info('Email reply added', {
+    logger.info('Email reply added to database', {
       component: 'replyToEmailThread',
       resource: threadId,
     });

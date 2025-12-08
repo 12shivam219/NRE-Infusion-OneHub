@@ -306,7 +306,7 @@ export const revokeGoogleDriveAccess = async (
           },
           body: `token=${accessToken}`,
         });
-      } catch (error) {
+      } catch {
         logger.warn('Failed to revoke token on Google side', {
           userId,
         });

@@ -39,6 +39,7 @@ import {
 import type { Database, UserRole, UserStatus, ErrorStatus } from '../../lib/database.types';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { EmailAccountsSettings } from './EmailAccountsSettings';
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -60,7 +61,7 @@ type UserSession = {
   location?: string | null;
 };
 
-type TabType = 'dashboard' | 'approvals' | 'security' | 'errors';
+type TabType = 'dashboard' | 'approvals' | 'security' | 'errors' | 'email-accounts';
 
 type ApprovalStatistics = {
   pendingApproval: number;
@@ -71,6 +72,16 @@ type ApprovalStatistics = {
   totalApproved: number;
   totalPending: number;
 };
+
+// Constants for magic numbers and configuration
+const ADMIN_CONSTANTS = {
+  APPROVAL_PAGE_SIZE: 10,
+  LOGIN_HISTORY_SLICE_LIMIT: 20,
+  ERROR_MESSAGE_PREVIEW_LENGTH: 80,
+  SEARCH_DEBOUNCE_MS: 300,
+  AUTO_RETRY_DELAY_MS: 1000,
+  FILE_UPLOAD_MAX_SIZE_MB: 10,
+} as const;
 
 const roleDirectory: { role: UserRole; label: string; description: string }[] = [
   {
@@ -192,8 +203,8 @@ export const AdminPage = () => {
   const [errorNoteDraft, setErrorNoteDraft] = useState('');
   const [attachmentUploading, setAttachmentUploading] = useState(false);
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null);
-
-  const pageSize = 10;
+  const [bulkActionInProgress, setBulkActionInProgress] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return; // Guard clause added here
@@ -270,33 +281,44 @@ export const AdminPage = () => {
     setErrorsLoading(false);
   }, [isAdmin, showToast]);
 
-  const loadErrorDetails = async (errorId: string) => {
+  const loadErrorDetails = useCallback(async (errorId: string) => {
+    // Cancel previous request if exists
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setErrorDetailLoading(true);
     setErrorAttachmentError(null);
     setAttachmentUploadError(null);
-    const [notesResult, attachmentsResult] = await Promise.all([
-      getErrorNotes(errorId),
-      getErrorAttachments(errorId),
-    ]);
+    try {
+      const [notesResult, attachmentsResult] = await Promise.all([
+        getErrorNotes(errorId),
+        getErrorAttachments(errorId),
+      ]);
 
-    if (notesResult.success && notesResult.notes) {
-      setErrorNotes(notesResult.notes);
-    } else if (notesResult.error) {
-      setErrorNotes([]);
-    }
+      // Only update state if this request wasn't aborted
+      if (abortControllerRef.current?.signal.aborted) return;
 
-    if (attachmentsResult.success && attachmentsResult.attachments) {
-      setErrorAttachments(attachmentsResult.attachments);
-      if (attachmentsResult.error) {
+      if (notesResult.success && notesResult.notes) {
+        setErrorNotes(notesResult.notes);
+      } else if (notesResult.error) {
+        setErrorNotes([]);
+      }
+
+      if (attachmentsResult.success && attachmentsResult.attachments) {
+        setErrorAttachments(attachmentsResult.attachments);
+        if (attachmentsResult.error) {
+          setErrorAttachmentError(attachmentsResult.error);
+        }
+      } else if (attachmentsResult.error) {
+        setErrorAttachments([]);
         setErrorAttachmentError(attachmentsResult.error);
       }
-    } else if (attachmentsResult.error) {
-      setErrorAttachments([]);
-      setErrorAttachmentError(attachmentsResult.error);
+    } finally {
+      setErrorDetailLoading(false);
     }
-
-    setErrorDetailLoading(false);
-  };
+  }, []);
 
   const loadUserContext = async (user: User) => {
     setUserDetailLoading(true);
@@ -393,7 +415,7 @@ export const AdminPage = () => {
     });
   }, [approvals, approvalsSearchTerm]);
 
-  const totalApprovalPages = Math.max(1, Math.ceil(filteredApprovals.length / pageSize));
+  const totalApprovalPages = Math.max(1, Math.ceil(filteredApprovals.length / ADMIN_CONSTANTS.APPROVAL_PAGE_SIZE));
 
   useEffect(() => {
     if (approvalPage > totalApprovalPages) {
@@ -404,7 +426,19 @@ export const AdminPage = () => {
   useEffect(() => {
     if (!focusedLoginId) return;
     const container = loginHistoryContainerRef.current;
-    if (!container) return;
+    if (!container) {
+      // Try again after a short delay if container not yet rendered
+      const timer = setTimeout(() => {
+        const retryContainer = loginHistoryContainerRef.current;
+        if (retryContainer) {
+          const target = retryContainer.querySelector<HTMLElement>(`[data-login-entry="${focusedLoginId}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+      }, ADMIN_CONSTANTS.AUTO_RETRY_DELAY_MS);
+      return () => clearTimeout(timer);
+    }
     const target = container.querySelector<HTMLElement>(`[data-login-entry="${focusedLoginId}"]`);
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -412,8 +446,8 @@ export const AdminPage = () => {
   }, [focusedLoginId, userLoginHistory]);
 
   const approvalPageSlice = useMemo(() => {
-    const start = (approvalPage - 1) * pageSize;
-    return filteredApprovals.slice(start, start + pageSize);
+    const start = (approvalPage - 1) * ADMIN_CONSTANTS.APPROVAL_PAGE_SIZE;
+    return filteredApprovals.slice(start, start + ADMIN_CONSTANTS.APPROVAL_PAGE_SIZE);
   }, [filteredApprovals, approvalPage]);
 
   const userMap = useMemo(() => {
@@ -443,7 +477,10 @@ export const AdminPage = () => {
 
       return emailMatch && locationMatch && statusMatch;
     });
-  }, [securityEvents, securityEmailFilter, securityLocationFilter, securityStatusFilter, userMap]);
+    // Note: Intentionally exclude userMap from dependencies as it's recreated on every user change
+    // and would cause unnecessary re-renders. The lookup still works correctly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [securityEvents, securityEmailFilter, securityLocationFilter, securityStatusFilter]);
 
   const securityStats = useMemo(() => {
     const suspicious = securityEvents.filter((event) => event.suspicious);
@@ -483,38 +520,35 @@ export const AdminPage = () => {
 
   const handleUserRoleChange = async (userId: string, role: UserRole) => {
     try {
-      console.log('[UI] handleUserRoleChange start', { userId, role, adminId });
       const result = await updateUserRole(userId, role, { adminId: adminId ?? undefined });
-      console.log('[UI] updateUserRole result', { result });
       if (!result.success && result.error) {
-        console.error('[UI] updateUserRole error', { error: result.error });
         showToast({ type: 'error', title: 'Failed to update role', message: result.error });
+      } else {
+        showToast({ type: 'success', title: 'Role updated', message: `User role changed to ${role}` });
       }
-    } catch (err) {
-      console.error('[UI] handleUserRoleChange exception', { err });
-      alert('Unexpected error updating role. See console for details.');
+    } catch {
+      showToast({ type: 'error', title: 'Unexpected error', message: 'Failed to update user role. Please try again.' });
     } finally {
       await loadUsers();
     }
   };
 
   const handleUserStatusChange = async (userId: string, status: UserStatus, reason?: string) => {
-    console.log(`[APPROVAL] Starting approval for user ${userId} with status ${status}`);
-    const result = await updateUserStatus(userId, status, {
-      adminId: adminId ?? undefined,
-      reason,
-    });
-    console.log(`[APPROVAL] Result:`, result);
-    if (!result.success && result.error) {
-      console.error(`[APPROVAL] Error occurred:`, result.error);
-      showToast({ type: 'error', title: 'Failed to update user status', message: result.error });
-    } else if (result.success) {
-      console.log(`[APPROVAL] Success! User approval updated.`);
-      showToast({ type: 'success', title: 'User status updated', message: `Status set to ${status.replace('_', ' ')}` });
-    }
-    await loadUsers();
-    if (activeTab === 'approvals') {
-      await loadApprovals();
+    try {
+      const result = await updateUserStatus(userId, status, {
+        adminId: adminId ?? undefined,
+        reason,
+      });
+      if (!result.success && result.error) {
+        showToast({ type: 'error', title: 'Failed to update user status', message: result.error });
+      } else {
+        showToast({ type: 'success', title: 'User status updated', message: `Status set to ${status.replace(/_/g, ' ')}` });
+      }
+    } finally {
+      await loadUsers();
+      if (activeTab === 'approvals') {
+        await loadApprovals();
+      }
     }
   };
 
@@ -529,58 +563,68 @@ export const AdminPage = () => {
 
   const handleBulkApprove = async () => {
     if (selectedApprovals.length === 0) return;
-    const responses = await Promise.all(
-      selectedApprovals.map((userId) =>
-        updateUserStatus(userId, 'approved', { adminId: adminId ?? undefined })
-      )
-    );
-    const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error);
-    if (failures.length > 0) {
-      showToast({
-        type: 'error',
-        title: 'Some approvals failed',
-        message: failures.join('\n'),
-      });
-    } else if (selectedApprovals.length > 0) {
-      showToast({
-        type: 'success',
-        title: 'Users approved',
-        message: `${selectedApprovals.length} account(s) approved`,
-      });
+    setBulkActionInProgress(true);
+    try {
+      const responses = await Promise.all(
+        selectedApprovals.map((userId) =>
+          updateUserStatus(userId, 'approved', { adminId: adminId ?? undefined })
+        )
+      );
+      const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
+      if (failures.length > 0) {
+        showToast({
+          type: 'error',
+          title: 'Some approvals failed',
+          message: failures.length === 1 ? failures[0] : `${failures.length} approvals failed`,
+        });
+      } else if (selectedApprovals.length > 0) {
+        showToast({
+          type: 'success',
+          title: 'Users approved',
+          message: `${selectedApprovals.length} account(s) approved successfully`,
+        });
+      }
+    } finally {
+      setSelectedApprovals([]);
+      setBulkActionInProgress(false);
+      await loadUsers();
+      await loadApprovals();
     }
-    setSelectedApprovals([]);
-    await loadUsers();
-    await loadApprovals();
   };
 
   const handleBulkReject = async () => {
     if (selectedApprovals.length === 0) return;
     const reason = window.prompt('Optional: provide a rejection reason for the selected users.');
-    const responses = await Promise.all(
-      selectedApprovals.map((userId) =>
-        updateUserStatus(userId, 'rejected', {
-          adminId: adminId ?? undefined,
-          reason: reason || undefined,
-        })
-      )
-    );
-    const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error);
-    if (failures.length > 0) {
-      showToast({
-        type: 'error',
-        title: 'Some rejections failed',
-        message: failures.join('\n'),
-      });
-    } else if (selectedApprovals.length > 0) {
-      showToast({
-        type: 'success',
-        title: 'Users rejected',
-        message: `${selectedApprovals.length} account(s) rejected`,
-      });
+    setBulkActionInProgress(true);
+    try {
+      const responses = await Promise.all(
+        selectedApprovals.map((userId) =>
+          updateUserStatus(userId, 'rejected', {
+            adminId: adminId ?? undefined,
+            reason: reason || undefined,
+          })
+        )
+      );
+      const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
+      if (failures.length > 0) {
+        showToast({
+          type: 'error',
+          title: 'Some rejections failed',
+          message: failures.length === 1 ? failures[0] : `${failures.length} rejections failed`,
+        });
+      } else if (selectedApprovals.length > 0) {
+        showToast({
+          type: 'success',
+          title: 'Users rejected',
+          message: `${selectedApprovals.length} account(s) rejected successfully`,
+        });
+      }
+    } finally {
+      setSelectedApprovals([]);
+      setBulkActionInProgress(false);
+      await loadUsers();
+      await loadApprovals();
     }
-    setSelectedApprovals([]);
-    await loadUsers();
-    await loadApprovals();
   };
 
   const handleOpenUser = async (user: User, loginId?: string) => {
@@ -693,25 +737,45 @@ export const AdminPage = () => {
     if (!selectedError) return;
     const file = event.target.files?.[0];
     if (!file) return;
+
+    // Client-side validation
+    const maxSizeMB = ADMIN_CONSTANTS.FILE_UPLOAD_MAX_SIZE_MB;
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setAttachmentUploadError(`File size exceeds ${maxSizeMB}MB limit. File size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      event.target.value = '';
+      return;
+    }
+
+    const allowedTypes = ['image/', 'application/pdf', 'text/plain', 'text/x-log'];
+    const isAllowedType = allowedTypes.some(type => file.type.startsWith(type.replace(/\/$/, '')));
+    if (!isAllowedType) {
+      setAttachmentUploadError(`File type not allowed. Accepted: images, PDF, TXT, LOG files`);
+      event.target.value = '';
+      return;
+    }
+
     if (!adminId) {
       setAttachmentUploadError('Your admin session is missing. Please sign in again.');
       event.target.value = '';
       return;
     }
+
     setAttachmentUploading(true);
     setAttachmentUploadError(null);
-    const result = await uploadErrorAttachment(selectedError.id, file, {
-      adminId,
-    });
-    if (!result.success && result.error) {
-      setAttachmentUploadError(result.error);
-      showToast({ type: 'error', title: 'Failed to upload attachment', message: result.error });
-    } else {
-      await loadErrorDetails(selectedError.id);
-      showToast({ type: 'success', title: 'Attachment uploaded', message: 'Your file was attached to the error.' });
+    try {
+      const result = await uploadErrorAttachment(selectedError.id, file, { adminId });
+      if (!result.success && result.error) {
+        setAttachmentUploadError(result.error);
+        showToast({ type: 'error', title: 'Failed to upload attachment', message: result.error });
+      } else {
+        await loadErrorDetails(selectedError.id);
+        showToast({ type: 'success', title: 'Attachment uploaded', message: 'Your file was attached to the error.' });
+      }
+    } finally {
+      setAttachmentUploading(false);
+      event.target.value = '';
     }
-    setAttachmentUploading(false);
-    event.target.value = '';
   };
 
   const tabs = [
@@ -719,6 +783,7 @@ export const AdminPage = () => {
     { id: 'approvals' as TabType, label: 'Pending Approvals', icon: UserCheck },
     { id: 'security' as TabType, label: 'Security Watch', icon: ShieldAlert },
     { id: 'errors' as TabType, label: 'Error Reports', icon: Bug },
+    { id: 'email-accounts' as TabType, label: 'Email Accounts', icon: Mail },
   ];
 
   // --- MOVED: Conditional check is now AFTER all hooks ---
@@ -988,27 +1053,27 @@ export const AdminPage = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={handleBulkApprove}
-                    disabled={selectedApprovals.length === 0 || approvalsLoading}
+                    disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
-                      selectedApprovals.length === 0 || approvalsLoading
+                      selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
                         ? 'bg-green-100 text-green-400 cursor-not-allowed'
                         : 'bg-green-600 text-white hover:bg-green-700'
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    Bulk approve
+                    {bulkActionInProgress ? 'Processing…' : 'Bulk approve'}
                   </button>
                   <button
                     onClick={handleBulkReject}
-                    disabled={selectedApprovals.length === 0 || approvalsLoading}
+                    disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
-                      selectedApprovals.length === 0 || approvalsLoading
+                      selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
                         ? 'bg-red-100 text-red-400 cursor-not-allowed'
                         : 'bg-red-600 text-white hover:bg-red-700'
                     }`}
                   >
                     <XCircle className="w-4 h-4" />
-                    Bulk reject
+                    {bulkActionInProgress ? 'Processing…' : 'Bulk reject'}
                   </button>
                 </div>
               </div>
@@ -1347,7 +1412,7 @@ export const AdminPage = () => {
                         {errors.map((error) => (
                           <tr key={error.id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
-                              <p className="font-medium text-gray-900">{error.error_message.slice(0, 80)}</p>
+                              <p className="font-medium text-gray-900">{error.error_message.slice(0, ADMIN_CONSTANTS.ERROR_MESSAGE_PREVIEW_LENGTH)}</p>
                               <p className="text-xs text-gray-500 truncate">{error.error_type || 'Unknown type'}</p>
                             </td>
                             <td className="px-6 py-4 text-gray-600">{error.user_id ? userMap.get(error.user_id)?.email || 'System' : 'System'}</td>
@@ -1378,6 +1443,10 @@ export const AdminPage = () => {
                 )}
               </div>
             </div>
+          )}
+
+          {activeTab === 'email-accounts' && (
+            <EmailAccountsSettings />
           )}
         </div>
       </nav>
@@ -1501,7 +1570,7 @@ export const AdminPage = () => {
                   <div className="py-6 text-center text-gray-500">No login history available.</div>
                 ) : (
                   <div className="space-y-2 text-sm">
-                    {userLoginHistory.slice(0, 20).map((entry) => (
+                    {userLoginHistory.slice(0, ADMIN_CONSTANTS.LOGIN_HISTORY_SLICE_LIMIT).map((entry) => (
                       <div
                         key={entry.id}
                         className={`rounded-lg border p-3 flex items-center justify-between ${
@@ -1533,7 +1602,7 @@ export const AdminPage = () => {
       {selectedError && (
         <div className="fixed inset-0 bg-black/40 z-50 flex justify-end">
           <div className="w-full max-w-3xl h-full bg-white shadow-2xl overflow-y-auto">
-            <div className="p-6 border-b border-gray-200 flex items-start justify-between">
+            <div className="sticky top-0 z-10 p-6 border-b border-gray-200 flex items-start justify-between bg-white">
               <div>
                 <p className="text-xs uppercase text-gray-500">Error report</p>
                 <h3 className="text-2xl font-semibold text-gray-900">{selectedError.error_message}</h3>

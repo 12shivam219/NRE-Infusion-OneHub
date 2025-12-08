@@ -10,7 +10,7 @@ export type UserRole = 'user' | 'marketing' | 'admin';
 export type UserStatus = 'pending_verification' | 'pending_approval' | 'approved' | 'rejected';
 export type ErrorStatus = 'new' | 'in_progress' | 'resolved' | 'closed';
 export type DocumentSource = 'local' | 'google_drive';
-export type RequirementStatus = 'NEW' | 'IN_PROGRESS' | 'INTERVIEW' | 'OFFER' | 'REJECTED' | 'CLOSED';
+export type RequirementStatus = 'NEW' | 'IN_PROGRESS' | 'SUBMITTED' | 'INTERVIEW' | 'OFFER' | 'REJECTED' | 'CLOSED';
 
 export interface Database {
   public: {
@@ -206,6 +206,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          requirement_number: number;
           title: string;
           company: string | null;
           description: string | null;
@@ -234,6 +235,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          requirement_number?: number;
           title: string;
           company?: string | null;
           description?: string | null;
@@ -262,6 +264,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          requirement_number?: number;
           title?: string;
           company?: string | null;
           description?: string | null;

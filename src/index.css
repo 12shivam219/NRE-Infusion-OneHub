@@ -1,3 +1,268 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ========== Base Improvements ========== */
+:root {
+  --color-primary: rgb(37, 99, 235);
+  --color-primary-dark: rgb(29, 78, 216);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 10px 20px -5px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* ========== Card Component Styles ========== */
+@layer components {
+  /* Base card styling with soft shadows */
+  .card-base {
+    @apply bg-white rounded-lg sm:rounded-xl border border-gray-100 shadow-card;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .card-base:hover {
+    @apply shadow-card-hover border-gray-200;
+  }
+
+  /* Card padding variants */
+  .card-p-md {
+    @apply p-4 sm:p-5 lg:p-6;
+  }
+
+  .card-p-sm {
+    @apply p-3 sm:p-4;
+  }
+
+  /* Card title styling */
+  .card-title {
+    @apply text-lg sm:text-xl font-bold text-gray-900 line-clamp-2;
+  }
+
+  /* Card subtitle */
+  .card-subtitle {
+    @apply text-sm sm:text-base text-gray-600 line-clamp-1;
+  }
+
+  /* Status indicator left border accent */
+  .status-accent {
+    @apply relative border-l-4;
+  }
+
+  /* Status colors with left border */
+  .status-new {
+    @apply status-accent border-l-blue-500 bg-blue-50;
+  }
+
+  .status-in-progress {
+    @apply status-accent border-l-yellow-500 bg-yellow-50;
+  }
+
+  .status-submitted {
+    @apply status-accent border-l-orange-500 bg-orange-50;
+  }
+
+  .status-interview {
+    @apply status-accent border-l-purple-500 bg-purple-50;
+  }
+
+  .status-offer {
+    @apply status-accent border-l-green-500 bg-green-50;
+  }
+
+  .status-rejected {
+    @apply status-accent border-l-red-500 bg-red-50;
+  }
+
+  .status-closed {
+    @apply status-accent border-l-gray-500 bg-gray-50;
+  }
+
+  /* Button variants */
+  .btn-primary {
+    @apply px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-primary:hover {
+    @apply bg-blue-700 shadow-md;
+  }
+
+  .btn-primary:active {
+    @apply bg-blue-800;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm border border-gray-200;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-secondary:hover {
+    @apply bg-gray-50 border-gray-300 shadow-sm;
+  }
+
+  .btn-outline {
+    @apply px-4 py-2.5 bg-white text-gray-700 rounded-lg font-semibold text-sm border border-gray-300;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-outline:hover {
+    @apply border-gray-400 shadow-sm bg-gray-50;
+  }
+
+  /* Icon button - minimal, light feel */
+  .btn-icon {
+    @apply inline-flex items-center justify-center p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-icon:hover {
+    @apply bg-gray-100;
+  }
+
+  /* Small icon button for dense layouts */
+  .btn-icon-sm {
+    @apply inline-flex items-center justify-center p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Badge/Tag styling - muted and refined */
+  .badge-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold;
+  }
+
+  .badge-success {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold;
+  }
+
+  .badge-danger {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold;
+  }
+
+  .badge-info {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold;
+  }
+
+  .badge-neutral {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold;
+  }
+}
+
+/* ========== Animations & Transitions ========== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 300ms ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 300ms ease-out;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ========== Utility Classes ========== */
+.text-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.text-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Responsive grid gaps */
+@media (max-width: 640px) {
+  .gap-responsive {
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .gap-responsive {
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1025px) {
+  .gap-responsive {
+    gap: 1.5rem;
+  }
+}
+
+/* ========== Focus States for Accessibility ========== */
+@layer utilities {
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+
+  .focus-ring-inset {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset;
+  }
+}
+
+/* ========== Selection Styles ========== */
+::selection {
+  background-color: rgb(37, 99, 235);
+  color: white;
+}
+
+::-moz-selection {
+  background-color: rgb(37, 99, 235);
+  color: white;
+}
+
+/* ========== Scrollbar Styling (Webkit Browsers) ========== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

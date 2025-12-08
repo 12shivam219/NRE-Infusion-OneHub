@@ -2,25 +2,41 @@
  * Form validation utilities for marketing section
  */
 
+import { VALIDATION_RULES } from './constants';
+
 export interface ValidationError {
   isValid: boolean;
   errors: Record<string, string>;
 }
 
 /**
- * Validate email format
+ * Validate email format - stricter validation
  */
 export const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  if (!email || typeof email !== 'string') return false;
+  // RFC 5322 simplified regex - ensures proper domain structure
+  const emailRegex = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  // Additional checks: no consecutive dots, no leading/trailing dots
+  const isValid = emailRegex.test(email);
+  if (!isValid) return false;
+  // Ensure no double dots or consecutive special characters
+  return !email.includes('..') && !email.startsWith('.') && !email.endsWith('.');
 };
 
 /**
- * Validate URL format
+ * Validate URL format with security checks
  */
 export const isValidUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
   try {
-    new URL(url);
+    const urlObj = new URL(url);
+    // Whitelist safe protocols
+    const safeProtocols = ['http:', 'https:'];
+    if (!safeProtocols.includes(urlObj.protocol)) return false;
+    // Ensure hostname exists
+    if (!urlObj.hostname) return false;
+    // Prevent javascript: and data: URLs (XSS prevention)
+    if (url.includes('javascript:') || url.includes('data:')) return false;
     return true;
   } catch {
     return false;
@@ -59,6 +75,8 @@ export const validateRequirementForm = (data: {
 
   if (!data.title?.trim()) {
     errors.title = 'Job title is required';
+  } else if (data.title.trim().length < 3) {
+    errors.title = 'Job title must be at least 3 characters';
   }
 
   if (!data.company?.trim()) {
@@ -118,10 +136,10 @@ export const validateConsultantForm = (data: {
   if (data.date_of_birth) {
     const dob = new Date(data.date_of_birth);
     const age = new Date().getFullYear() - dob.getFullYear();
-    if (age < 18) {
-      errors.date_of_birth = 'Must be at least 18 years old';
+    if (age < VALIDATION_RULES.MIN_AGE) {
+      errors.date_of_birth = `Must be at least ${VALIDATION_RULES.MIN_AGE} years old`;
     }
-    if (age > 120) {
+    if (age > VALIDATION_RULES.MAX_AGE) {
       errors.date_of_birth = 'Invalid date of birth';
     }
   }

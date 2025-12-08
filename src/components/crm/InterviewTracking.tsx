@@ -8,7 +8,7 @@ import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 import InterviewCard from './InterviewCard';
 import { InterviewDetailModal } from './InterviewDetailModal';
-import ErrorAlert from '../common/ErrorAlert';
+import { ErrorAlert } from '../common/ErrorAlert';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -78,11 +78,14 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
       setError({ title: 'Error loading data', message: 'An unexpected error occurred' });
     } finally {
       setLoading(false);
-      setCurrentPage(1);
+      // Only reset page on initial load, not on data refresh
+      // This prevents pagination reset interrupting user navigation
     }
   }, [user]);
 
   useEffect(() => {
+    // Initial load only - reset page on first mount
+    setCurrentPage(1);
     loadData();
     let unsubscribe: (() => void) | undefined;
     if (user) {
@@ -100,14 +103,14 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
         } else if (update.type === 'DELETE') {
           setInterviews(prev => prev.filter(i => i.id !== update.record.id));
           // Clear selected interview if it was deleted
-          if (selectedInterview?.id === update.record.id) {
-            setSelectedInterview(null);
-          }
+          setSelectedInterview(prev =>
+            prev?.id === update.record.id ? null : prev
+          );
         }
       });
     }
     return () => { unsubscribe?.(); };
-  }, [loadData, user, selectedInterview?.id]);
+  }, [loadData, user]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!isAdmin) {
@@ -147,9 +150,9 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
 
   const handleViewDetails = (interview: Interview) => {
     setSelectedInterview(interview);
-    // These fields will be added when database is updated
-    setSelectedCreatedBy((interview as unknown as { created_by?: string }).created_by || null);
-    setSelectedUpdatedBy((interview as unknown as { updated_by?: string }).updated_by || null);
+    // Interviews table doesn't currently have created_by/updated_by fields
+    setSelectedCreatedBy(null);
+    setSelectedUpdatedBy(null);
   };
 
   const getRequirementTitle = (requirementId: string) => {

@@ -18,12 +18,8 @@ if (import.meta.env.DEV) {
     if (!supabaseUrl) return;
 
     window.fetch = async (input: string | Request | URL, init?: RequestInit) => {
-      try {
-        // Silent logging in dev mode only
-        return await originalFetch(input, init);
-      } catch (err) {
-        throw err;
-      }
+      // Silent logging in dev mode only
+      return await originalFetch(input, init);
     };
   })();
 }

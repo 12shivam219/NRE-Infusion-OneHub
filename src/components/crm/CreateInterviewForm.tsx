@@ -6,6 +6,7 @@ import { createInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
 import { validateInterviewForm, getAllInterviewStatuses } from '../../lib/interviewValidation';
+import { sanitizeText } from '../../lib/utils';
 import type { Database } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -162,7 +163,9 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prevState => ({ ...prevState, [name]: value }));
+    // Trim string values to prevent leading/trailing whitespace issues
+    const trimmedValue = typeof value === 'string' ? value.trim() : value;
+    setFormData(prevState => ({ ...prevState, [name]: trimmedValue }));
   }, []);
 
   const loadData = useCallback(async () => {
@@ -210,7 +213,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || loading) return; // Prevent double-submit
 
     // Validate form data
     const validation = validateInterviewForm({
@@ -242,19 +245,19 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
       type: formData.type || null,
       status: formData.status,
       consultant_id: formData.consultant_id || null,
-      vendor_company: formData.vendor_company || null,
-      interview_with: formData.interview_with || null,
-      result: formData.result || null,
+      vendor_company: sanitizeText(formData.vendor_company),
+      interview_with: sanitizeText(formData.interview_with),
+      result: sanitizeText(formData.result),
       round: formData.round || null,
       mode: formData.mode || null,
       meeting_type: formData.meeting_type || null,
-      subject_line: formData.subject_line || null,
-      interviewer: formData.interviewer || null,
-      location: formData.location || null,
-      interview_focus: formData.interview_focus || null,
-      special_note: formData.special_note || null,
-      job_description_excerpt: formData.job_description_excerpt || null,
-      feedback_notes: formData.feedback_notes || null,
+      subject_line: sanitizeText(formData.subject_line),
+      interviewer: sanitizeText(formData.interviewer),
+      location: sanitizeText(formData.location),
+      interview_focus: sanitizeText(formData.interview_focus),
+      special_note: sanitizeText(formData.special_note),
+      job_description_excerpt: sanitizeText(formData.job_description_excerpt),
+      feedback_notes: sanitizeText(formData.feedback_notes),
     });
 
     setLoading(false);

@@ -45,12 +45,10 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
   const [replyBody, setReplyBody] = useState('');
   const [replying, setReplying] = useState(false);
 
-  if (!user) {
-    return <div className="text-center p-6 text-gray-600">Please sign in to view emails</div>;
-  }
-
   // Load email threads
   const loadThreads = useCallback(async () => {
+    if (!user) return; // Guard clause
+
     setLoading(true);
     let result;
 
@@ -72,11 +70,13 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
     }
 
     setLoading(false);
-  }, [user.id, requirementId, showToast]);
+  }, [user, requirementId, showToast]);
 
   useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
+    if (user) {
+      loadThreads();
+    }
+  }, [loadThreads, user]);
 
   const handleToggleThreadExpand = useCallback((threadId: string) => {
     setExpandedThreads((prev) => {
@@ -92,6 +92,8 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
   }, []);
 
   const handleCompose = useCallback(async () => {
+    if (!user) return; // Guard clause
+
     if (!composeData.subject || !composeData.toEmail || !composeData.body) {
       showToast({
         type: 'warning',
@@ -125,9 +127,11 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
       });
     }
     setComposing(false);
-  }, [composeData, user.id, user.email, requirementId, showToast, loadThreads]);
+  }, [composeData, user, requirementId, showToast, loadThreads]);
 
   const handleReply = useCallback(async () => {
+    if (!user) return; // Guard clause
+
     if (!replyBody || !selectedThreadId) {
       showToast({
         type: 'warning',
@@ -163,7 +167,7 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
       });
     }
     setReplying(false);
-  }, [replyBody, selectedThreadId, threads, user.id, user.email, showToast, loadThreads]);
+  }, [replyBody, selectedThreadId, threads, user, showToast, loadThreads]);
 
   const handleDelete = useCallback(
     async (threadId: string) => {
@@ -204,6 +208,11 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
   };
+
+  // --- MOVED EARLY RETURN HERE, AFTER ALL HOOKS ---
+  if (!user) {
+    return <div className="text-center p-6 text-gray-600">Please sign in to view emails</div>;
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col h-[600px]">

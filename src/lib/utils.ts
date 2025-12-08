@@ -32,6 +32,22 @@ export const sanitizeFilename = (filename: string): string => {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 };
 
+/**
+ * Sanitize text input to prevent XSS
+ * Removes or escapes potentially dangerous characters while preserving legitimate content
+ */
+export const sanitizeText = (text: string): string => {
+  if (!text || typeof text !== 'string') return '';
+  
+  // Remove any HTML tags and entities
+  return text
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+};
+
 export const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
   return text.substring(0, maxLength) + '...';

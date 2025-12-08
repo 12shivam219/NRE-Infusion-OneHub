@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { useToast } from '../../contexts/ToastContext';
 import { AuditLog } from '../common/AuditLog';
+import { subscribeToInterviewById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
@@ -69,15 +70,43 @@ export const InterviewDetailModal = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Interview> | null>(null);
+  const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
 
   useEffect(() => {
     if (interview) {
       // Update form data with fresh interview data when not editing
       if (!isEditing) {
         setFormData(interview);
+        setRemoteUpdateNotified(false);
       }
     }
   }, [interview, isEditing]);
+
+  // Subscribe to real-time updates for this specific interview
+  useEffect(() => {
+    if (!isOpen || !interview) return;
+
+    const unsubscribe = subscribeToInterviewById(interview.id, (update: RealtimeUpdate<Interview>) => {
+      // Only update if not currently editing
+      if (!isEditing && update.type === 'UPDATE') {
+        setFormData(update.record);
+        
+        // Show notification if another user made changes
+        if (!remoteUpdateNotified) {
+          showToast({
+            type: 'info',
+            title: 'Updated',
+            message: 'This interview was updated by another user. Changes are reflected below.',
+          });
+          setRemoteUpdateNotified(true);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [isOpen, interview, isEditing, remoteUpdateNotified, showToast]);
 
   if (!isOpen || !interview || !formData) return null;
 
@@ -94,6 +123,10 @@ export const InterviewDetailModal = ({
 
   const handleSave = async () => {
     if (!user) return;
+    
+    // Store original data for rollback in case of error
+    const originalFormData = formData;
+    
     setIsLoading(true);
 
     const result = await updateInterview(
@@ -110,6 +143,8 @@ export const InterviewDetailModal = ({
       setIsEditing(false);
       onUpdate();
     } else if (result.error) {
+      // Rollback on error
+      setFormData(originalFormData);
       showToast({
         type: 'error',
         title: 'Failed to update',
@@ -403,8 +438,8 @@ export const InterviewDetailModal = ({
                 isEditing={isEditing}
               >
                 <textarea
-                  value={(formData as any).notes || ''}
-                  onChange={(e) => handleFieldChange('notes' as any, e.target.value)}
+                  value={formData.notes || ''}
+                  onChange={(e) => handleFieldChange('notes', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
                   rows={2}
                 />
@@ -420,7 +455,7 @@ export const InterviewDetailModal = ({
                 createdBy={createdBy}
                 updatedAt={interview.updated_at}
                 updatedBy={updatedBy}
-                showToNonAdmins={true}
+                isVisibleToNonAdmins={true}
               />
             </AccordionSection>
           )}

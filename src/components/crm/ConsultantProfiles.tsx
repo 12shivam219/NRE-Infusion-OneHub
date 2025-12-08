@@ -6,7 +6,7 @@ import { subscribeToConsultants } from '../../lib/api/realtimeSync';
 import { debounce } from '../../lib/utils';
 import { SkeletonCard } from '../common/SkeletonCard';
 import { ConsultantDetailModal } from './ConsultantDetailModal';
-import ErrorAlert from '../common/ErrorAlert';
+import {ErrorAlert} from '../common/ErrorAlert';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -27,7 +27,8 @@ interface ConsultantProfilesProps {
 export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
-  const [consultants, setConsultants] = useState<Consultant[]>([]);
+    const [consultants, setConsultants] = useState<Consultant[]>([]);
+    const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,14 +91,14 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         } else if (update.type === 'DELETE') {
           setConsultants(prev => prev.filter(c => c.id !== update.record.id));
           // Clear selected consultant if it was deleted
-          if (selectedConsultant?.id === update.record.id) {
-            setSelectedConsultant(null);
-          }
+          setSelectedConsultant(prev => 
+            prev?.id === update.record.id ? null : prev
+          );
         }
       });
     }
     return () => { unsubscribe?.(); };
-  }, [loadConsultants, user, selectedConsultant?.id]);
+  }, [loadConsultants, user]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!isAdmin) {
@@ -150,8 +151,9 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
 
   const handleViewDetails = (consultant: Consultant) => {
     setSelectedConsultant(consultant);
-    setSelectedCreatedBy((consultant as unknown as { created_by?: string }).created_by || null);
-    setSelectedUpdatedBy((consultant as unknown as { updated_by?: string }).updated_by || null);
+    // Consultants table doesn't currently have created_by/updated_by fields
+    setSelectedCreatedBy(null);
+    setSelectedUpdatedBy(null);
   };
 
   const totalPages = Math.ceil(filteredConsultants.length / itemsPerPage);
@@ -205,11 +207,19 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
             placeholder="Search by name or email..."
             value={searchTerm}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
-              handleDebouncedSearch(e.target.value);
+              const value = e.target.value;
+              setSearchTerm(value);
+              if (value.length > 100) {
+                setSearchError('Search term too long.');
+              } else {
+                setSearchError(null);
+                handleDebouncedSearch(value);
+              }
             }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
-          />
+            aria-label="Search consultants"
+        />
+        {searchError && <p className="text-xs text-red-600 mt-2">{searchError}</p>}
         </div>
         <select
           value={filterStatus}

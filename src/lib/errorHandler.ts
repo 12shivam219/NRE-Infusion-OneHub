@@ -253,7 +253,7 @@ export function safeJsonParse<T>(
 ): T {
   try {
     return JSON.parse(json) as T;
-  } catch (error) {
+  } catch {
     logger.warn('JSON parse failed', { ...context, json: json.slice(0, 100) });
     return fallback;
   }
@@ -268,7 +268,7 @@ export function safeJsonStringify(
 ): string {
   try {
     return JSON.stringify(obj);
-  } catch (error) {
+  } catch {
     logger.warn('JSON stringify failed', context);
     return '{}';
   }

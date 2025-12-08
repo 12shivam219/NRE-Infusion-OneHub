@@ -1,11 +1,17 @@
+import { useEffect, useState } from 'react';
 import { User, Clock } from 'lucide-react';
+import { getUserName } from '../../lib/api/requirements';
 
 interface AuditLogProps {
   createdAt: string;
   createdBy?: string | null;
   updatedAt?: string;
   updatedBy?: string | null;
-  showToNonAdmins?: boolean;
+  /**
+   * If true, component will render for all users (not just admins).
+   * If false, component only renders when user is admin (handled by parent).
+   */
+  isVisibleToNonAdmins?: boolean;
 }
 
 export const AuditLog = ({
@@ -13,21 +19,41 @@ export const AuditLog = ({
   createdBy,
   updatedAt,
   updatedBy,
-  showToNonAdmins = false,
+  isVisibleToNonAdmins = true,
 }: AuditLogProps) => {
-  // Parse user info from string (format: "Name (email)" or just show ID)
-  const parseUserInfo = (userInfo?: string | null) => {
-    if (!userInfo) return { name: 'Unknown', email: 'N/A' };
-    
-    const match = userInfo.match(/(.+?)\s*\(([^)]+)\)/);
-    if (match) {
-      return { name: match[1].trim(), email: match[2].trim() };
-    }
-    return { name: userInfo, email: '' };
-  };
+  const [createdUser, setCreatedUser] = useState<{ name: string; email: string }>({ name: 'Unknown', email: 'N/A' });
+  const [updatedUser, setUpdatedUser] = useState<{ name: string; email: string }>({ name: 'Unknown', email: 'N/A' });
+  const [loading, setLoading] = useState(true);
 
-  const createdUser = parseUserInfo(createdBy);
-  const updatedUser = parseUserInfo(updatedBy);
+  useEffect(() => {
+    const fetchUserNames = async () => {
+      setLoading(true);
+      
+      // Only fetch if we have a createdBy ID
+      if (createdBy) {
+        const created = await getUserName(createdBy);
+        if (created && created.full_name) {
+          setCreatedUser({ name: created.full_name, email: created.email || 'N/A' });
+        } else {
+          setCreatedUser({ name: 'Unknown', email: 'N/A' });
+        }
+      }
+
+      // Only fetch if we have a different updatedBy ID
+      if (updatedBy && updatedBy !== createdBy) {
+        const updated = await getUserName(updatedBy);
+        if (updated && updated.full_name) {
+          setUpdatedUser({ name: updated.full_name, email: updated.email || 'N/A' });
+        } else {
+          setUpdatedUser({ name: 'Unknown', email: 'N/A' });
+        }
+      }
+      
+      setLoading(false);
+    };
+
+    fetchUserNames();
+  }, [createdBy, updatedBy]);
 
   const formatDate = (dateString: string) => {
     try {
@@ -44,8 +70,14 @@ export const AuditLog = ({
     }
   };
 
-  // If showToNonAdmins is false, we don't render anything (admin-only)
-  if (!showToNonAdmins) {
+  // If isVisibleToNonAdmins is false, parent should handle visibility
+  // (this component doesn't check user role - that's parent's responsibility)
+  if (!isVisibleToNonAdmins) {
+    return null;
+  }
+
+  // If no createdBy data and no updatedBy data, don't render
+  if (!createdBy && !updatedBy) {
     return null;
   }
 
@@ -63,8 +95,8 @@ export const AuditLog = ({
           <div className="flex-1 min-w-0">
             <p className="text-gray-600">
               <span className="font-medium text-gray-900">Created</span> by{' '}
-              <span className="font-medium text-gray-900">{createdUser.name}</span>
-              {createdUser.email && (
+              <span className="font-medium text-gray-900">{loading ? 'Loading...' : createdUser.name}</span>
+              {createdUser.email && createdUser.email !== 'N/A' && (
                 <span className="text-gray-500"> ({createdUser.email})</span>
               )}
             </p>
@@ -81,8 +113,8 @@ export const AuditLog = ({
             <div className="flex-1 min-w-0">
               <p className="text-gray-600">
                 <span className="font-medium text-gray-900">Last updated</span> by{' '}
-                <span className="font-medium text-gray-900">{updatedUser.name}</span>
-                {updatedUser.email && (
+                <span className="font-medium text-gray-900">{loading ? 'Loading...' : updatedUser.name}</span>
+                {updatedUser.email && updatedUser.email !== 'N/A' && (
                   <span className="text-gray-500"> ({updatedUser.email})</span>
                 )}
               </p>

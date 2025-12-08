@@ -15,6 +15,7 @@ interface ExportOptionsModalProps {
 }
 
 const CSV_COLUMNS = [
+  'requirement_number',
   'id',
   'title',
   'company',
@@ -73,7 +74,7 @@ export const ExportOptionsModal = ({ isOpen, onClose, requirements }: ExportOpti
 
   const handleExportPDF = () => {
     // Create a simple HTML table for PDF generation
-    let htmlContent = `
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -120,7 +121,12 @@ export const ExportOptionsModal = ({ isOpen, onClose, requirements }: ExportOpti
             ${requirements.map(req => `
               <tr>
                 ${selectedColumns.map(col => {
-                  let value = req[col as keyof Requirement];
+                  const value = req[col as keyof Requirement];
+                  
+                  if (col === 'requirement_number') {
+                    const formattedNum = String(value).padStart(3, '0');
+                    return `<td><strong>#${formattedNum}</strong></td>`;
+                  }
                   
                   if (col === 'priority') {
                     const priorityClass = `priority-${(value as string)?.toLowerCase() || 'medium'}`;

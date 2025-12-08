@@ -3,7 +3,7 @@ import { GripVertical } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getRequirements, updateRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
-import { calculateDaysOpen, getPriorityColors } from '../../lib/requirementUtils';
+import { calculateDaysOpen } from '../../lib/requirementUtils';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -24,42 +24,38 @@ const statusConfig: Record<RequirementStatus, { title: string; color: string; bg
   'OFFER': { title: 'Offer', color: 'green', bgColor: 'bg-green-50' },
   'CLOSED': { title: 'Closed', color: 'gray', bgColor: 'bg-gray-50' },
   'REJECTED': { title: 'Rejected', color: 'red', bgColor: 'bg-red-50' },
+  'SUBMITTED': { title: 'Submitted', color: 'indigo', bgColor: 'bg-indigo-50' },
 };
 
 const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; onDragStart: (e: React.DragEvent<HTMLDivElement>, req: Requirement) => void }) => {
   const daysOpen = calculateDaysOpen(requirement.created_at);
-  const priority = requirement.priority || 'medium';
-  const priorityColors = getPriorityColors(priority);
 
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, requirement)}
-      className="bg-white border border-gray-200 rounded-lg p-3 mb-3 cursor-move hover:shadow-md transition hover:border-gray-300"
+      className="bg-white border border-gray-200 rounded-lg p-3 mb-3 cursor-move shadow-card hover:shadow-card-hover transition-all duration-200 hover:border-gray-300 group"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm text-gray-900 truncate">{requirement.title}</p>
-          <p className="text-xs text-gray-600 truncate">{requirement.company || 'No company'}</p>
+          <p className="font-semibold text-sm text-gray-900 truncate">{requirement.title}</p>
+          <p className="text-xs text-gray-600 truncate mt-0.5">{requirement.company || 'No company'}</p>
         </div>
-        <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
+        <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-gray-400 transition-colors" />
       </div>
 
-      <div className="flex gap-1 mb-2 flex-wrap">
-        <span className={`px-2 py-1 rounded text-xs font-medium ${priorityColors.badge}`}>
-          {priorityColors.icon} {priority}
-        </span>
+      <div className="flex gap-1.5 mb-2.5 flex-wrap">
         {requirement.primary_tech_stack && (
-          <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700 truncate">
+          <span className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-700 truncate">
             {requirement.primary_tech_stack.split(',')[0].trim()}
           </span>
         )}
       </div>
 
-      <div className="text-xs text-gray-500 space-y-1">
-        {requirement.rate && <p>Rate: {requirement.rate}</p>}
-        <p>Open: {daysOpen} days</p>
-        {requirement.next_step && <p className="truncate">Next: {requirement.next_step}</p>}
+      <div className="text-xs text-gray-600 space-y-1.5 border-t border-gray-100 pt-2.5">
+        {requirement.rate && <p className="font-medium">💰 {requirement.rate}</p>}
+        <p className="text-gray-500">⏳ {daysOpen} days open</p>
+        {requirement.next_step && <p className="truncate text-gray-600 italic">→ {requirement.next_step}</p>}
       </div>
     </div>
   );
@@ -75,20 +71,20 @@ const KanbanColumn = ({
 }: KanbanColumnProps) => {
   const config = statusConfig[status];
   const borderColor = {
-    blue: 'border-blue-200 bg-blue-50',
-    yellow: 'border-yellow-200 bg-yellow-50',
-    purple: 'border-purple-200 bg-purple-50',
-    green: 'border-green-200 bg-green-50',
-    gray: 'border-gray-200 bg-gray-50',
-    red: 'border-red-200 bg-red-50',
+    blue: 'border-l-4 border-l-blue-500 bg-blue-50',
+    yellow: 'border-l-4 border-l-yellow-500 bg-yellow-50',
+    purple: 'border-l-4 border-l-purple-500 bg-purple-50',
+    green: 'border-l-4 border-l-green-500 bg-green-50',
+    gray: 'border-l-4 border-l-gray-500 bg-gray-50',
+    red: 'border-l-4 border-l-red-500 bg-red-50',
   }[config.color];
 
   return (
-    <div className={`flex-1 min-w-80 border-2 rounded-lg p-4 ${borderColor}`}>
+    <div className={`flex-1 min-w-80 rounded-lg p-4 border border-gray-200 shadow-card ${borderColor}`}>
       <div className="mb-4">
-        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+        <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
           {title}
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white text-sm font-bold text-gray-700">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-sm font-bold text-gray-700 shadow-sm">
             {requirements.length}
           </span>
         </h3>
@@ -97,7 +93,7 @@ const KanbanColumn = ({
       <div
         onDragOver={onDragOver}
         onDrop={(e) => onDrop(e, status)}
-        className="space-y-2 min-h-96 bg-white rounded-lg p-2"
+        className="space-y-2 min-h-96 bg-white bg-opacity-60 rounded-lg p-3"
       >
         {requirements.length === 0 ? (
           <div className="flex items-center justify-center h-96 text-gray-400">
@@ -123,7 +119,6 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [draggedRequirement, setDraggedRequirement] = useState<Requirement | null>(null);
-  const [filterPriority, setFilterPriority] = useState<string>('all');
 
   const loadRequirements = useCallback(async () => {
     if (!user) return;
@@ -158,7 +153,7 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
       return;
     }
 
-    const result = await updateRequirement(draggedRequirement.id, { status: newStatus });
+    const result = await updateRequirement(draggedRequirement.id, { status: newStatus }, user?.id);
     if (result.success) {
       showToast({ 
         type: 'success', 
@@ -174,19 +169,14 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
       });
     }
     setDraggedRequirement(null);
-  }, [draggedRequirement, loadRequirements, showToast]);
-
-  const filteredRequirements = requirements.filter(req => {
-    if (filterPriority === 'all') return true;
-    return (req.priority || 'medium').toLowerCase() === filterPriority;
-  });
+  }, [draggedRequirement, loadRequirements, showToast, user?.id]);
 
   const groupedByStatus = {
-    NEW: filteredRequirements.filter(r => r.status === 'NEW'),
-    IN_PROGRESS: filteredRequirements.filter(r => r.status === 'IN_PROGRESS'),
-    INTERVIEW: filteredRequirements.filter(r => r.status === 'INTERVIEW'),
-    OFFER: filteredRequirements.filter(r => r.status === 'OFFER'),
-    CLOSED: filteredRequirements.filter(r => r.status === 'CLOSED'),
+    NEW: requirements.filter(r => r.status === 'NEW'),
+    IN_PROGRESS: requirements.filter(r => r.status === 'IN_PROGRESS'),
+    INTERVIEW: requirements.filter(r => r.status === 'INTERVIEW'),
+    OFFER: requirements.filter(r => r.status === 'OFFER'),
+    CLOSED: requirements.filter(r => r.status === 'CLOSED'),
   };
 
   if (loading) {
@@ -194,33 +184,20 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-gray-900">Requirement Pipeline</h2>
-        <div className="flex gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Filter by priority:</label>
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Priorities</option>
-              <option value="high">🔴 High</option>
-              <option value="medium">🟡 Medium</option>
-              <option value="low">🟢 Low</option>
-            </select>
-          </div>
+        <div className="flex gap-3 flex-wrap items-start sm:items-center">
           <button
             onClick={() => onQuickAdd?.('requirement')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm whitespace-nowrap"
           >
             + Add Requirement
           </button>
         </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 sm:-mx-8 sm:px-8">
         <KanbanColumn
           status="NEW"
           title="New"
@@ -263,11 +240,11 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
         />
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-8">
         {Object.entries(groupedByStatus).map(([status, reqs]) => (
-          <div key={status} className="bg-white border border-gray-200 rounded-lg p-4">
-            <p className="text-gray-600 text-sm">{statusConfig[status as RequirementStatus].title}</p>
-            <p className="text-3xl font-bold text-gray-900">{reqs.length}</p>
+          <div key={status} className="card-base card-p-md text-center">
+            <p className="text-gray-600 text-sm font-medium mb-2">{statusConfig[status as RequirementStatus].title}</p>
+            <p className="text-3xl sm:text-4xl font-bold text-blue-600">{reqs.length}</p>
           </div>
         ))}
       </div>

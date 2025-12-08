@@ -25,11 +25,18 @@ export const getInterviews = async (
     const { data, error } = await query;
 
     if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching interviews:', error.message);
+      }
       return { success: false, error: error.message };
     }
 
-    return { success: true, interviews: data };
-  } catch {
+    return { success: true, interviews: data || [] };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching interviews:', errorMsg);
+    }
     return { success: false, error: 'Failed to fetch interviews' };
   }
 };
@@ -45,11 +52,18 @@ export const getInterviewById = async (
       .single();
 
     if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching interview:', error.message);
+      }
       return { success: false, error: error.message };
     }
 
     return { success: true, interview: data };
-  } catch {
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching interview:', errorMsg);
+    }
     return { success: false, error: 'Failed to fetch interview' };
   }
 };

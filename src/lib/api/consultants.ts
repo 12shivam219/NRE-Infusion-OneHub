@@ -25,11 +25,18 @@ export const getConsultants = async (
     const { data, error } = await query;
 
     if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching consultants:', error.message);
+      }
       return { success: false, error: error.message };
     }
 
-    return { success: true, consultants: data };
-  } catch {
+    return { success: true, consultants: data || [] };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching consultants:', errorMsg);
+    }
     return { success: false, error: 'Failed to fetch consultants' };
   }
 };
@@ -45,11 +52,18 @@ export const getConsultantById = async (
       .single();
 
     if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching consultant:', error.message);
+      }
       return { success: false, error: error.message };
     }
 
     return { success: true, consultant: data };
-  } catch {
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching consultant:', errorMsg);
+    }
     return { success: false, error: 'Failed to fetch consultant' };
   }
 };

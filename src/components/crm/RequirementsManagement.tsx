@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Trash2, Download, Eye, Sparkles, Cog, Calendar, CheckCircle, XCircle, Lock, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, Trash2, Download, Eye, Sparkles, Cog, Calendar, CheckCircle, XCircle, Lock, ArrowUpDown, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useSearchFilters } from '../../hooks/useSearchFilters';
 import { debounce } from '../../lib/utils';
 import { getRequirements, deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
 import type { Database, RequirementStatus } from '../../lib/database.types';
@@ -29,6 +30,7 @@ const getStatusIcon = (status: RequirementStatus) => {
 const statusColors: Record<RequirementStatus, { badge: string; label: string }> = {
   NEW: { badge: 'bg-blue-100 text-blue-800', label: 'New' },
   IN_PROGRESS: { badge: 'bg-yellow-100 text-yellow-800', label: 'In Progress' },
+  SUBMITTED: { badge: 'bg-cyan-100 text-cyan-800', label: 'Submitted' },
   INTERVIEW: { badge: 'bg-purple-100 text-purple-800', label: 'Interview' },
   OFFER: { badge: 'bg-green-100 text-green-800', label: 'Offer' },
   REJECTED: { badge: 'bg-red-100 text-red-800', label: 'Rejected' },
@@ -37,35 +39,139 @@ const statusColors: Record<RequirementStatus, { badge: string; label: string }> 
 
 interface RequirementsManagementProps {
   onQuickAdd?: () => void;
+  onCreateInterview?: (requirementId: string) => void;
 }
 
-export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementProps) => {
+export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
+  const { filters: savedFilters, updateFilters, clearFilters, isLoaded } = useSearchFilters();
+  
   const [requirements, setRequirements] = useState<RequirementWithLogs[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm || '');
   const [debouncedValue, setDebouncedValue] = useState('');
-  const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'ALL'>('ALL');
-  const [sortBy, setSortBy] = useState<'date' | 'company' | 'daysOpen'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
-  const [jumpToPageInput, setJumpToPageInput] = useState('');
+  const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'ALL'>((savedFilters?.filterStatus as RequirementStatus | 'ALL') || 'ALL');
+  const [sortBy, setSortBy] = useState<'date' | 'company' | 'daysOpen'>((savedFilters?.sortBy as 'date' | 'company' | 'daysOpen') || 'date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((savedFilters?.sortOrder as 'asc' | 'desc') || 'desc');
+  const [displayCount, setDisplayCount] = useState(20);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
   const [selectedJDRequirement, setSelectedJDRequirement] = useState<Requirement | null>(null);
   const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
+  // Advanced filtering state
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<RequirementStatus>>(new Set());
+  const [minRate, setMinRate] = useState(savedFilters?.minRate || '');
+  const [maxRate, setMaxRate] = useState(savedFilters?.maxRate || '');
+  const [remoteFilter, setRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>((savedFilters?.remoteFilter as 'ALL' | 'REMOTE' | 'ONSITE') || 'ALL');
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ 
+    from: savedFilters?.dateRangeFrom || '', 
+    to: savedFilters?.dateRangeTo || '' 
+  });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Initialize debounced search with saved value
+  useEffect(() => {
+    if (isLoaded && savedFilters?.searchTerm) {
+      setDebouncedValue(savedFilters.searchTerm);
+    }
+  }, [isLoaded, savedFilters]);
+
+  // Save filters only on debounced search changes - cleanup timeout properly
+  useEffect(() => {
+    if (!isLoaded) return;
+    
+    const timeoutId = setTimeout(() => {
+      updateFilters({
+        searchTerm: debouncedValue,
+        sortBy,
+        sortOrder,
+        filterStatus: filterStatus.toString(),
+        minRate,
+        maxRate,
+        remoteFilter,
+        dateRangeFrom: dateRange.from,
+        dateRangeTo: dateRange.to,
+      });
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [debouncedValue, sortBy, sortOrder, filterStatus, minRate, maxRate, remoteFilter, dateRange, isLoaded, updateFilters]);
 
   const handleDebouncedSearch = useMemo(
     () => debounce((value: unknown) => {
       setDebouncedValue(value as string);
-      setCurrentPage(0);
+      setDisplayCount(20);
     }, 300),
     []
   );
+
+  // Enhanced search function - searches across multiple fields including phone numbers and requirement number
+  const matchesSearch = useCallback((req: RequirementWithLogs, searchValue: string): boolean => {
+    if (!searchValue.trim()) return true;
+    
+    const search = searchValue.toLowerCase();
+    const requirementNum = String(req.requirement_number).padStart(3, '0');
+    
+    return !!(
+      req.title.toLowerCase().includes(search) ||
+      req.company?.toLowerCase().includes(search) ||
+      req.vendor_company?.toLowerCase().includes(search) ||
+      req.primary_tech_stack?.toLowerCase().includes(search) ||
+      req.description?.toLowerCase().includes(search) ||
+      req.vendor_email?.toLowerCase().includes(search) ||
+      req.vendor_phone?.toLowerCase().includes(search) ||
+      requirementNum.includes(search) ||
+      requirementNum.includes(search.replace('#', ''))
+    );
+  }, []);
+
+  // Helper to check if rate is within range
+  const isRateInRange = useCallback((rate: string | null): boolean => {
+    if (!rate) return true;
+    const rateNum = parseFloat(rate.replace(/[^0-9.-]/g, ''));
+    if (isNaN(rateNum)) return true;
+    
+    if (minRate && parseFloat(minRate) > rateNum) return false;
+    if (maxRate && parseFloat(maxRate) < rateNum) return false;
+    return true;
+  }, [minRate, maxRate]);
+
+  // Helper to check if date is in range - with validation
+  const isDateInRange = useCallback((createdAt: string): boolean => {
+    if (!dateRange.from && !dateRange.to) return true;
+    
+    try {
+      const created = new Date(createdAt).getTime();
+      if (isNaN(created)) return true; // Skip invalid dates
+      
+      if (dateRange.from) {
+        const fromDate = new Date(dateRange.from).getTime();
+        if (!isNaN(fromDate) && fromDate > created) return false;
+      }
+      
+      if (dateRange.to) {
+        const toDate = new Date(dateRange.to).getTime();
+        if (!isNaN(toDate) && toDate < created) return false;
+      }
+      
+      return true;
+    } catch {
+      return true; // Skip if there's an error
+    }
+  }, [dateRange]);
+
+  // Helper to check remote preference
+  const matchesRemoteFilter = useCallback((remote: string | null): boolean => {
+    if (remoteFilter === 'ALL') return true;
+    if (!remote) return true;
+    
+    const isRemote = remote.toLowerCase().includes('remote') || remote.toLowerCase().includes('yes');
+    return remoteFilter === 'REMOTE' ? isRemote : !isRemote;
+  }, [remoteFilter]);
 
   const loadRequirements = useCallback(async () => {
     if (!user) return;
@@ -99,12 +205,33 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
       unsubscribe = subscribeToRequirements(user.id, (update: RealtimeUpdate<Requirement>) => {
         if (update.type === 'INSERT') {
           setRequirements(prev => [update.record, ...prev]);
+          showToast({
+            type: 'info',
+            title: 'New requirement',
+            message: `"${update.record.title}" has been added`,
+          });
         } else if (update.type === 'UPDATE') {
           setRequirements(prev =>
             prev.map(r => (r.id === update.record.id ? update.record : r))
           );
+          // Show notification if not the current user editing
+          if (selectedRequirement?.id !== update.record.id) {
+            showToast({
+              type: 'info',
+              title: 'Requirement updated',
+              message: 'Changes have been made to a requirement',
+            });
+          }
         } else if (update.type === 'DELETE') {
           setRequirements(prev => prev.filter(r => r.id !== update.record.id));
+          if (selectedRequirement?.id === update.record.id) {
+            setSelectedRequirement(null);
+          }
+          showToast({
+            type: 'info',
+            title: 'Requirement deleted',
+            message: 'A requirement has been removed',
+          });
         }
       });
     }
@@ -112,7 +239,7 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
     return () => {
       unsubscribe?.();
     };
-  }, [loadRequirements, user]);
+  }, [loadRequirements, user, selectedRequirement?.id, showToast]);
 
   const handleDelete = useCallback(async () => {
     const requirement = selectedRequirement;
@@ -145,17 +272,26 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
 
   const handleViewDetails = (req: Requirement) => {
     setSelectedRequirement(req);
-    setSelectedCreatedBy((req as unknown as { created_by?: string }).created_by || null);
-    setSelectedUpdatedBy((req as unknown as { updated_by?: string }).updated_by || null);
+    setSelectedCreatedBy(req.created_by || null);
+    setSelectedUpdatedBy(req.updated_by || null);
   };
 
   const filteredRequirements = useMemo(() => {
     const filtered = requirements.filter(req => {
-      const matchesSearch = 
-        req.title.toLowerCase().includes(debouncedValue.toLowerCase()) ||
-        req.company?.toLowerCase().includes(debouncedValue.toLowerCase());
-      const matchesFilter = filterStatus === 'ALL' || req.status === filterStatus;
-      return matchesSearch && matchesFilter;
+      // Apply enhanced search across multiple fields
+      const searchMatches = matchesSearch(req, debouncedValue);
+      
+      // Apply status filter (support both single and multiple selection)
+      const statusMatches = selectedStatuses.size > 0 
+        ? selectedStatuses.has(req.status)
+        : filterStatus === 'ALL' || req.status === filterStatus;
+      
+      // Apply advanced filters
+      const rateMatches = isRateInRange(req.rate);
+      const dateMatches = isDateInRange(req.created_at);
+      const remoteMatches = matchesRemoteFilter(req.remote);
+      
+      return searchMatches && statusMatches && rateMatches && dateMatches && remoteMatches;
     });
 
     // Apply sorting
@@ -170,20 +306,48 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
           break;
         case 'date':
         default:
-          comparison = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
           break;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
     return filtered;
-    }, [requirements, debouncedValue, filterStatus, sortBy, sortOrder]);
+    }, [requirements, debouncedValue, filterStatus, selectedStatuses, sortBy, sortOrder, matchesSearch, isRateInRange, isDateInRange, matchesRemoteFilter]);
 
-  const totalPages = Math.ceil(filteredRequirements.length / itemsPerPage);
-  const paginatedRequirements = useMemo(() => {
-    const start = currentPage * itemsPerPage;
-    return filteredRequirements.slice(start, start + itemsPerPage);
-  }, [filteredRequirements, currentPage, itemsPerPage]);
+  const displayedRequirements = useMemo(() => {
+    return filteredRequirements.slice(0, displayCount);
+  }, [filteredRequirements, displayCount]);
+
+  const hasMoreRequirements = displayCount < filteredRequirements.length;
+
+  // Helper to highlight search terms
+  const HighlightedText = ({ text, searchTerm }: { text: string; searchTerm: string }) => {
+    if (!searchTerm.trim()) return <>{text}</>;
+    
+    const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
+    return (
+      <>
+        {parts.map((part, index) =>
+          part.toLowerCase() === searchTerm.toLowerCase() ? (
+            <mark key={index} className="bg-yellow-200 font-semibold">
+              {part}
+            </mark>
+          ) : (
+            <span key={index}>{part}</span>
+          )
+        )}
+      </>
+    );
+  };
+
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    setTimeout(() => {
+      setDisplayCount(prev => prev + 20);
+      setLoadingMore(false);
+    }, 300);
+  };
 
   if (loading) {
     return (
@@ -213,211 +377,437 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Requirements Management</h2>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setShowReport(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 flex items-center justify-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            Report
-          </button>
-          <button
-            onClick={onQuickAdd}
-            className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Create Requirement
-          </button>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
-          <div className="flex-1 min-w-[250px] relative">
-            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by company or role..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                handleDebouncedSearch(e.target.value);
-              }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
-              title="Search for requirements by company name or job title"
-            />
+      {/* Sticky Header Section */}
+      <div className="sticky top-0 z-40 bg-white pb-6 -mx-6 px-6 pt-6 border-b border-gray-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Requirements Management</h2>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowReport(true)}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm"
+            >
+              <Download className="w-4 h-4" />
+              Report
+            </button>
+            <button
+              onClick={onQuickAdd}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Create Requirement
+            </button>
           </div>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as RequirementStatus | 'ALL')}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-            title="Filter requirements by status"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="NEW">New</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="INTERVIEW">Interview</option>
-            <option value="OFFER">Offer</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="CLOSED">Closed</option>
-          </select>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-            title="Sort requirements by selected criteria"
-          >
-            <option value="date">Sort by Date</option>
-            <option value="company">Sort by Company</option>
-            <option value="daysOpen">Sort by Days Open</option>
-          </select>
-          <button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-1"
-            title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-          >
-            <ArrowUpDown className="w-4 h-4" />
-            {sortOrder === 'asc' ? 'Asc' : 'Desc'}
-          </button>
+        </div>
+
+        {/* Search and Filter */}
+        <div className="flex flex-col gap-4">
+          {/* Main Search Bar with Status Indicator */}
+          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
+            <div className="flex-1 min-w-[250px] relative">
+              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by title, company, tech stack, vendor, phone..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  handleDebouncedSearch(e.target.value);
+                }}
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm"
+                title="Search across title, company, tech stack, vendor name, phone number, email, and job description"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedValue('');
+                  }}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  title="Clear search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+              {debouncedValue && (
+                <div className="absolute -bottom-7 left-0 text-xs text-gray-500">
+                  Searching for: <span className="font-semibold text-gray-700">"{debouncedValue}"</span>
+                </div>
+              )}
+            </div>
+            <select
+              value={filterStatus}
+              onChange={(e) => {
+                setFilterStatus(e.target.value as RequirementStatus | 'ALL');
+                setSelectedStatuses(new Set());
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
+              title="Filter requirements by status"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="NEW">New</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="INTERVIEW">Interview</option>
+              <option value="OFFER">Offer</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="CLOSED">Closed</option>
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
+              title="Sort requirements by selected criteria"
+            >
+              <option value="date">Sort by Date</option>
+              <option value="company">Sort by Company</option>
+              <option value="daysOpen">Sort by Days Open</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-1"
+              title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+            >
+              <ArrowUpDown className="w-4 h-4" />
+              {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+            </button>
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all ${
+                showAdvancedFilters
+                  ? 'bg-blue-50 border-blue-300 text-blue-700'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+              title="Toggle advanced filters"
+            >
+              ⚙️ Filters {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to) && '✓'}
+            </button>
+          </div>
+
+          {/* Advanced Filters Panel */}
+          {showAdvancedFilters && (
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Rate Range */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">Min Rate</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 50"
+                    value={minRate}
+                    onChange={(e) => setMinRate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    title="Minimum hourly/daily rate"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">Max Rate</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 150"
+                    value={maxRate}
+                    onChange={(e) => setMaxRate(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    title="Maximum hourly/daily rate"
+                  />
+                </div>
+
+                {/* Remote Filter */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">Work Type</label>
+                  <select
+                    value={remoteFilter}
+                    onChange={(e) => setRemoteFilter(e.target.value as typeof remoteFilter)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    title="Filter by remote/onsite preference"
+                  >
+                    <option value="ALL">All Types</option>
+                    <option value="REMOTE">Remote</option>
+                    <option value="ONSITE">On-site</option>
+                  </select>
+                </div>
+
+                {/* Date Range - From */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">From Date</label>
+                  <input
+                    type="date"
+                    value={dateRange.from}
+                    onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    title="Filter requirements created from this date"
+                  />
+                </div>
+
+                {/* Date Range - To */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">To Date</label>
+                  <input
+                    type="date"
+                    value={dateRange.to}
+                    onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    title="Filter requirements created until this date"
+                  />
+                </div>
+              </div>
+
+              {/* Clear Filters Button */}
+              {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || debouncedValue || filterStatus !== 'ALL') && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedValue('');
+                    setFilterStatus('ALL');
+                    setMinRate('');
+                    setMaxRate('');
+                    setRemoteFilter('ALL');
+                    setDateRange({ from: '', to: '' });
+                    setSelectedStatuses(new Set());
+                    clearFilters();
+                  }}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline"
+                  title="Reset all advanced filters"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Active Filters Summary */}
+          {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) && (
+            <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded flex items-center gap-2 flex-wrap">
+              <span className="text-gray-500 font-medium">Active filters:</span>
+              {debouncedValue && (
+                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
+                  Search: "{debouncedValue}"
+                </span>
+              )}
+              {filterStatus !== 'ALL' && (
+                <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-medium">
+                  Status: {filterStatus}
+                </span>
+              )}
+              {minRate && (
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
+                  Min: ${minRate}
+                </span>
+              )}
+              {maxRate && (
+                <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
+                  Max: ${maxRate}
+                </span>
+              )}
+              {remoteFilter !== 'ALL' && (
+                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded font-medium">
+                  {remoteFilter}
+                </span>
+              )}
+              {dateRange.from && (
+                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
+                  From: {dateRange.from}
+                </span>
+              )}
+              {dateRange.to && (
+                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
+                  To: {dateRange.to}
+                </span>
+              )}
+              {filteredRequirements.length > 0 && (
+                <span className="ml-auto font-semibold text-gray-700">
+                  {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setDebouncedValue('');
+                  setFilterStatus('ALL');
+                  setMinRate('');
+                  setMaxRate('');
+                  setRemoteFilter('ALL');
+                  setDateRange({ from: '', to: '' });
+                  setSelectedStatuses(new Set());
+                  clearFilters();
+                  setShowAdvancedFilters(false);
+                }}
+                className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition"
+                title="Clear all filters and reset search"
+              >
+                ✕ Clear All
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Requirements Cards - Responsive Grid & Virtualized */}
+      {/* Requirements Grid */}
       <div className="w-full">
         {filteredRequirements.length === 0 ? (
-          <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-lg border border-gray-200">
-            <Sparkles className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 font-medium mb-2">No requirements found</p>
+          <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-lg border border-gray-100 shadow-card">
+            <Sparkles className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+            <p className="text-gray-700 font-semibold mb-2 text-lg">No requirements found</p>
             <p className="text-sm text-gray-500 mb-6">Create your first requirement to get started tracking job opportunities.</p>
             <button
               onClick={onQuickAdd}
-              className="inline-flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5" />
               Create First Requirement
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5 lg:gap-6">
-            {paginatedRequirements.map(req => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-responsive">
+            {displayedRequirements.map((req: RequirementWithLogs) => {
+              const statusBgMap: Record<typeof req.status, string> = {
+                'NEW': 'status-new',
+                'IN_PROGRESS': 'status-in-progress',
+                'SUBMITTED': 'status-submitted',
+                'INTERVIEW': 'status-interview',
+                'OFFER': 'status-offer',
+                'REJECTED': 'status-rejected',
+                'CLOSED': 'status-closed',
+              };
+
+              // Use requirement_number if available, otherwise use index + 1 as fallback
+              const reqNumber = req.requirement_number || (requirements.findIndex(r => r.id === req.id) + 1);
+
               return (
                 <div
                   key={req.id}
-                  className="bg-white border border-gray-200 rounded-xl sm:rounded-2xl shadow-sm hover:shadow-xl transition-all duration-200 overflow-hidden flex flex-col h-full min-w-0"
+                  className={`card-base overflow-hidden flex flex-col h-full animate-fade-in ${statusBgMap[req.status]}`}
                 >
-                  {/* ZONE 1: IDENTITY ZONE - Job Title, Status */}
-                  <div className="p-3 sm:p-5 lg:p-6 pb-2 sm:pb-4 border-b border-gray-100">
-                    {/* Title with Status Icon */}
-                    <div className="flex flex-col sm:flex-row items-start justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
-                      <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                  {/* HEADER: Job Title & Status */}
+                  <div className="card-p-md pb-3 sm:pb-4 border-b border-gray-200">
+                    {/* Title with Requirement Number */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="flex-shrink-0 text-gray-400 mt-0.5">
                         {getStatusIcon(req.status)}
-                        <span className="line-clamp-2">{req.title}</span>
-                      </h3>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm text-gray-500 font-semibold mb-1">
+                          Req No: <span className="font-bold text-blue-600">{reqNumber}</span>
+                        </p>
+                        <h3 className="card-title">
+                          <HighlightedText text={req.title} searchTerm={debouncedValue} />
+                        </h3>
+                      </div>
                     </div>
 
-                    {/* Badges: Status */}
-                    <div className="flex flex-wrap gap-2 mb-2 sm:mb-3">
-                      <span className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${statusColors[req.status].badge}`}>
+                    {/* Status Badge - Refined */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <span className="badge-primary">
                         {statusColors[req.status].label}
                       </span>
                     </div>
 
-                    {/* Company Name - Subtle Secondary Context */}
-                    <p className="text-xs sm:text-sm text-gray-500 truncate">
-                      <span className="text-gray-400">From</span> <span className="font-semibold text-gray-700">{req.company || 'N/A'}</span>
+                    {/* Company - Secondary Info */}
+                    <p className="text-xs sm:text-sm text-gray-600">
+                      <span className="text-gray-500">Company:</span> <span className="font-semibold text-gray-800"><HighlightedText text={req.company || 'N/A'} searchTerm={debouncedValue} /></span>
                     </p>
                   </div>
 
-                  {/* ZONE 2: KEY INFO GRID - Vendor Contact & Context */}
-                  <div className="px-3 sm:px-5 lg:px-6 py-2 sm:py-4 bg-gray-50 border-b border-gray-100">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-4">
+                  {/* KEY INFORMATION SECTION */}
+                  <div className="card-p-md py-3 sm:py-4 bg-white bg-opacity-50 border-b border-gray-100">
+                    <div className="grid grid-cols-2 gap-3">
                       {/* Vendor Name */}
                       {req.vendor_company && (
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">🏢 Vendor</span>
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">{req.vendor_company}</span>
+                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Vendor</span>
+                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_company} searchTerm={debouncedValue} /></span>
                         </div>
                       )}
 
                       {/* Vendor Email */}
                       {req.vendor_email && (
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">📧 Email</span>
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">{req.vendor_email}</span>
+                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Email</span>
+                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_email} searchTerm={debouncedValue} /></span>
                         </div>
                       )}
 
                       {/* Vendor Phone */}
                       {req.vendor_phone && (
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">📱 Phone</span>
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">{req.vendor_phone}</span>
+                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Phone</span>
+                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_phone} searchTerm={debouncedValue} /></span>
                         </div>
                       )}
 
-                      {/* Tech Stack (First item) */}
+                      {/* Tech Stack */}
                       {req.primary_tech_stack && (
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">🧩 Tech</span>
-                          <span className="text-xs sm:text-sm font-bold text-gray-900 truncate">{req.primary_tech_stack.split(',')[0].trim()}</span>
+                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Tech</span>
+                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.primary_tech_stack.split(',')[0].trim()} searchTerm={debouncedValue} /></span>
                         </div>
                       )}
                     </div>
                   </div>
 
-
-
-                  {/* ZONE 4: FOOTER SECTION - Metadata & Actions */}
-                  <div className="px-3 sm:px-5 lg:px-6 py-3 sm:py-5 bg-gray-50 border-t border-gray-100">
-                    {/* Left: Duration & Work Type */}
-                    <div className="flex flex-wrap gap-2 sm:gap-4 mb-3 sm:mb-5 text-xs sm:text-sm">
+                  {/* METADATA SECTION */}
+                  <div className="card-p-md py-3 sm:py-4 border-b border-gray-100 flex-1">
+                    <div className="space-y-2 text-xs sm:text-sm">
                       {req.duration && (
                         <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-gray-400 flex-shrink-0 text-sm">⏳</span>
+                          <span className="text-gray-400 text-sm">⏳</span>
                           <span className="font-medium">{req.duration}</span>
                         </div>
                       )}
                       {req.remote && (
                         <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-gray-400 flex-shrink-0 text-sm">🏠</span>
+                          <span className="text-gray-400 text-sm">🏠</span>
                           <span className="font-medium">{req.remote}</span>
                         </div>
                       )}
+                      {req.rate && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <span className="text-gray-400 text-sm">💰</span>
+                          <span className="font-medium">{req.rate}</span>
+                        </div>
+                      )}
                     </div>
+                  </div>
 
-                    {/* Right: Action Buttons - Vertical on mobile, horizontal on tablet+ */}
+                  {/* ACTION BUTTONS - Equal Size, Aligned Horizontally */}
+                  <div className="card-p-md pt-3 sm:pt-4 bg-white bg-opacity-50">
                     <div className="flex flex-col sm:flex-row gap-2 w-full">
                       <button
                         onClick={() => handleViewDetails(req)}
-                        className="flex-1 h-10 sm:h-11 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs sm:text-sm font-semibold whitespace-nowrap"
+                        className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
                         title="View full details"
                       >
                         <Eye className="w-4 h-4 flex-shrink-0" />
-                        <span className="hidden sm:inline">View</span>
+                        <span className="hidden sm:inline truncate">View</span>
+                      </button>
+
+                      <button
+                        onClick={() => onCreateInterview?.(req.id)}
+                        className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
+                        title="Create interview for this requirement"
+                      >
+                        <Calendar className="w-4 h-4 flex-shrink-0" />
+                        <span className="hidden sm:inline truncate">Interview</span>
                       </button>
 
                       {req.description && (
                         <button
                           onClick={() => setSelectedJDRequirement(req)}
-                          className="flex-1 h-10 sm:h-11 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs sm:text-sm font-semibold whitespace-nowrap"
+                          className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs font-semibold min-w-0"
                           title="View job description"
                         >
-                          <span className="text-base flex-shrink-0">📄</span>
-                          <span className="hidden xs:inline">JD</span>
+                          <span className="text-sm flex-shrink-0">📄</span>
+                          <span className="hidden sm:inline truncate">JD</span>
                         </button>
                       )}
 
                       {isAdmin && (
                         <button
                           onClick={() => handleDelete()}
-                          className="flex-1 h-10 sm:h-11 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 active:bg-red-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs sm:text-sm font-semibold whitespace-nowrap"
+                          className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 text-xs font-semibold min-w-0"
                           title="Delete requirement"
                         >
                           <Trash2 className="w-4 h-4 flex-shrink-0" />
-                          <span className="hidden xs:inline">Delete</span>
+                          <span className="hidden sm:inline truncate">Delete</span>
                         </button>
                       )}
                     </div>
@@ -430,89 +820,28 @@ export const RequirementsManagement = ({ onQuickAdd }: RequirementsManagementPro
         )}
       </div>
 
-      {/* Pagination Controls */}
-      {filteredRequirements.length > itemsPerPage && (
-        <div className="flex flex-col gap-4 mt-6 px-4 py-4 bg-gray-50 rounded-lg">
-          {/* Pagination Info and Items Per Page Selector */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <span className="text-sm text-gray-600">
-              Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, filteredRequirements.length)} of {filteredRequirements.length}
-            </span>
-            <div className="flex flex-col xs:flex-row gap-3 items-start xs:items-center">
-              <div className="flex items-center gap-2">
-                <label htmlFor="itemsPerPage" className="text-sm text-gray-600 font-medium">Items per page:</label>
-                <select
-                  id="itemsPerPage"
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(parseInt(e.target.value));
-                    setCurrentPage(0);
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-100 transition"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2">
-                <label htmlFor="jumpToPage" className="text-sm text-gray-600 font-medium">Go to page:</label>
-                <input
-                  id="jumpToPage"
-                  type="number"
-                  min="1"
-                  max={totalPages}
-                  value={jumpToPageInput}
-                  onChange={(e) => setJumpToPageInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const pageNum = parseInt(jumpToPageInput) - 1;
-                      if (pageNum >= 0 && pageNum < totalPages) {
-                        setCurrentPage(pageNum);
-                        setJumpToPageInput('');
-                      }
-                    }
-                  }}
-                  placeholder="Page #"
-                  className="w-16 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                />
-                <button
-                  onClick={() => {
-                    const pageNum = parseInt(jumpToPageInput) - 1;
-                    if (pageNum >= 0 && pageNum < totalPages) {
-                      setCurrentPage(pageNum);
-                      setJumpToPageInput('');
-                    }
-                  }}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:bg-gray-100 transition font-medium"
-                >
-                  Go
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Page Navigation Buttons */}
-          <div className="flex gap-2 justify-end">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
-              disabled={currentPage === 0}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Previous
-            </button>
-            <span className="px-4 py-2 text-sm text-gray-600">
-              Page {currentPage + 1} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
-              disabled={currentPage >= totalPages - 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Next
-            </button>
-          </div>
+      {/* Load More Section */}
+      {hasMoreRequirements && (
+        <div className="flex flex-col items-center gap-4 py-8">
+          <p className="text-sm text-gray-600">
+            Showing <span className="font-semibold">{displayCount}</span> of <span className="font-semibold">{filteredRequirements.length}</span> requirements
+          </p>
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loadingMore ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Loading...
+              </>
+            ) : (
+              <>
+                Load 20 More
+              </>
+            )}
+          </button>
         </div>
       )}
 

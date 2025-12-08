@@ -44,7 +44,7 @@ export const isDateInFuture = (dateString: string, timeString?: string): boolean
   if (parts.length !== 3) return false;
   
   const [year, month, day] = parts;
-  let interviewDate = new Date(year, month - 1, day);
+  const interviewDate = new Date(year, month - 1, day);
 
   if (timeString) {
     const timeParts = timeString.split(':').map(Number);
@@ -66,7 +66,7 @@ export const isValidUrl = (string: string): boolean => {
   try {
     new URL(string);
     return true;
-  } catch (_) {
+  } catch {
     return false;
   }
 };

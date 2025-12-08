@@ -28,7 +28,7 @@ export const GoogleDrivePicker = ({
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [authenticated, _setAuthenticated] = useState(false);
+  const [authenticated] = useState(false);
   const [files, setFiles] = useState<
     Array<{ id: string; name: string; mimeType: string; size: number }>
   >([]);
@@ -37,27 +37,7 @@ export const GoogleDrivePicker = ({
   const [nextPageToken, setNextPageToken] = useState<string | undefined>();
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
-  if (!user) {
-    return (
-      <div className="text-center p-8 text-gray-600">
-        Please sign in to use Google Drive integration
-      </div>
-    );
-  }
-
-  if (!isGoogleDriveConfigured()) {
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-        <Cloud className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Google Drive Integration Not Configured
-        </h3>
-        <p className="text-gray-700 mb-4">
-          Your administrator needs to set up Google OAuth. Contact support for assistance.
-        </p>
-      </div>
-    );
-  }
+  // HOOKS MUST BE DEFINED BEFORE EARLY RETURNS
 
   const handleAuthenticate = useCallback(async () => {
     showToast({
@@ -67,6 +47,8 @@ export const GoogleDrivePicker = ({
   }, [showToast]);
 
   const handleLoadFiles = useCallback(async () => {
+    if (!user) return; // Guard clause for type safety
+    
     if (!authenticated) {
       showToast({
         type: 'error',
@@ -97,10 +79,12 @@ export const GoogleDrivePicker = ({
       });
     }
     setLoading(false);
-  }, [authenticated, user.id, nextPageToken, showToast]);
+  }, [authenticated, user, nextPageToken, showToast]);
 
   const handleImportFile = useCallback(
     async (fileId: string, fileName: string) => {
+      if (!user) return; // Guard clause
+
       setImporting(fileId);
 
       const tokenResult = await getGoogleDriveToken(user.id);
@@ -144,10 +128,12 @@ export const GoogleDrivePicker = ({
 
       setImporting(null);
     },
-    [user.id, showToast, onFilesImported]
+    [user, showToast, onFilesImported]
   );
 
   const handleBatchImport = useCallback(async () => {
+    if (!user) return; // Guard clause
+
     if (selectedFiles.size === 0) {
       showToast({
         type: 'warning',
@@ -197,7 +183,7 @@ export const GoogleDrivePicker = ({
 
       setSelectedFiles(new Set());
     }
-  }, [selectedFiles, files, user.id, showToast, onFilesImported]);
+  }, [selectedFiles, files, user, showToast, onFilesImported]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
@@ -206,6 +192,30 @@ export const GoogleDrivePicker = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
+
+  // CONDITIONAL RENDERING MOVED HERE (AFTER HOOKS)
+
+  if (!user) {
+    return (
+      <div className="text-center p-8 text-gray-600">
+        Please sign in to use Google Drive integration
+      </div>
+    );
+  }
+
+  if (!isGoogleDriveConfigured()) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+        <Cloud className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Google Drive Integration Not Configured
+        </h3>
+        <p className="text-gray-700 mb-4">
+          Your administrator needs to set up Google OAuth. Contact support for assistance.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-4xl w-full max-h-[90vh] flex flex-col">

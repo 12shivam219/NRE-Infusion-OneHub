@@ -6,6 +6,7 @@ import { createRequirement, getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
 import { findSimilarRequirements } from '../../lib/requirementUtils';
 import { validateRequirementForm } from '../../lib/formValidation';
+import { sanitizeText } from '../../lib/utils';
 import { ErrorAlert } from '../common/ErrorAlert';
 import type { Database } from '../../lib/database.types';
 
@@ -143,17 +144,23 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prevState => ({ ...prevState, [name]: value }));
-    
-    // Check for similar requirements whenever company or tech stack changes
-    if (name === 'company' || name === 'primary_tech_stack' || name === 'title') {
-      const similar = findSimilarRequirements(
-        { title: formData.title, company: formData.company, primary_tech_stack: formData.primary_tech_stack },
-        allRequirements
-      );
-      setSimilarRequirements(similar);
-    }
-  }, [formData, allRequirements]);
+    setFormData(prevState => {
+      // Trim string values to prevent leading/trailing whitespace issues
+      const trimmedValue = typeof value === 'string' ? value.trim() : value;
+      const newFormData = { ...prevState, [name]: trimmedValue };
+      
+      // Check for similar requirements whenever company or tech stack changes
+      if (name === 'company' || name === 'primary_tech_stack' || name === 'title') {
+        const similar = findSimilarRequirements(
+          { title: newFormData.title, company: newFormData.company, primary_tech_stack: newFormData.primary_tech_stack },
+          allRequirements
+        );
+        setSimilarRequirements(similar);
+      }
+      
+      return newFormData;
+    });
+  }, [allRequirements]);
 
   const loadConsultants = useCallback(async () => {
     if (!user) return;
@@ -183,7 +190,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || loading) return; // Prevent double-submit
 
     // Validate form
     const validation = validateRequirementForm({
@@ -213,27 +220,27 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
     try {
       const result = await createRequirement({
         user_id: user.id,
-        title: formData.title,
-        company: formData.company,
+        title: sanitizeText(formData.title),
+        company: sanitizeText(formData.company),
         status: formData.status,
         consultant_id: formData.consultant_id || null,
         applied_for: formData.applied_for || null,
         rate: formData.rate || null,
-        primary_tech_stack: formData.primary_tech_stack || null,
-        imp_name: formData.imp_name || null,
+        primary_tech_stack: sanitizeText(formData.primary_tech_stack),
+        imp_name: sanitizeText(formData.imp_name),
         client_website: formData.client_website || null,
         imp_website: formData.imp_website || null,
-        vendor_company: formData.vendor_company || null,
+        vendor_company: sanitizeText(formData.vendor_company),
         vendor_website: formData.vendor_website || null,
-        vendor_person_name: formData.vendor_person_name || null,
+        vendor_person_name: sanitizeText(formData.vendor_person_name),
         vendor_phone: formData.vendor_phone || null,
         vendor_email: formData.vendor_email || null,
-        description: formData.description || null,
-        next_step: formData.next_step || null,
+        description: sanitizeText(formData.description),
+        next_step: sanitizeText(formData.next_step),
         remote: formData.remote || null,
         duration: formData.duration || null,
-        location: formData.location || null,
-      });
+        location: sanitizeText(formData.location),
+      }, user.id);
 
       setLoading(false);
       if (result.success) {
@@ -271,6 +278,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
+            aria-label="Close form"
+            title="Close form"
           >
             <X className="w-6 h-6" />
           </button>
@@ -333,6 +342,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                   { label: 'Submitted', value: 'SUBMITTED' },
                   { label: 'Interview', value: 'INTERVIEW' },
                   { label: 'Offer', value: 'OFFER' },
+                  { label: 'Rejected', value: 'REJECTED' },
                   { label: 'Closed', value: 'CLOSED' },
                 ]}
               />
@@ -500,6 +510,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               type="submit"
               disabled={loading}
               className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition"
+              aria-busy={loading}
+              aria-label="Create requirement"
             >
               {loading ? 'Creating...' : 'Create Requirement'}
             </button>

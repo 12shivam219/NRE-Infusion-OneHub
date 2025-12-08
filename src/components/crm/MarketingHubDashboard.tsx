@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { TrendingUp, Download, Plus, BarChart3, Calendar, UserPlus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getRequirements } from '../../lib/api/requirements';
@@ -39,12 +40,33 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
     loadData();
   }, [loadData]);
 
-  const getStats = () => {
+  // Memoize stats calculation to prevent unnecessary recalculations
+  const stats = useMemo(() => {
+    if (!Array.isArray(requirements) || !Array.isArray(interviews) || !Array.isArray(consultants)) {
+      return {
+        activeRequirements: 0,
+        newRequirements: 0,
+        inProgressRequirements: 0,
+        interviewRequirements: 0,
+        offerRequirements: 0,
+        upcomingInterviews: 0,
+        completedInterviews: 0,
+        activeConsultants: 0,
+        placedConsultants: 0,
+        placementRate: 0,
+      };
+    }
     const activeRequirements = requirements.filter(r => r.status !== 'CLOSED' && r.status !== 'REJECTED');
     const upcomingInterviews = interviews.filter(i => {
-      const date = new Date(i.scheduled_date);
-      const now = new Date();
-      return date > now && i.status !== 'Cancelled';
+      try {
+        const date = new Date(i.scheduled_date);
+        const now = new Date();
+        // Validate date is not invalid
+        if (isNaN(date.getTime())) return false;
+        return date > now && i.status !== 'Cancelled';
+      } catch {
+        return false;
+      }
     });
     const activeConsultants = consultants.filter(c => c.status === 'Active');
     const placedConsultants = consultants.filter(c => c.status === 'Recently Placed');
@@ -62,29 +84,41 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
         ? Math.round((placedConsultants.length / consultants.length) * 100)
         : 0,
     };
-  };
+  }, [requirements, interviews, consultants]);
 
-  const stats = getStats();
-
-  const recentActivity = [
-    ...requirements.slice(0, 2).map(r => ({
-      type: 'requirement',
-      title: `New requirement: ${r.title} at ${r.company}`,
-      time: new Date(r.created_at).toLocaleDateString(),
-    })),
-    ...interviews.slice(0, 2).map(i => ({
-      type: 'interview',
-      title: `Interview scheduled for requirement`,
-      time: new Date(i.scheduled_date).toLocaleDateString(),
-    })),
-    ...consultants.slice(0, 2).map(c => ({
-      type: 'consultant',
-      title: `${c.name} status: ${c.status}`,
-      time: new Date(c.updated_at).toLocaleDateString(),
-    })),
-  ]
-    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-    .slice(0, 5);
+  // Memoize recent activity calculation - sort all data first, then take most recent 2 of each
+  const recentActivity = useMemo(() => {
+    try {
+      const activities = [
+        ...(requirements || []).slice(0, 2).map(r => ({
+          type: 'requirement' as const,
+          title: `New requirement: ${r.title || 'Untitled'} at ${r.company || 'Unknown'}`,
+          time: new Date(r.created_at),
+        })),
+        ...(interviews || []).slice(0, 2).map(i => ({
+          type: 'interview' as const,
+          title: `Interview scheduled for requirement`,
+          time: new Date(i.scheduled_date),
+        })),
+        ...(consultants || []).slice(0, 2).map(c => ({
+          type: 'consultant' as const,
+          title: `${c.name || 'Unknown'} status: ${c.status || 'Unknown'}`,
+          time: new Date(c.updated_at),
+        })),
+      ].filter(a => !isNaN(a.time.getTime())); // Filter out invalid dates
+      
+      return activities
+        .sort((a, b) => b.time.getTime() - a.time.getTime())
+        .slice(0, 5)
+        .map(a => ({
+          type: a.type,
+          title: a.title,
+          time: a.time.toLocaleDateString(),
+        }));
+    } catch {
+      return [];
+    }
+  }, [requirements, interviews, consultants]);
 
   if (loading) {
     return (
@@ -302,49 +336,62 @@ interface ListSectionProps {
 }
 
 const ListSection = ({ data, type }: ListSectionProps) => {
-  if (!data.length)
+  if (!data.length) {
     return (
       <p className="text-gray-500 text-center italic py-6">
         No {type}s found
       </p>
     );
-
+  }
   return (
-    <div className="space-y-3">
-      {data.slice(0, 5).map((item) => (
-        <div
-          key={item.id}
-          className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
-        >
-          <div className="flex-1">
-            <p className="font-medium text-gray-900">
-              {type === 'requirement'
-                ? (item as Requirement).title
-                : type === 'interview'
-                ? 'Interview scheduled'
-                : (item as Consultant).name}
-            </p>
-            <p className="text-sm text-gray-600">
-              {type === 'requirement'
-                ? (item as Requirement).company
-                : type === 'interview'
-                ? new Date((item as Interview).scheduled_date).toLocaleDateString()
-                : (item as Consultant).email || 'No email'}
-            </p>
-          </div>
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-medium ${
-              type === 'requirement'
-                ? 'bg-blue-100 text-blue-800'
-                : type === 'interview'
-                ? 'bg-purple-100 text-purple-800'
-                : 'bg-green-100 text-green-800'
-            }`}
+    <ErrorBoundary>
+      <div className="space-y-8">
+        {data.map((item, idx) => (
+          <div
+            key={idx}
+            className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
           >
-            {item.status}
-          </span>
-        </div>
-      ))}
-    </div>
+            <div className="flex-1">
+              <p className="font-medium text-gray-900">
+                {type === 'requirement'
+                  ? (item as Requirement).title || 'Untitled'
+                  : type === 'interview'
+                  ? 'Interview scheduled'
+                  : (item as Consultant).name || 'Unknown'}
+              </p>
+              <p className="text-sm text-gray-600">
+                {type === 'requirement'
+                  ? (item as Requirement).company || 'Unknown company'
+                  : type === 'interview'
+                  ? (() => {
+                      try {
+                        const date = new Date((item as Interview).scheduled_date);
+                        return isNaN(date.getTime()) ? 'Invalid date' : date.toLocaleDateString();
+                      } catch {
+                        return 'Invalid date';
+                      }
+                    })()
+                  : (item as Consultant).email || 'No email'}
+              </p>
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                type === 'requirement'
+                  ? 'bg-blue-100 text-blue-800'
+                  : type === 'interview'
+                  ? 'bg-purple-100 text-purple-800'
+                  : 'bg-green-100 text-green-800'
+              }`}
+            >
+              {type === 'requirement'
+                ? (item as Requirement).status || ''
+                : type === 'interview'
+                ? (item as Interview).status || ''
+                : (item as Consultant).status || ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    </ErrorBoundary>
   );
 };

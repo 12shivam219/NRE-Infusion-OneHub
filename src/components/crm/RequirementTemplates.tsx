@@ -34,6 +34,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<RequirementTemplate | null>(null);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
 
   const loadRequirements = useCallback(async () => {
     if (!user) return;
@@ -82,14 +83,18 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
         duration: req.duration,
         remote: req.remote,
         vendor_company: req.vendor_company,
-        priority: req.priority,
       }));
   }, [requirements]);
 
   const handleCreateTemplate = (requirement: Requirement) => {
-    setSelectedTemplate({
+    if (!newTemplateName.trim()) {
+      setFormError('Template name is required.');
+      return;
+    }
+    setFormError(null);
+    const newTemplate: RequirementTemplate = {
       id: `template_${Date.now()}`,
-      name: newTemplateName || `${requirement.title} Template`,
+      name: newTemplateName,
       title: requirement.title,
       company: requirement.company,
       description: requirement.description,
@@ -98,21 +103,17 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       duration: requirement.duration,
       remote: requirement.remote,
       vendor_company: requirement.vendor_company,
-      priority: requirement.priority,
-    });
-    
+    };
     setTemplates(prev => {
-      const updated = [...prev, selectedTemplate!];
+      const updated = [...prev, newTemplate];
       localStorage.setItem('requirementTemplates', JSON.stringify(updated));
       return updated;
     });
-
     showToast({
       type: 'success',
       title: 'Template created',
       message: `Template "${newTemplateName}" saved successfully`,
     });
-    
     setNewTemplateName('');
     setShowTemplateForm(false);
   };
@@ -139,7 +140,6 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       company: template.company || null,
       description: template.description || null,
       status: 'NEW',
-      priority: template.priority || 'medium',
       primary_tech_stack: template.primary_tech_stack || null,
       rate: template.rate || null,
       duration: template.duration || null,
@@ -234,7 +234,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                   </button>
                   <button
                     onClick={() => {
-                      setSelectedTemplate(template);
+                      setSelectedTemplate(template as RequirementTemplate);
                       setShowTemplateForm(true);
                     }}
                     className="px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 text-sm"
@@ -263,7 +263,18 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
 
                 <button
                   onClick={() => {
-                    setSelectedTemplate(req as any);
+                    setSelectedTemplate({
+                      id: req.id,
+                      name: req.title,
+                      title: req.title,
+                      company: req.company,
+                      description: req.description,
+                      primary_tech_stack: req.primary_tech_stack,
+                      rate: req.rate,
+                      duration: req.duration,
+                      remote: req.remote,
+                      vendor_company: req.vendor_company,
+                    });
                     setShowTemplateForm(true);
                   }}
                   className="w-full mt-3 px-3 py-2 bg-green-50 text-green-600 rounded-lg font-medium hover:bg-green-100 text-sm flex items-center justify-center gap-2"
@@ -304,9 +315,10 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                   onChange={(e) => setNewTemplateName(e.target.value)}
                   placeholder={`${selectedTemplate.company} - ${selectedTemplate.primary_tech_stack}`}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  aria-label="Template Name"
                 />
+                {formError && <p className="text-xs text-red-600 mt-2">{formError}</p>}
               </div>
-
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 <p className="text-sm font-medium text-gray-700">Template Preview:</p>
                 {selectedTemplate.company && (
@@ -325,11 +337,11 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                   <p className="text-xs text-gray-600">Duration: {selectedTemplate.duration}</p>
                 )}
               </div>
-
               <div className="flex gap-3 pt-4 border-t border-gray-200">
                 <button
-                  onClick={() => handleCreateTemplate(selectedTemplate as any)}
+                  onClick={() => handleCreateTemplate(selectedTemplate as unknown as Requirement)}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                  aria-label="Save Template"
                 >
                   Save Template
                 </button>
@@ -338,8 +350,10 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                     setShowTemplateForm(false);
                     setSelectedTemplate(null);
                     setNewTemplateName('');
+                    setFormError(null);
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  aria-label="Cancel"
                 >
                   Cancel
                 </button>

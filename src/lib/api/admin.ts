@@ -177,7 +177,7 @@ export const updateUserStatus = async (
       if (import.meta.env.DEV) console.error('[STATUS UPDATE] Full error:', {
         message: error.message,
         code: error.code,
-        details: (error as any).details,
+        details: (error as { details?: unknown }).details,
       });
       return { success: false, error: error.message };
     }
@@ -230,7 +230,7 @@ export const updateUserRole = async (
       if (import.meta.env.DEV) console.error('[ROLE UPDATE] Full error:', {
         message: error.message,
         code: error.code,
-        details: (error as any).details,
+        details: (error as { details?: unknown }).details,
       });
       return { success: false, error: error.message };
     }

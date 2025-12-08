@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant } from '../../lib/api/consultants';
 import { useToast } from '../../contexts/ToastContext';
 import { AuditLog } from '../common/AuditLog';
+import { subscribeToConsultantById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
@@ -31,13 +32,41 @@ export const ConsultantDetailModal = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Consultant> | null>(null);
+  const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
 
   useEffect(() => {
     if (consultant) {
       setFormData(consultant);
       setIsEditing(false);
+      setRemoteUpdateNotified(false);
     }
   }, [consultant, isOpen]);
+
+  // Subscribe to real-time updates for this specific consultant
+  useEffect(() => {
+    if (!isOpen || !consultant) return;
+
+    const unsubscribe = subscribeToConsultantById(consultant.id, (update: RealtimeUpdate<Consultant>) => {
+      // Only update if not currently editing
+      if (!isEditing && update.type === 'UPDATE') {
+        setFormData(update.record);
+        
+        // Show notification if another user made changes
+        if (!remoteUpdateNotified) {
+          showToast({
+            type: 'info',
+            title: 'Updated',
+            message: 'This consultant was updated by another user. Changes are reflected below.',
+          });
+          setRemoteUpdateNotified(true);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [isOpen, consultant, isEditing, remoteUpdateNotified, showToast]);
 
   if (!isOpen || !consultant || !formData) return null;
 
@@ -47,6 +76,10 @@ export const ConsultantDetailModal = ({
 
   const handleSave = async () => {
     if (!user) return;
+    
+    // Store original data for rollback in case of error
+    const originalFormData = formData;
+    
     setIsLoading(true);
 
     const result = await updateConsultant(
@@ -64,6 +97,8 @@ export const ConsultantDetailModal = ({
       setIsEditing(false);
       onUpdate();
     } else if (result.error) {
+      // Rollback on error
+      setFormData(originalFormData);
       showToast({
         type: 'error',
         title: 'Failed to update',
@@ -304,7 +339,7 @@ export const ConsultantDetailModal = ({
               createdBy={createdBy}
               updatedAt={consultant.updated_at}
               updatedBy={updatedBy}
-              showToNonAdmins={true}
+              isVisibleToNonAdmins={true}
             />
           )}
 

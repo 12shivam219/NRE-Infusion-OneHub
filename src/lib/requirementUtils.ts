@@ -155,3 +155,12 @@ export const downloadFile = (content: string, filename: string, mimeType: string
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+/**
+ * Format requirement number with padding
+ * @param number The requirement number
+ * @returns Formatted number like "#001", "#042", etc.
+ */
+export const formatRequirementNumber = (number: number): string => {
+  return `#${String(number).padStart(3, '0')}`;
+};

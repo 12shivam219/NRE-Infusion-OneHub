@@ -5,6 +5,7 @@ import { updateRequirement, deleteRequirement } from '../../lib/api/requirements
 import { useToast } from '../../contexts/ToastContext';
 import { AuditLog } from '../common/AuditLog';
 import { EmailThreading } from './EmailThreading';
+import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -33,13 +34,41 @@ export const RequirementDetailModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Requirement> | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'emails'>('details');
+  const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
 
   useEffect(() => {
     if (requirement) {
       setFormData(requirement);
       setIsEditing(false);
+      setRemoteUpdateNotified(false);
     }
   }, [requirement, isOpen]);
+
+  // Subscribe to real-time updates for this specific requirement
+  useEffect(() => {
+    if (!isOpen || !requirement) return;
+
+    const unsubscribe = subscribeToRequirementById(requirement.id, (update: RealtimeUpdate<Requirement>) => {
+      // Only update if not currently editing
+      if (!isEditing && update.type === 'UPDATE') {
+        setFormData(update.record);
+        
+        // Show notification if another user made changes
+        if (!remoteUpdateNotified) {
+          showToast({
+            type: 'info',
+            title: 'Updated',
+            message: 'This requirement was updated by another user. Changes are reflected below.',
+          });
+          setRemoteUpdateNotified(true);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [isOpen, requirement, isEditing, remoteUpdateNotified, showToast]);
 
   if (!isOpen || !requirement || !formData) return null;
 
@@ -49,7 +78,14 @@ export const RequirementDetailModal = ({
 
   const handleSave = async () => {
     if (!user) return;
+    
+    // Store original data for rollback in case of error
+    const originalFormData = formData;
+    
     setIsLoading(true);
+    
+    // Optimistic update: immediately show the changes to the user
+    // The real-time subscription will sync with server changes
 
     const result = await updateRequirement(
       requirement.id,
@@ -66,6 +102,8 @@ export const RequirementDetailModal = ({
       setIsEditing(false);
       onUpdate();
     } else if (result.error) {
+      // Rollback on error
+      setFormData(originalFormData);
       showToast({
         type: 'error',
         title: 'Failed to update',
@@ -121,7 +159,9 @@ export const RequirementDetailModal = ({
                 {isEditing ? 'Edit Requirement' : 'Requirement Details'}
               </h2>
             </div>
-            <p className="text-blue-100 text-xs sm:text-sm lg:text-base ml-3 sm:ml-4 font-medium">Manage and track all requirement information</p>
+            <p className="text-blue-100 text-xs sm:text-sm lg:text-base ml-3 sm:ml-4 font-medium">
+              Req No: <span className="font-bold text-blue-200">{requirement.requirement_number || 'N/A'}</span>
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -133,8 +173,8 @@ export const RequirementDetailModal = ({
         </div>
 
         {/* Tab Navigation */}
-        <div className="border-b border-gray-200 overflow-visible bg-white px-3 sm:px-4 lg:px-6 flex gap-1 sm:gap-2 pt-2 pb-1">
-          <div className="flex gap-1 sm:gap-2 bg-gray-100 rounded-lg sm:rounded-xl p-1 shadow-sm w-full">
+        <div className="border-b border-gray-200 overflow-visible bg-white px-3 sm:px-4 lg:px-6">
+          <div className="flex gap-1 sm:gap-2 bg-gray-100 rounded-lg sm:rounded-xl p-1 shadow-sm w-full mb-3">
             <button
               onClick={() => setActiveTab('details')}
               className={`py-2 sm:py-2.5 lg:py-3 px-3 sm:px-4 lg:px-6 font-semibold rounded-md sm:rounded-lg transition whitespace-nowrap text-xs sm:text-sm lg:text-base flex-1 ${
@@ -225,6 +265,7 @@ export const RequirementDetailModal = ({
                 >
                   <option value="NEW">New</option>
                   <option value="IN_PROGRESS">In Progress</option>
+                  <option value="SUBMITTED">Submitted</option>
                   <option value="INTERVIEW">Interview</option>
                   <option value="OFFER">Offer</option>
                   <option value="REJECTED">Rejected</option>
@@ -510,7 +551,7 @@ export const RequirementDetailModal = ({
                 createdBy={createdBy}
                 updatedAt={requirement.updated_at}
                 updatedBy={updatedBy}
-                showToNonAdmins={true}
+                isVisibleToNonAdmins={true}
               />
             </div>
           )}
