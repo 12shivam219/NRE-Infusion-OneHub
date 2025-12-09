@@ -103,10 +103,19 @@ const AppContent = () => {
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} currentPage={currentPage} />
 
         <main className="flex-1 overflow-y-auto">
-          {currentPage === 'dashboard' && <Dashboard />}
-          {currentPage === 'documents' && <DocumentsPage />}
-          {currentPage === 'crm' && <CRMPage />}
-          {currentPage === 'admin' && <AdminPage />}
+          {/* Keep pages mounted to avoid reloading data when switching sections */}
+          <div className={currentPage === 'dashboard' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'dashboard'}>
+            <Dashboard />
+          </div>
+          <div className={currentPage === 'documents' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'documents'}>
+            <DocumentsPage />
+          </div>
+          <div className={currentPage === 'crm' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'crm'}>
+            <CRMPage />
+          </div>
+          <div className={currentPage === 'admin' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'admin'}>
+            <AdminPage />
+          </div>
         </main>
       </div>
 

@@ -390,34 +390,36 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
               </div>
             </div>
 
-            {/* Requirements Table */}
-            <div className="overflow-x-auto border border-gray-200 rounded-lg">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Title</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Company</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Days Open</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-700">Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRequirements.slice(0, 10).map(req => (
-                    <tr key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{req.title}</td>
-                      <td className="px-4 py-3 text-gray-600">{req.company || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          {req.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{calculateDaysOpen(req.created_at)}</td>
-                      <td className="px-4 py-3 text-gray-600">{new Date(req.created_at).toLocaleDateString()}</td>
+            {/* Requirements Table with Scrolling */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Title</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Company</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Days Open</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-700">Created</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredRequirements.map(req => (
+                      <tr key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900 truncate">{req.title}</td>
+                        <td className="px-4 py-3 text-gray-600 truncate">{req.company || '-'}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {req.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-center">{calculateDaysOpen(req.created_at)}</td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">{new Date(req.created_at).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {filteredRequirements.length > 10 && (

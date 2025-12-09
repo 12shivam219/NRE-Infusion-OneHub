@@ -1,10 +1,22 @@
 /**
  * Bulk Email Campaign API
  * Handles creating and managing bulk email campaigns with rotation
+ * Features:
+ * - Batch size: 5 items per batch to prevent server overload
+ * - Automatic delay between batches (100ms) for rate limiting
+ * - Uses GIN indexes on email columns for fast lookups
+ * - Optimized pagination for large recipient lists
  */
 
 import { supabase } from '../supabase';
 import { logger, handleApiError, retryAsync } from '../errorHandler';
+
+// Configuration constants for bulk operations
+export const BULK_EMAIL_CONFIG = {
+  BATCH_SIZE: 5,           // Max recipients per batch
+  BATCH_DELAY_MS: 100,     // Delay between batches to prevent overload
+  MAX_RECIPIENTS: 1000,    // Max recipients per campaign
+} as const;
 
 interface BulkEmailCampaign {
   id: string;
@@ -236,6 +248,14 @@ export const sendBulkEmailCampaign = async (
       return { success: false, error: 'No recipients in campaign' };
     }
 
+    // Limit recipients to prevent overload
+    if (recipients.length > BULK_EMAIL_CONFIG.MAX_RECIPIENTS) {
+      return {
+        success: false,
+        error: `Campaign exceeds maximum recipients (${BULK_EMAIL_CONFIG.MAX_RECIPIENTS})`,
+      };
+    }
+
     // Prepare recipients list for server
     const recipientEmails = recipients.map((r) => ({
       email: r.recipient_email,
@@ -279,19 +299,33 @@ export const sendBulkEmailCampaign = async (
       })
       .eq('id', campaignId);
 
-    // Update recipient statuses
-    for (const detail of result.details) {
-      const status = detail.status === 'sent' ? 'sent' : 'failed';
-      await supabase
-        .from('campaign_recipients')
-        .update({
-          status,
-          message_id: detail.messageId || null,
-          error_message: detail.error || null,
-          sent_at: status === 'sent' ? new Date().toISOString() : null,
+    // Update recipient statuses in batches to prevent overload
+    const detailBatches = [];
+    for (let i = 0; i < result.details.length; i += BULK_EMAIL_CONFIG.BATCH_SIZE) {
+      detailBatches.push(result.details.slice(i, i + BULK_EMAIL_CONFIG.BATCH_SIZE));
+    }
+
+    for (const batch of detailBatches) {
+      await Promise.all(
+        batch.map((detail: any) => {
+          const status = detail.status === 'sent' ? 'sent' : 'failed';
+          return supabase
+            .from('campaign_recipients')
+            .update({
+              status,
+              message_id: detail.messageId || null,
+              error_message: detail.error || null,
+              sent_at: status === 'sent' ? new Date().toISOString() : null,
+            })
+            .eq('campaign_id', campaignId)
+            .eq('recipient_email', detail.email);
         })
-        .eq('campaign_id', campaignId)
-        .eq('recipient_email', detail.email);
+      );
+      
+      // Delay between batches
+      if (detailBatches.indexOf(batch) < detailBatches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, BULK_EMAIL_CONFIG.BATCH_DELAY_MS));
+      }
     }
 
     logger.info('Bulk email campaign sent', {
@@ -299,6 +333,7 @@ export const sendBulkEmailCampaign = async (
       resource: campaignId,
       sent: result.sent,
       failed: result.failed,
+      batches: detailBatches.length,
     });
 
     return {

@@ -1,12 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Search, Plus, Trash2, Download, Eye, Sparkles, Cog, Calendar, CheckCircle, XCircle, Lock, ArrowUpDown, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../contexts/ToastContext';
 import { useSearchFilters } from '../../hooks/useSearchFilters';
 import { debounce } from '../../lib/utils';
-import { getRequirements, deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
+import { getRequirementsPage, deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
 import type { Database, RequirementStatus } from '../../lib/database.types';
-import { useToast } from '../../contexts/ToastContext';
-import { calculateDaysOpen } from '../../lib/requirementUtils';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsReport } from './RequirementsReport';
@@ -55,15 +54,14 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
   const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'ALL'>((savedFilters?.filterStatus as RequirementStatus | 'ALL') || 'ALL');
   const [sortBy, setSortBy] = useState<'date' | 'company' | 'daysOpen'>((savedFilters?.sortBy as 'date' | 'company' | 'daysOpen') || 'date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((savedFilters?.sortOrder as 'asc' | 'desc') || 'desc');
-  const [displayCount, setDisplayCount] = useState(20);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalResults, setTotalResults] = useState<number | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
   const [selectedJDRequirement, setSelectedJDRequirement] = useState<Requirement | null>(null);
   const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
   // Advanced filtering state
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<RequirementStatus>>(new Set());
   const [minRate, setMinRate] = useState(savedFilters?.minRate || '');
   const [maxRate, setMaxRate] = useState(savedFilters?.maxRate || '');
   const [remoteFilter, setRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>((savedFilters?.remoteFilter as 'ALL' | 'REMOTE' | 'ONSITE') || 'ALL');
@@ -72,6 +70,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     to: savedFilters?.dateRangeTo || '' 
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const pageSize = 20;
 
   // Initialize debounced search with saved value
   useEffect(() => {
@@ -104,32 +103,12 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
   const handleDebouncedSearch = useMemo(
     () => debounce((value: unknown) => {
       setDebouncedValue(value as string);
-      setDisplayCount(20);
+      setPage(0);
     }, 300),
     []
   );
 
   // Enhanced search function - searches across multiple fields including phone numbers and requirement number
-  const matchesSearch = useCallback((req: RequirementWithLogs, searchValue: string): boolean => {
-    if (!searchValue.trim()) return true;
-    
-    const search = searchValue.toLowerCase();
-    const requirementNum = String(req.requirement_number).padStart(3, '0');
-    
-    return !!(
-      req.title.toLowerCase().includes(search) ||
-      req.company?.toLowerCase().includes(search) ||
-      req.vendor_company?.toLowerCase().includes(search) ||
-      req.primary_tech_stack?.toLowerCase().includes(search) ||
-      req.description?.toLowerCase().includes(search) ||
-      req.vendor_email?.toLowerCase().includes(search) ||
-      req.vendor_phone?.toLowerCase().includes(search) ||
-      requirementNum.includes(search) ||
-      requirementNum.includes(search.replace('#', ''))
-    );
-  }, []);
-
-  // Helper to check if rate is within range
   const isRateInRange = useCallback((rate: string | null): boolean => {
     if (!rate) return true;
     const rateNum = parseFloat(rate.replace(/[^0-9.-]/g, ''));
@@ -173,47 +152,86 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     return remoteFilter === 'REMOTE' ? isRemote : !isRemote;
   }, [remoteFilter]);
 
-  const loadRequirements = useCallback(async () => {
+  const lastQueryKeyRef = useRef<string>('');
+
+  const loadRequirements = useCallback(async (opts?: { newPage?: number; force?: boolean }) => {
     if (!user) return;
+    const requestedPage = opts?.newPage ?? page;
+    const queryKey = JSON.stringify({
+      page: requestedPage,
+      search: debouncedValue,
+      status: filterStatus,
+      dateFrom: dateRange.from,
+      dateTo: dateRange.to,
+      sortBy,
+      sortOrder,
+      userId: user.id,
+    });
+
+    if (!opts?.force && lastQueryKeyRef.current === queryKey) {
+      return; // Skip duplicate fetch when nothing changed
+    }
+
     try {
+      if (requestedPage === 0 && requirements.length === 0) {
+        setLoading(true);
+      }
+
       setError(null);
-      const reqResult = await getRequirements(user.id);
-      if (reqResult.success && reqResult.requirements) {
-        setRequirements(reqResult.requirements);
+      lastQueryKeyRef.current = queryKey;
+
+      const orderByColumn = sortBy === 'date' ? 'created_at' : sortBy === 'company' ? 'company' : 'created_at';
+
+      const result = await getRequirementsPage({
+        userId: user.id,
+        limit: pageSize,
+        offset: requestedPage * pageSize,
+        search: debouncedValue,
+        status: filterStatus,
+        dateFrom: dateRange.from || undefined,
+        dateTo: dateRange.to || undefined,
+        orderBy: orderByColumn,
+        orderDir: sortOrder,
+      });
+
+      if (result.success && result.requirements) {
+        setRequirements(result.requirements);
+        setTotalResults(result.total ?? null);
       } else {
-        setError({
-          title: 'Failed to load requirements',
-          message: reqResult.error || 'An unexpected error occurred',
-        });
+        setError({ title: 'Failed to load requirements', message: result.error || 'An unexpected error occurred' });
       }
     } catch (err) {
-      setError({
-        title: 'Error',
-        message: err instanceof Error ? err.message : 'Failed to load requirements',
-      });
+      setError({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to load requirements' });
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, page, pageSize, debouncedValue, filterStatus, dateRange.from, dateRange.to, sortBy, sortOrder, requirements.length]);
 
   useEffect(() => {
-    loadRequirements();
+    // initial load or when filters change reset to first page
+    setPage(0);
+    loadRequirements({ newPage: 0, force: true });
 
     // Subscribe to real-time changes
     let unsubscribe: (() => void) | undefined;
     if (user) {
       unsubscribe = subscribeToRequirements(user.id, (update: RealtimeUpdate<Requirement>) => {
         if (update.type === 'INSERT') {
-          setRequirements(prev => [update.record, ...prev]);
+          // insert at front if it matches current search/status filters roughly
+          // Server-side filtering is authoritative; here we add to current page if it appears relevant
+          const matchesSearch = !debouncedValue || (update.record.title || '').toLowerCase().includes(debouncedValue.toLowerCase());
+          const matchesStatus = filterStatus === 'ALL' || update.record.status === filterStatus;
+          if (matchesSearch && matchesStatus) {
+            setRequirements(prev => [update.record, ...prev]);
+            setTotalResults(prev => (prev !== null ? prev + 1 : null));
+          }
           showToast({
             type: 'info',
             title: 'New requirement',
             message: `"${update.record.title}" has been added`,
           });
         } else if (update.type === 'UPDATE') {
-          setRequirements(prev =>
-            prev.map(r => (r.id === update.record.id ? update.record : r))
-          );
+          setRequirements(prev => prev.map(r => (r.id === update.record.id ? update.record : r)));
           // Show notification if not the current user editing
           if (selectedRequirement?.id !== update.record.id) {
             showToast({
@@ -224,6 +242,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
           }
         } else if (update.type === 'DELETE') {
           setRequirements(prev => prev.filter(r => r.id !== update.record.id));
+          setTotalResults(prev => (prev !== null ? Math.max(0, prev - 1) : null));
           if (selectedRequirement?.id === update.record.id) {
             setSelectedRequirement(null);
           }
@@ -239,7 +258,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     return () => {
       unsubscribe?.();
     };
-  }, [loadRequirements, user, selectedRequirement?.id, showToast]);
+  }, [loadRequirements, user, selectedRequirement?.id, showToast, debouncedValue, filterStatus]);
 
   const handleDelete = useCallback(async () => {
     const requirement = selectedRequirement;
@@ -258,9 +277,11 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       try {
         const result = await deleteRequirement(requirement.id);
         if (result.success) {
-          setSelectedRequirement(null);
-          showToast({ type: 'success', title: 'Requirement deleted', message: 'The requirement has been removed.' });
-          await loadRequirements();
+            setSelectedRequirement(null);
+            showToast({ type: 'success', title: 'Requirement deleted', message: 'The requirement has been removed.' });
+            // reload first page
+            setPage(0);
+            await loadRequirements({ newPage: 0 });
         } else {
           showToast({ type: 'error', title: 'Failed to delete', message: result.error || 'Unknown error' });
         }
@@ -277,49 +298,21 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
   };
 
   const filteredRequirements = useMemo(() => {
+    // After switching to server-side pagination, `requirements` contains the current pages fetched.
+    // We still apply lightweight client-side filters that aren't yet supported server-side (min/max rate, remote)
     const filtered = requirements.filter(req => {
-      // Apply enhanced search across multiple fields
-      const searchMatches = matchesSearch(req, debouncedValue);
-      
-      // Apply status filter (support both single and multiple selection)
-      const statusMatches = selectedStatuses.size > 0 
-        ? selectedStatuses.has(req.status)
-        : filterStatus === 'ALL' || req.status === filterStatus;
-      
-      // Apply advanced filters
+      if (!req) return false;
+      // Apply client-side advanced filters not handled by server
       const rateMatches = isRateInRange(req.rate);
       const dateMatches = isDateInRange(req.created_at);
       const remoteMatches = matchesRemoteFilter(req.remote);
-      
-      return searchMatches && statusMatches && rateMatches && dateMatches && remoteMatches;
-    });
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case 'company':
-          comparison = (a.company || '').localeCompare(b.company || '');
-          break;
-        case 'daysOpen':
-          comparison = calculateDaysOpen(a.created_at) - calculateDaysOpen(b.created_at);
-          break;
-        case 'date':
-        default:
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-          break;
-      }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return rateMatches && dateMatches && remoteMatches;
     });
 
     return filtered;
-    }, [requirements, debouncedValue, filterStatus, selectedStatuses, sortBy, sortOrder, matchesSearch, isRateInRange, isDateInRange, matchesRemoteFilter]);
+  }, [requirements, isRateInRange, isDateInRange, matchesRemoteFilter]);
 
-  const displayedRequirements = useMemo(() => {
-    return filteredRequirements.slice(0, displayCount);
-  }, [filteredRequirements, displayCount]);
-
-  const hasMoreRequirements = displayCount < filteredRequirements.length;
+  const hasMoreRequirements = totalResults !== null ? requirements.length < totalResults : false;
 
   // Helper to highlight search terms
   const HighlightedText = ({ text, searchTerm }: { text: string; searchTerm: string }) => {
@@ -342,11 +335,9 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
   };
 
   const handleLoadMore = () => {
-    setLoadingMore(true);
-    setTimeout(() => {
-      setDisplayCount(prev => prev + 20);
-      setLoadingMore(false);
-    }, 300);
+    // Load next page using server-side pagination
+    const nextPage = page + 1;
+    setPage(nextPage);
   };
 
   if (loading) {
@@ -438,7 +429,6 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
               value={filterStatus}
               onChange={(e) => {
                 setFilterStatus(e.target.value as RequirementStatus | 'ALL');
-                setSelectedStatuses(new Set());
               }}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
               title="Filter requirements by status"
@@ -562,7 +552,6 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
                     setMaxRate('');
                     setRemoteFilter('ALL');
                     setDateRange({ from: '', to: '' });
-                    setSelectedStatuses(new Set());
                     clearFilters();
                   }}
                   className="text-xs font-medium text-blue-600 hover:text-blue-700 underline"
@@ -627,7 +616,6 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
                   setMaxRate('');
                   setRemoteFilter('ALL');
                   setDateRange({ from: '', to: '' });
-                  setSelectedStatuses(new Set());
                   clearFilters();
                   setShowAdvancedFilters(false);
                 }}
@@ -658,7 +646,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-responsive">
-            {displayedRequirements.map((req: RequirementWithLogs) => {
+            {requirements.map((req: RequirementWithLogs) => {
               const statusBgMap: Record<typeof req.status, string> = {
                 'NEW': 'status-new',
                 'IN_PROGRESS': 'status-in-progress',
@@ -824,21 +812,21 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       {hasMoreRequirements && (
         <div className="flex flex-col items-center gap-4 py-8">
           <p className="text-sm text-gray-600">
-            Showing <span className="font-semibold">{displayCount}</span> of <span className="font-semibold">{filteredRequirements.length}</span> requirements
+            Showing <span className="font-semibold">{requirements.length}</span> of <span className="font-semibold">{totalResults ?? 0}</span> requirements
           </p>
           <button
             onClick={handleLoadMore}
-            disabled={loadingMore}
+            disabled={loading}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {loadingMore ? (
+            {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 Loading...
               </>
             ) : (
               <>
-                Load 20 More
+                Load Next Page
               </>
             )}
           </button>

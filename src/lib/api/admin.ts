@@ -445,14 +445,16 @@ export const forceLogoutUserSessions = async (
 };
 
 export const getPendingApprovals = async (
-  search?: string
+  search?: string,
+  limit: number = 50
 ): Promise<{ success: boolean; users?: User[]; error?: string }> => {
   try {
     let query = supabase
       .from('users')
       .select('*')
       .in('status', ['pending_verification', 'pending_approval'])
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit); // Add limit to prevent loading thousands of records
 
     if (search) {
       const term = `%${search}%`;
@@ -480,7 +482,10 @@ export const getApprovalStatistics = async (): Promise<{
     const fetchCount = async (filters?: Record<string, unknown>) => {
       let query = supabase.from('users').select('id', { count: 'exact', head: true });
       if (filters) {
-        query = query.match(filters);
+        // Apply filters using eq() for each key-value pair
+        Object.entries(filters).forEach(([key, value]) => {
+          query = query.eq(key, value);
+        });
       }
       const { count, error } = await query;
       if (error) {
@@ -525,7 +530,7 @@ export const getApprovalStatistics = async (): Promise<{
   }
 };
 
-export const getSuspiciousLogins = async (): Promise<{
+export const getSuspiciousLogins = async (limit: number = 100): Promise<{
   success: boolean;
   events?: LoginHistory[];
   error?: string;
@@ -536,6 +541,7 @@ export const getSuspiciousLogins = async (): Promise<{
       .select('*')
       .or('suspicious.eq.true,success.eq.false')
       .order('created_at', { ascending: false })
+      .limit(limit) // Add limit to prevent loading excessive records
       .limit(200);
 
     if (error) {

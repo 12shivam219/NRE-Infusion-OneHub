@@ -249,7 +249,7 @@ export const AdminPage = () => {
   const loadSecurityEvents = useCallback(async () => {
     if (!isAdmin) return;
     setSecurityLoading(true);
-    const result = await getSuspiciousLogins();
+    const result = await getSuspiciousLogins(100); // Limit to 100 events for performance
     if (result.success && result.events) {
       setSecurityEvents(result.events);
     } else if (result.error) {
@@ -565,12 +565,23 @@ export const AdminPage = () => {
     if (selectedApprovals.length === 0) return;
     setBulkActionInProgress(true);
     try {
-      const responses = await Promise.all(
-        selectedApprovals.map((userId) =>
-          updateUserStatus(userId, 'approved', { adminId: adminId ?? undefined })
-        )
-      );
-      const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
+      const batchSize = 5;
+      let failures: string[] = [];
+      
+      for (let i = 0; i < selectedApprovals.length; i += batchSize) {
+        const batch = selectedApprovals.slice(i, i + batchSize);
+        const responses = await Promise.all(
+          batch.map((userId) =>
+            updateUserStatus(userId, 'approved', { adminId: adminId ?? undefined })
+          )
+        );
+        const batchFailures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
+        failures = [...failures, ...batchFailures];
+        if (i + batchSize < selectedApprovals.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
       if (failures.length > 0) {
         showToast({
           type: 'error',
@@ -597,15 +608,26 @@ export const AdminPage = () => {
     const reason = window.prompt('Optional: provide a rejection reason for the selected users.');
     setBulkActionInProgress(true);
     try {
-      const responses = await Promise.all(
-        selectedApprovals.map((userId) =>
-          updateUserStatus(userId, 'rejected', {
-            adminId: adminId ?? undefined,
-            reason: reason || undefined,
-          })
-        )
-      );
-      const failures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
+      const batchSize = 5;
+      let failures: string[] = [];
+      
+      for (let i = 0; i < selectedApprovals.length; i += batchSize) {
+        const batch = selectedApprovals.slice(i, i + batchSize);
+        const responses = await Promise.all(
+          batch.map((userId) =>
+            updateUserStatus(userId, 'rejected', {
+              adminId: adminId ?? undefined,
+              reason: reason || undefined,
+            })
+          )
+        );
+        const batchFailures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
+        failures = [...failures, ...batchFailures];
+        if (i + batchSize < selectedApprovals.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      
       if (failures.length > 0) {
         showToast({
           type: 'error',
@@ -920,69 +942,73 @@ export const AdminPage = () => {
                       <div className="py-12 text-center text-gray-500">Loading users…</div>
                     ) : filteredUsers.length === 0 ? (
                       <div className="py-12 text-center text-gray-500">No users match the current filters.</div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="py-12 text-center text-gray-500">No users match the current filters.</div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
-                            <tr>
-                              <th className="px-6 py-3 text-left">User</th>
-                              <th className="px-6 py-3 text-left">Role</th>
-                              <th className="px-6 py-3 text-left">Status</th>
-                              <th className="px-6 py-3 text-left">Joined</th>
-                              <th className="px-6 py-3 text-left">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {filteredUsers.map((user) => (
-                              <tr key={user.id} className="hover:bg-gray-50">
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold">
-                                      {getInitials(user.full_name)}
-                                    </div>
-                                    <div>
-                                      <p className="font-medium text-gray-900">{user.full_name}</p>
-                                      <p className="text-gray-500">{user.email}</p>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <select
-                                    value={user.role}
-                                    onChange={(event) => handleUserRoleChange(user.id, event.target.value as UserRole)}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                                  >
-                                    <option value="user">User</option>
-                                    <option value="marketing">Marketing</option>
-                                    <option value="admin">Admin</option>
-                                  </select>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <select
-                                    value={user.status}
-                                    onChange={(event) => handleUserStatusChange(user.id, event.target.value as UserStatus)}
-                                    className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                                  >
-                                    {userStatusOptions.map((option) => (
-                                      <option key={option.value} value={option.value}>
-                                        {option.label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="px-6 py-4 text-gray-600">{formatDateTime(user.created_at)}</td>
-                                <td className="px-6 py-4">
-                                  <button
-                                    onClick={() => handleOpenUser(user)}
-                                    className="text-blue-600 hover:text-blue-700 font-medium"
-                                  >
-                                    View profile
-                                  </button>
-                                </td>
+                      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto max-h-96">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide sticky top-0 z-10">
+                              <tr>
+                                <th className="px-6 py-3 text-left">User</th>
+                                <th className="px-6 py-3 text-left">Role</th>
+                                <th className="px-6 py-3 text-left">Status</th>
+                                <th className="px-6 py-3 text-left">Joined</th>
+                                <th className="px-6 py-3 text-left">Actions</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {filteredUsers.map((user) => (
+                                <tr key={user.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
+                                        {getInitials(user.full_name)}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-gray-900 truncate">{user.full_name}</p>
+                                        <p className="text-gray-500 text-xs truncate">{user.email}</p>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <select
+                                      value={user.role}
+                                      onChange={(event) => handleUserRoleChange(user.id, event.target.value as UserRole)}
+                                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                                    >
+                                      <option value="user">User</option>
+                                      <option value="marketing">Marketing</option>
+                                      <option value="admin">Admin</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <select
+                                      value={user.status}
+                                      onChange={(event) => handleUserStatusChange(user.id, event.target.value as UserStatus)}
+                                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                                    >
+                                      {userStatusOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </td>
+                                  <td className="px-6 py-4 text-gray-600 text-xs">{formatDateTime(user.created_at)}</td>
+                                  <td className="px-6 py-4">
+                                    <button
+                                      onClick={() => handleOpenUser(user)}
+                                      className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                                    >
+                                      View
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>

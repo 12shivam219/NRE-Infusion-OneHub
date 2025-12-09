@@ -350,18 +350,20 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
-              {paginatedInterviews.map(interview => (
-                <InterviewCard
-                  key={interview.id}
-                  interview={interview}
-                  requirementTitle={getRequirementTitle(interview.requirement_id)}
-                  statusColor={interviewStatusColors[interview.status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
-                  onStatusChange={handleStatusChange}
-                  onDelete={handleDelete}
-                  onViewDetails={handleViewDetails}
-                />
-              ))}
+            <div className="max-h-[700px] overflow-y-auto border border-gray-200 rounded-lg p-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+                {paginatedInterviews.map(interview => (
+                  <InterviewCard
+                    key={interview.id}
+                    interview={interview}
+                    requirementTitle={getRequirementTitle(interview.requirement_id)}
+                    statusColor={interviewStatusColors[interview.status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
+                    onStatusChange={handleStatusChange}
+                    onDelete={handleDelete}
+                    onViewDetails={handleViewDetails}
+                  />
+                ))}
+              </div>
             </div>
 
             {totalPages > 1 && (

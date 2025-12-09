@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Search, Plus, Mail, Phone, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getConsultants, updateConsultant, deleteConsultant } from '../../lib/api/consultants';
+import { updateConsultant, deleteConsultant, getConsultantsPage } from '../../lib/api/consultants';
 import { subscribeToConsultants } from '../../lib/api/realtimeSync';
 import { debounce } from '../../lib/utils';
 import { SkeletonCard } from '../common/SkeletonCard';
@@ -27,8 +27,8 @@ interface ConsultantProfilesProps {
 export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
-    const [consultants, setConsultants] = useState<Consultant[]>([]);
-    const [searchError, setSearchError] = useState<string | null>(null);
+  const [consultants, setConsultants] = useState<Consultant[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -38,6 +38,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
   const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [totalResults, setTotalResults] = useState<number | null>(null);
   const itemsPerPage = 9;
 
   const handleDebouncedSearch = useMemo(
@@ -48,14 +49,25 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
     []
   );
 
-  const loadConsultants = useCallback(async () => {
+  // Server-side pagination & filtering
+  const loadConsultants = useCallback(async (page: number = 0) => {
     if (!user) return;
     try {
+      setLoading(true);
       setError(null);
-      const result = await getConsultants(user.id);
+
+      // Use server-side pagination with filtering
+      const result = await getConsultantsPage({
+        userId: user.id,
+        limit: itemsPerPage,
+        offset: page * itemsPerPage,
+        search: debouncedValue || undefined,
+        status: filterStatus !== 'ALL' ? filterStatus : undefined,
+      });
+
       if (result.success && result.consultants) {
         setConsultants(result.consultants);
-        // Update selected consultant if it exists with new data
+        setTotalResults(result.total ?? null);
         setSelectedConsultant(prev => {
           if (prev && result.consultants) {
             const updated = result.consultants.find(c => c.id === prev.id);
@@ -71,26 +83,35 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, debouncedValue, filterStatus, itemsPerPage]);
 
+  // Load consultants when filters change
   useEffect(() => {
-    loadConsultants();
+    loadConsultants(0);
+  }, [loadConsultants]);
+
+  // Realtime subscription
+  useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     if (user) {
       unsubscribe = subscribeToConsultants(user.id, (update: RealtimeUpdate<Consultant>) => {
         if (update.type === 'INSERT') {
-          setConsultants(prev => [update.record, ...prev]);
+          // Refresh to include new item
+          loadConsultants(0);
+          showToast({
+            type: 'info',
+            title: 'New consultant',
+            message: `"${update.record.name}" has been added`,
+          });
         } else if (update.type === 'UPDATE') {
           setConsultants(prev =>
             prev.map(c => (c.id === update.record.id ? update.record : c))
           );
-          // Update selected consultant if it matches
           setSelectedConsultant(prev =>
             prev?.id === update.record.id ? update.record : prev
           );
         } else if (update.type === 'DELETE') {
           setConsultants(prev => prev.filter(c => c.id !== update.record.id));
-          // Clear selected consultant if it was deleted
           setSelectedConsultant(prev => 
             prev?.id === update.record.id ? null : prev
           );
@@ -98,7 +119,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
       });
     }
     return () => { unsubscribe?.(); };
-  }, [loadConsultants, user]);
+  }, [user, loadConsultants, showToast]);
 
   const handleDelete = useCallback(async (id: string) => {
     if (!isAdmin) {
@@ -115,7 +136,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         const result = await deleteConsultant(id);
         if (result.success) {
           showToast({ type: 'success', title: 'Consultant deleted', message: 'The consultant has been removed.' });
-          await loadConsultants();
+          await loadConsultants(0);
         } else if (result.error) {
           setError({ title: 'Failed to delete', message: result.error });
         }
@@ -129,7 +150,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
     try {
       const result = await updateConsultant(id, { status: newStatus }, user?.id);
       if (result.success) {
-        await loadConsultants();
+        await loadConsultants(currentPage);
         showToast({ type: 'success', title: 'Status updated', message: `Consultant marked as ${newStatus}` });
       } else if (result.error) {
         setError({ title: 'Failed to update', message: result.error });
@@ -137,30 +158,15 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
     } catch {
       setError({ title: 'Error', message: 'Failed to update consultant' });
     }
-  }, [loadConsultants, showToast, user?.id]);
-
-  const filteredConsultants = useMemo(() => {
-    return consultants.filter(con => {
-      const matchesSearch = 
-        con.name.toLowerCase().includes(debouncedValue.toLowerCase()) ||
-        con.email?.toLowerCase().includes(debouncedValue.toLowerCase());
-      const matchesFilter = filterStatus === 'ALL' || con.status === filterStatus;
-      return matchesSearch && matchesFilter;
-    });
-  }, [consultants, debouncedValue, filterStatus]);
+  }, [loadConsultants, currentPage, showToast, user?.id]);
 
   const handleViewDetails = (consultant: Consultant) => {
     setSelectedConsultant(consultant);
-    // Consultants table doesn't currently have created_by/updated_by fields
     setSelectedCreatedBy(null);
     setSelectedUpdatedBy(null);
   };
 
-  const totalPages = Math.ceil(filteredConsultants.length / itemsPerPage);
-  const paginatedConsultants = useMemo(() => {
-    const start = currentPage * itemsPerPage;
-    return filteredConsultants.slice(start, start + itemsPerPage);
-  }, [filteredConsultants, currentPage, itemsPerPage]);
+  const totalPages = totalResults ? Math.ceil(totalResults / itemsPerPage) : 1;
 
   if (loading) {
     return (
@@ -233,14 +239,15 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         </select>
       </div>
 
-      {/* Consultant Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {filteredConsultants.length === 0 ? (
-          <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No consultants found</p>
-          </div>
-        ) : (
-          paginatedConsultants.map(consultant => (
+      {/* Consultant Cards Grid with Scrolling Container */}
+      <div className="max-h-[600px] overflow-y-auto border border-gray-200 rounded-lg p-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {consultants.length === 0 ? (
+            <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-500">No consultants found</p>
+            </div>
+          ) : (
+            consultants.map(consultant => (
             <div
               key={consultant.id}
               className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-lg transition cursor-pointer"
@@ -380,17 +387,21 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
             </div>
           ))
         )}
+        </div>
       </div>
 
       {/* Pagination Controls */}
-      {filteredConsultants.length > itemsPerPage && (
+      {totalResults && totalResults > itemsPerPage && (
         <div className="flex items-center justify-between mt-6 px-4 py-4 bg-gray-50 rounded-lg">
           <span className="text-sm text-gray-600">
-            Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, filteredConsultants.length)} of {filteredConsultants.length}
+            Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalResults)} of {totalResults}
           </span>
           <div className="flex gap-2">
             <button
-              onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+              onClick={() => {
+                setCurrentPage(prev => Math.max(0, prev - 1));
+                loadConsultants(Math.max(0, currentPage - 1));
+              }}
               disabled={currentPage === 0}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
@@ -400,7 +411,11 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
               Page {currentPage + 1} of {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+              onClick={() => {
+                const nextPage = Math.min(totalPages - 1, currentPage + 1);
+                setCurrentPage(nextPage);
+                loadConsultants(nextPage);
+              }}
               disabled={currentPage >= totalPages - 1}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >

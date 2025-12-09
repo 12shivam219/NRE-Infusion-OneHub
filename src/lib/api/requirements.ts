@@ -85,6 +85,76 @@ export const getRequirements = async (
   }
 };
 
+export const getRequirementsPage = async (
+  options: {
+    userId?: string;
+    limit?: number;
+    offset?: number;
+    search?: string;
+    status?: string | 'ALL';
+    dateFrom?: string;
+    dateTo?: string;
+    orderBy?: string;
+    orderDir?: 'asc' | 'desc';
+  }
+): Promise<{ success: boolean; requirements?: RequirementWithLogs[]; total?: number; error?: string }> => {
+  const {
+    userId,
+    limit = 20,
+    offset = 0,
+    search,
+    status,
+    dateFrom,
+    dateTo,
+    orderBy = 'created_at',
+    orderDir = 'desc',
+  } = options;
+
+  try {
+    let query = supabase.from('requirements').select('*', { count: 'exact' });
+
+    if (userId) query = query.eq('user_id', userId);
+    if (status && status !== 'ALL') query = query.eq('status', status);
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      // Uses pg_trgm extension for fast substring search on large datasets
+      // For best performance with 10K+ records, enable GIN indexes on searched columns
+      query = query.or(`title.ilike.${term},company.ilike.${term},primary_tech_stack.ilike.${term},vendor_company.ilike.${term}`);
+    }
+
+    if (dateFrom) {
+      query = query.gte('created_at', dateFrom);
+    }
+    if (dateTo) {
+      query = query.lte('created_at', dateTo);
+    }
+
+    query = query.order(orderBy, { ascending: orderDir === 'asc' });
+    // use range for pagination
+    const start = offset;
+    const end = offset + limit - 1;
+    query = query.range(start, end);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching paged requirements:', error.message);
+      }
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, requirements: data || [], total: count ?? 0 };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching paged requirements:', errorMsg);
+    }
+    return { success: false, error: 'Failed to fetch requirements' };
+  }
+};
+
 export const getRequirementById = async (
   id: string
 ): Promise<{ success: boolean; requirement?: Requirement; error?: string }> => {

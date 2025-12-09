@@ -41,6 +41,67 @@ export const getConsultants = async (
   }
 };
 
+/**
+ * Get consultants with server-side pagination and filtering
+ * Optimized for 10K+ records with minimal client-side processing
+ */
+export const getConsultantsPage = async (options: {
+  userId: string;
+  limit?: number;
+  offset?: number;
+  search?: string;
+  status?: string;
+}): Promise<{ success: boolean; consultants?: ConsultantWithLogs[]; total?: number; error?: string }> => {
+  const {
+    userId,
+    limit = 20,
+    offset = 0,
+    search,
+    status,
+  } = options;
+
+  try {
+    let query = supabase
+      .from('consultants')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+
+    // Server-side filtering
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      // Use ilike for trigram-optimized search (enable pg_trgm for best performance)
+      query = query.or(`name.ilike.${term},email.ilike.${term},primary_skills.ilike.${term}`);
+    }
+
+    // Server-side pagination
+    const start = offset;
+    const end = offset + limit - 1;
+    query = query.range(start, end);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching paged consultants:', error.message);
+      }
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, consultants: data || [], total: count ?? 0 };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching paged consultants:', errorMsg);
+    }
+    return { success: false, error: 'Failed to fetch consultants' };
+  }
+};
+
 export const getConsultantById = async (
   id: string
 ): Promise<{ success: boolean; consultant?: Consultant; error?: string }> => {

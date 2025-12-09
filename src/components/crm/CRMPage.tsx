@@ -82,37 +82,39 @@ export const CRMPage = () => {
       <div className="flex-1 overflow-y-auto bg-gray-50">
         <div className="p-4 sm:p-6 md:p-8">
           <ErrorBoundary>
-            <>
-              {currentView === 'dashboard' && (
-                <MarketingHubDashboard 
-                  onQuickAdd={(type: QuickAddType) => {
-                    if (type === 'requirement') setShowCreateForm(true);
-                    else if (type === 'interview') setShowCreateInterview(true);
-                    else if (type === 'consultant') setShowCreateConsultant(true);
-                  }}
-                />
-              )}
-              {currentView === 'requirements' && (
-                <RequirementsManagement 
-                  onQuickAdd={() => setShowCreateForm(true)}
-                  onCreateInterview={(requirementId) => {
-                    setSelectedRequirementIdForInterview(requirementId);
-                    setShowCreateInterview(true);
-                  }}
-                />
-              )}
-              {currentView === 'interviews' && (
-                <InterviewTracking 
-                  onQuickAdd={() => setShowCreateInterview(true)}
-                />
-              )}
-            </>
+            {/* Keep views mounted to avoid re-fetching data when returning */}
+            <div className={currentView === 'dashboard' ? 'block' : 'hidden'} aria-hidden={currentView !== 'dashboard'}>
+              <MarketingHubDashboard 
+                onQuickAdd={(type: QuickAddType) => {
+                  if (type === 'requirement') setShowCreateForm(true);
+                  else if (type === 'interview') setShowCreateInterview(true);
+                  else if (type === 'consultant') setShowCreateConsultant(true);
+                }}
+              />
+            </div>
+
+            <div className={currentView === 'requirements' ? 'block' : 'hidden'} aria-hidden={currentView !== 'requirements'}>
+              <RequirementsManagement 
+                onQuickAdd={() => setShowCreateForm(true)}
+                onCreateInterview={(requirementId) => {
+                  setSelectedRequirementIdForInterview(requirementId);
+                  setShowCreateInterview(true);
+                }}
+              />
+            </div>
+
+            <div className={currentView === 'interviews' ? 'block' : 'hidden'} aria-hidden={currentView !== 'interviews'}>
+              <InterviewTracking 
+                onQuickAdd={() => setShowCreateInterview(true)}
+              />
+            </div>
           </ErrorBoundary>
-        {currentView === 'consultants' && (
-          <ConsultantProfiles 
-            onQuickAdd={() => setShowCreateConsultant(true)}
-          />
-        )}
+
+          <div className={currentView === 'consultants' ? 'block' : 'hidden'} aria-hidden={currentView !== 'consultants'}>
+            <ConsultantProfiles 
+              onQuickAdd={() => setShowCreateConsultant(true)}
+            />
+          </div>
         </div>
       </div>
 
