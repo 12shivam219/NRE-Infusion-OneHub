@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '../supabase';
+import { logActivity } from './audit';
 import { logger, handleApiError, retryAsync } from '../errorHandler';
 
 // Configuration constants for bulk operations
@@ -118,6 +119,18 @@ export const createBulkEmailCampaign = async (
     if (!campaign) {
       return { success: false, error: 'Failed to create campaign' };
     }
+
+    await logActivity({
+      action: 'bulk_email_campaign_created',
+      actorId: userId,
+      resourceType: 'bulk_email_campaign',
+      resourceId: campaign.id,
+      details: {
+        subject,
+        recipients: recipients.length,
+        rotationEnabled,
+      },
+    });
 
     // Insert recipient records
     const recipientRecords = recipients.map((recipient) => ({

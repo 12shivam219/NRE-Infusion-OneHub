@@ -228,8 +228,9 @@ export const login = async (
       // Continue even if activity_logs doesn't exist or fails
     }
 
-    // Store user data locally (Supabase session is managed automatically)
-    // Use auth user data if profile doesn't exist yet
+    // Store user data in sessionStorage (cleared when tab closes)
+    // SECURITY: Use sessionStorage instead of localStorage to prevent persistent token storage
+    // Supabase session is managed automatically via secure cookies
     const userData = user || {
       id: authData.user.id,
       email: authData.user.email || '',
@@ -240,14 +241,15 @@ export const login = async (
       origin_ip: clientIp || null,
     };
 
-    localStorage.setItem('user', JSON.stringify({
+    // Store ONLY non-sensitive user info in sessionStorage
+    sessionStorage.setItem('user', JSON.stringify({
       id: userData.id,
       email: userData.email,
       full_name: userData.full_name,
       role: userData.role,
       status: userData.status,
       email_verified: userData.email_verified,
-      origin_ip: userData.origin_ip,
+      // Don't store IP in session storage
     }));
 
     return {
@@ -299,11 +301,14 @@ export const logout = async (): Promise<void> => {
     // Continue with local cleanup even if Supabase signout fails
   }
 
+  // Clear both sessionStorage and localStorage (for fallback compatibility)
+  sessionStorage.removeItem('user');
   localStorage.removeItem('user');
 };
 
 export const getCurrentUser = (): User | null => {
-  const userStr = localStorage.getItem('user');
+  // SECURITY: Read from sessionStorage (cleared when tab closes)
+  const userStr = sessionStorage.getItem('user');
   if (!userStr) return null;
 
   try {

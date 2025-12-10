@@ -29,7 +29,21 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Fall back to any cached user stored locally (from a previous login).
-      const cachedUser = getCurrentUser();
+      // SECURITY: Check sessionStorage (cleared on tab close) before localStorage
+      let cachedUser = getCurrentUser();
+      
+      // Fallback to localStorage only if sessionStorage is empty (for session recovery)
+      if (!cachedUser) {
+        const localUser = localStorage.getItem('user');
+        if (localUser) {
+          try {
+            cachedUser = JSON.parse(localUser);
+          } catch {
+            // Invalid data in localStorage
+          }
+        }
+      }
+      
       if (cachedUser) {
         setUser(cachedUser);
         return;
@@ -39,6 +53,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
         setUser(null);
+        sessionStorage.removeItem('user');
         localStorage.removeItem('user');
         return;
       }
@@ -56,6 +71,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error loading authenticated user:', error);
       setUser(null);
+      sessionStorage.removeItem('user');
       localStorage.removeItem('user');
     } finally {
       setIsLoading(false);
@@ -85,6 +101,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (event === 'SIGNED_OUT') {
           // User signed out
           setUser(null);
+          sessionStorage.removeItem('user');
           localStorage.removeItem('user');
         }
       }

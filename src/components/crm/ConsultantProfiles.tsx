@@ -133,7 +133,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
 
     if (confirm('Are you sure you want to delete this consultant?')) {
       try {
-        const result = await deleteConsultant(id);
+        const result = await deleteConsultant(id, user?.id);
         if (result.success) {
           showToast({ type: 'success', title: 'Consultant deleted', message: 'The consultant has been removed.' });
           await loadConsultants(0);

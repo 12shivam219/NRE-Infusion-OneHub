@@ -124,7 +124,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
 
     if (confirm('Are you sure you want to delete this interview?')) {
       try {
-        const result = await deleteInterview(id);
+        const result = await deleteInterview(id, user?.id);
         if (result.success) {
           showToast({ type: 'success', title: 'Interview deleted', message: 'The interview has been removed.' });
           await loadData();
@@ -139,7 +139,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
 
   const handleStatusChange = useCallback(async (id: string, status: string) => {
     if (!user) return;
-    const result = await updateInterview(id, { status });
+    const result = await updateInterview(id, { status }, user?.id);
     if (result.success) {
       await loadData();
       showToast({ type: 'success', title: 'Status updated', message: `Interview marked as ${status}` });

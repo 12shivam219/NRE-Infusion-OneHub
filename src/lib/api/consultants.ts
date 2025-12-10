@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
+import { logActivity } from './audit';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 type ConsultantInsert = Database['public']['Tables']['consultants']['Insert'];
@@ -150,6 +151,14 @@ export const createConsultant = async (
       return { success: false, error: error.message };
     }
 
+    await logActivity({
+      action: 'consultant_created',
+      actorId: userId,
+      resourceType: 'consultant',
+      resourceId: data.id,
+      details: { name: data.name },
+    });
+
     return { success: true, consultant: data };
   } catch {
     return { success: false, error: 'Failed to create consultant' };
@@ -179,6 +188,14 @@ export const updateConsultant = async (
       return { success: false, error: error.message };
     }
 
+    await logActivity({
+      action: 'consultant_updated',
+      actorId: userId,
+      resourceType: 'consultant',
+      resourceId: id,
+      details: { fields: Object.keys(updates) },
+    });
+
     return { success: true, consultant: data };
   } catch {
     return { success: false, error: 'Failed to update consultant' };
@@ -186,9 +203,17 @@ export const updateConsultant = async (
 };
 
 export const deleteConsultant = async (
-  id: string
+  id: string,
+  userId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    await logActivity({
+      action: 'consultant_deleted',
+      actorId: userId,
+      resourceType: 'consultant',
+      resourceId: id,
+    });
+
     const { error } = await supabase
       .from('consultants')
       .delete()

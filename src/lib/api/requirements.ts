@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
+import { logActivity } from './audit';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type RequirementInsert = Database['public']['Tables']['requirements']['Insert'];
@@ -219,6 +220,18 @@ export const createRequirement = async (
       return { success: false, error: error.message };
     }
 
+    // Write audit entry (best effort)
+    await logActivity({
+      action: 'requirement_created',
+      actorId: userId,
+      resourceType: 'requirement',
+      resourceId: data.id,
+      details: {
+        requirement_number: data.requirement_number,
+        title: data.title,
+      },
+    });
+
     return { success: true, requirement: data };
   } catch {
     return { success: false, error: 'Failed to create requirement' };
@@ -248,6 +261,16 @@ export const updateRequirement = async (
       return { success: false, error: error.message };
     }
 
+    await logActivity({
+      action: 'requirement_updated',
+      actorId: userId,
+      resourceType: 'requirement',
+      resourceId: id,
+      details: {
+        fields: Object.keys(updates),
+      },
+    });
+
     return { success: true, requirement: data };
   } catch {
     return { success: false, error: 'Failed to update requirement' };
@@ -255,9 +278,17 @@ export const updateRequirement = async (
 };
 
 export const deleteRequirement = async (
-  id: string
+  id: string,
+  userId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    await logActivity({
+      action: 'requirement_deleted',
+      actorId: userId,
+      resourceType: 'requirement',
+      resourceId: id,
+    });
+
     const { error } = await supabase
       .from('requirements')
       .delete()

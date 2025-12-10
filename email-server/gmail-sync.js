@@ -7,11 +7,14 @@ dotenv.config();
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  throw new Error('Missing Supabase environment variables');
-}
+let supabase = null;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+// Only initialize Supabase if credentials are provided
+if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+} else {
+  console.warn('⚠️  Supabase credentials not configured. Gmail sync scheduler disabled.');
+}
 
 // ============================================
 // Gmail API Integration
@@ -406,6 +409,12 @@ async function syncGmailEmails(userId) {
 // ============================================
 
 async function startSyncScheduler() {
+  // Check if Supabase is properly configured
+  if (!supabase) {
+    console.warn('⚠️  Gmail sync scheduler not started: Supabase not configured');
+    return;
+  }
+
   console.log('Starting Gmail sync scheduler...');
 
   // Initial sync for all active users

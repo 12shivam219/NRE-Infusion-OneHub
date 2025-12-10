@@ -275,7 +275,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
 
     if (confirm('Are you sure you want to delete this requirement? This action cannot be undone.')) {
       try {
-        const result = await deleteRequirement(requirement.id);
+        const result = await deleteRequirement(requirement.id, user?.id);
         if (result.success) {
             setSelectedRequirement(null);
             showToast({ type: 'success', title: 'Requirement deleted', message: 'The requirement has been removed.' });

@@ -1,12 +1,15 @@
 /**
  * Gmail OAuth and API utilities
  * Handles authentication, token management, and API communication
+ * 
+ * SECURITY NOTE: Client secret is handled server-side only.
+ * Never expose GOOGLE_CLIENT_SECRET to frontend.
  */
 
 import { supabase } from '../supabase';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
+// Client secret is handled by backend only - see api/gmailIntegration backend proxy
 const GOOGLE_REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI || `${window.location.origin}/oauth/callback`;
 
 interface GmailToken {
@@ -57,24 +60,25 @@ function getGmailAuthUrl(): string {
 
 /**
  * Exchange authorization code for tokens
+ * SECURITY: Uses backend proxy to keep client_secret secure
  */
 async function exchangeCodeForToken(code: string): Promise<GmailToken> {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
+  // Call backend proxy that handles the actual token exchange
+  // Backend keeps client_secret safe and only returns access_token
+  const response = await fetch('/api/gmail/exchange-token', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
+    body: JSON.stringify({
       code,
-      grant_type: 'authorization_code',
       redirect_uri: GOOGLE_REDIRECT_URI,
-    }).toString(),
+    }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to exchange code for token: ${response.status}`);
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `Failed to exchange code for token: ${response.status}`);
   }
 
   const data = (await response.json()) as {
@@ -92,23 +96,23 @@ async function exchangeCodeForToken(code: string): Promise<GmailToken> {
 
 /**
  * Refresh access token using refresh token
+ * SECURITY: Uses backend proxy to keep client_secret secure
  */
 async function refreshAccessToken(refreshToken: string): Promise<GmailToken> {
-  const response = await fetch('https://oauth2.googleapis.com/token', {
+  // Call backend proxy for token refresh
+  const response = await fetch('/api/gmail/refresh-token', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
     },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      client_secret: GOOGLE_CLIENT_SECRET,
+    body: JSON.stringify({
       refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }).toString(),
+    }),
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to refresh token: ${response.status}`);
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `Failed to refresh token: ${response.status}`);
   }
 
   const data = (await response.json()) as {

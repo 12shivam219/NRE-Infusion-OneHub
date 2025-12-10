@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
+import { logActivity } from './audit';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type InterviewInsert = Database['public']['Tables']['interviews']['Insert'];
@@ -69,18 +70,33 @@ export const getInterviewById = async (
 };
 
 export const createInterview = async (
-  interview: InterviewInsert
+  interview: InterviewInsert,
+  userId?: string
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
+    const payload = {
+      ...interview,
+      created_by: userId ?? null,
+      updated_by: userId ?? null,
+    };
+
     const { data, error } = await supabase
       .from('interviews')
-      .insert(interview)
+      .insert(payload)
       .select()
       .single();
 
     if (error) {
       return { success: false, error: error.message };
     }
+
+    await logActivity({
+      action: 'interview_created',
+      actorId: userId,
+      resourceType: 'interview',
+      resourceId: data.id,
+      details: { scheduled_date: data.scheduled_date },
+    });
 
     return { success: true, interview: data };
   } catch {
@@ -90,12 +106,14 @@ export const createInterview = async (
 
 export const updateInterview = async (
   id: string,
-  updates: Partial<InterviewInsert>
+  updates: Partial<InterviewInsert>,
+  userId?: string
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
     const dataToUpdate = {
       ...updates,
       updated_at: new Date().toISOString(),
+      updated_by: userId ?? null,
     };
 
     const { data, error } = await supabase
@@ -109,6 +127,14 @@ export const updateInterview = async (
       return { success: false, error: error.message };
     }
 
+    await logActivity({
+      action: 'interview_updated',
+      actorId: userId,
+      resourceType: 'interview',
+      resourceId: id,
+      details: { fields: Object.keys(updates) },
+    });
+
     return { success: true, interview: data };
   } catch {
     return { success: false, error: 'Failed to update interview' };
@@ -116,9 +142,17 @@ export const updateInterview = async (
 };
 
 export const deleteInterview = async (
-  id: string
+  id: string,
+  userId?: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
+    await logActivity({
+      action: 'interview_deleted',
+      actorId: userId,
+      resourceType: 'interview',
+      resourceId: id,
+    });
+
     const { error } = await supabase
       .from('interviews')
       .delete()

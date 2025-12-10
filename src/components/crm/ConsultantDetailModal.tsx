@@ -3,7 +3,7 @@ import { X, Edit2, Trash2, Loader } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant } from '../../lib/api/consultants';
 import { useToast } from '../../contexts/ToastContext';
-import { AuditLog } from '../common/AuditLog';
+import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { subscribeToConsultantById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 
@@ -123,7 +123,7 @@ export const ConsultantDetailModal = ({
     }
 
     setIsDeleting(true);
-    const result = await deleteConsultant(consultant.id);
+    const result = await deleteConsultant(consultant.id, user?.id);
 
     if (result.success) {
       showToast({
@@ -334,12 +334,10 @@ export const ConsultantDetailModal = ({
 
           {/* Audit Log - Admin Only */}
           {isAdmin && (
-            <AuditLog
-              createdAt={consultant.created_at}
-              createdBy={createdBy}
-              updatedAt={consultant.updated_at}
-              updatedBy={updatedBy}
-              isVisibleToNonAdmins={true}
+            <ResourceAuditTimeline
+              resourceType="consultant"
+              resourceId={consultant.id}
+              title="Recent admin + CRM actions"
             />
           )}
 

@@ -8,6 +8,11 @@
     <meta property="og:image" content="https://bolt.new/static/og_default.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+    <!-- SECURITY: Content Security Policy to prevent XSS attacks -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://api.ipify.org https://*.supabase.co wss://*.supabase.co http://localhost:3001 https://accounts.google.com https://oauth2.googleapis.com; frame-src 'none'; object-src 'none';">
+    <!-- SECURITY: Additional security headers -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
 </head>
   <body>
     <div id="root"></div>

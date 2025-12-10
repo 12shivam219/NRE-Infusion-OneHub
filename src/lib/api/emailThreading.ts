@@ -113,10 +113,12 @@ export const createEmailThread = async (
 
     // First, try to send the actual email via the email server
     const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+    const apiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
     const sendEmailResponse = await fetch(`${emailServerUrl}/api/send-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         to: toEmail,
@@ -214,10 +216,12 @@ export const replyToEmailThread = async (
 
     // First, try to send the actual email reply via the email server
     const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+    const apiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
     const sendEmailResponse = await fetch(`${emailServerUrl}/api/send-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         to: toEmail,

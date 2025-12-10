@@ -134,18 +134,21 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
   const handleApplyTemplate = async (template: RequirementTemplate) => {
     if (!user) return;
 
-    const result = await createRequirement({
-      user_id: user.id,
-      title: template.title,
-      company: template.company || null,
-      description: template.description || null,
-      status: 'NEW',
-      primary_tech_stack: template.primary_tech_stack || null,
-      rate: template.rate || null,
-      duration: template.duration || null,
-      remote: template.remote || null,
-      vendor_company: template.vendor_company || null,
-    });
+    const result = await createRequirement(
+      {
+        user_id: user.id,
+        title: template.title,
+        company: template.company || null,
+        description: template.description || null,
+        status: 'NEW',
+        primary_tech_stack: template.primary_tech_stack || null,
+        rate: template.rate || null,
+        duration: template.duration || null,
+        remote: template.remote || null,
+        vendor_company: template.vendor_company || null,
+      },
+      user.id
+    );
 
     if (result.success) {
       showToast({

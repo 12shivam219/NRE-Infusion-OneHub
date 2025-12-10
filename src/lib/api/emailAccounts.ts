@@ -5,6 +5,7 @@
 
 import { supabase } from '../supabase';
 import { logger, handleApiError, retryAsync } from '../errorHandler';
+import { encryptData } from '../encryption';
 
 interface EmailAccount {
   id: string;
@@ -74,8 +75,18 @@ export const addEmailAccount = async (
       };
     }
 
-    // In production, you would encrypt the app password before storing
-    // For now, we'll store it as-is (⚠️ NOT RECOMMENDED FOR PRODUCTION)
+    // SECURITY: Encrypt the app password before storing in database
+    let encryptedPassword: string;
+    try {
+      encryptedPassword = encryptData(appPassword);
+    } catch (encryptError) {
+      const appError = handleApiError(encryptError, {
+        component: 'addEmailAccount',
+        resource: 'password encryption',
+      });
+      return { success: false, error: `Encryption failed: ${appError.message}` };
+    }
+
     const { data, error } = await retryAsync(
       async () =>
         supabase
@@ -83,7 +94,7 @@ export const addEmailAccount = async (
           .insert({
             user_id: userId,
             email_address: emailAddress,
-            app_password_encrypted: appPassword, // TODO: Encrypt this
+            app_password_encrypted: encryptedPassword,
             email_limit_per_rotation: emailLimitPerRotation || 5,
             is_active: true,
             order_index: 0,
@@ -212,11 +223,13 @@ export const testEmailAccount = async (
 ): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+    const apiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
     
     const response = await fetch(`${emailServerUrl}/api/send-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         to: emailAddress,

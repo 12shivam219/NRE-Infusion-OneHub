@@ -4,6 +4,7 @@
  */
 
 import { supabase } from '../supabase';
+import { logActivity } from './audit';
 
 interface RequirementEmail {
   id: string;
@@ -77,6 +78,19 @@ export async function createEmailRecord(
     .single();
 
   if (error) throw error;
+
+  await logActivity({
+    action: 'requirement_email_sent',
+    actorId: userId,
+    resourceType: 'requirement_email',
+    resourceId: data.id,
+    details: {
+      requirementId,
+      recipientEmail,
+      subject,
+    },
+  });
+
   return data;
 }
 

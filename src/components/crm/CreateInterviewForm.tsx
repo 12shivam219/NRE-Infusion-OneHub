@@ -235,30 +235,33 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
 
     setFormErrors({});
     setLoading(true);
-    const result = await createInterview({
-      user_id: user.id,
-      requirement_id: formData.requirement_id,
-      scheduled_date: formData.scheduled_date,
-      scheduled_time: formData.scheduled_time || null,
-      timezone: formData.timezone || null,
-      duration_minutes: parseInt(formData.duration_minutes),
-      type: formData.type || null,
-      status: formData.status,
-      consultant_id: formData.consultant_id || null,
-      vendor_company: sanitizeText(formData.vendor_company),
-      interview_with: sanitizeText(formData.interview_with),
-      result: sanitizeText(formData.result),
-      round: formData.round || null,
-      mode: formData.mode || null,
-      meeting_type: formData.meeting_type || null,
-      subject_line: sanitizeText(formData.subject_line),
-      interviewer: sanitizeText(formData.interviewer),
-      location: sanitizeText(formData.location),
-      interview_focus: sanitizeText(formData.interview_focus),
-      special_note: sanitizeText(formData.special_note),
-      job_description_excerpt: sanitizeText(formData.job_description_excerpt),
-      feedback_notes: sanitizeText(formData.feedback_notes),
-    });
+    const result = await createInterview(
+      {
+        user_id: user.id,
+        requirement_id: formData.requirement_id,
+        scheduled_date: formData.scheduled_date,
+        scheduled_time: formData.scheduled_time || null,
+        timezone: formData.timezone || null,
+        duration_minutes: parseInt(formData.duration_minutes),
+        type: formData.type || null,
+        status: formData.status,
+        consultant_id: formData.consultant_id || null,
+        vendor_company: sanitizeText(formData.vendor_company),
+        interview_with: sanitizeText(formData.interview_with),
+        result: sanitizeText(formData.result),
+        round: formData.round || null,
+        mode: formData.mode || null,
+        meeting_type: formData.meeting_type || null,
+        subject_line: sanitizeText(formData.subject_line),
+        interviewer: sanitizeText(formData.interviewer),
+        location: sanitizeText(formData.location),
+        interview_focus: sanitizeText(formData.interview_focus),
+        special_note: sanitizeText(formData.special_note),
+        job_description_excerpt: sanitizeText(formData.job_description_excerpt),
+        feedback_notes: sanitizeText(formData.feedback_notes),
+      },
+      user.id
+    );
 
     setLoading(false);
     if (result.success) {

@@ -3,7 +3,7 @@ import { X, Edit2, Trash2, Loader, Mail } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateRequirement, deleteRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
-import { AuditLog } from '../common/AuditLog';
+import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { EmailThreading } from './EmailThreading';
 import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
@@ -128,7 +128,7 @@ export const RequirementDetailModal = ({
     }
 
     setIsDeleting(true);
-    const result = await deleteRequirement(requirement.id);
+    const result = await deleteRequirement(requirement.id, user?.id);
 
     if (result.success) {
       showToast({
@@ -546,12 +546,10 @@ export const RequirementDetailModal = ({
           {/* Audit Log - Admin Only */}
           {isAdmin && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mt-6">
-              <AuditLog
-                createdAt={requirement.created_at}
-                createdBy={createdBy}
-                updatedAt={requirement.updated_at}
-                updatedBy={updatedBy}
-                isVisibleToNonAdmins={true}
+              <ResourceAuditTimeline
+                resourceType="requirement"
+                resourceId={requirement.id}
+                title="Recent admin + CRM actions"
               />
             </div>
           )}

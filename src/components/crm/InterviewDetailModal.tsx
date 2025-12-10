@@ -4,7 +4,7 @@ import { isValidUrl, isMeetingLink, extractDomainFromUrl } from '../../lib/inter
 import { useAuth } from '../../hooks/useAuth';
 import { updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { useToast } from '../../contexts/ToastContext';
-import { AuditLog } from '../common/AuditLog';
+import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { subscribeToInterviewById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 
@@ -131,7 +131,8 @@ export const InterviewDetailModal = ({
 
     const result = await updateInterview(
       interview.id,
-      formData as Partial<Interview>
+      formData as Partial<Interview>,
+      user?.id
     );
 
     if (result.success) {
@@ -169,7 +170,7 @@ export const InterviewDetailModal = ({
     }
 
     setIsDeleting(true);
-    const result = await deleteInterview(interview.id);
+    const result = await deleteInterview(interview.id, user?.id);
 
     if (result.success) {
       showToast({
@@ -450,12 +451,10 @@ export const InterviewDetailModal = ({
           {/* Audit Log - Admin Only */}
           {isAdmin && (
             <AccordionSection title="Audit Information" defaultOpen={false}>
-              <AuditLog
-                createdAt={interview.created_at}
-                createdBy={createdBy}
-                updatedAt={interview.updated_at}
-                updatedBy={updatedBy}
-                isVisibleToNonAdmins={true}
+              <ResourceAuditTimeline
+                resourceType="interview"
+                resourceId={interview.id}
+                title="Recent admin + CRM actions"
               />
             </AccordionSection>
           )}
