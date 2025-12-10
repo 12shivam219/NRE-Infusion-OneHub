@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import { Search, Plus, Trash2, Download, Eye, Sparkles, Cog, Calendar, CheckCircle, XCircle, Lock, ArrowUpDown, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
@@ -40,6 +41,247 @@ interface RequirementsManagementProps {
   onQuickAdd?: () => void;
   onCreateInterview?: (requirementId: string) => void;
 }
+
+// HighlightedText component
+const HighlightedText = ({ text, searchTerm }: { text: string; searchTerm: string }) => {
+  if (!searchTerm.trim()) return <>{text}</>;
+  
+  const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.toLowerCase() === searchTerm.toLowerCase() ? (
+          <mark key={index} className="bg-yellow-200 font-semibold">
+            {part}
+          </mark>
+        ) : (
+          <span key={index}>{part}</span>
+        )
+      )}
+    </>
+  );
+};
+
+// RequirementCard component
+const RequirementCard = ({
+  req,
+  onViewDetails,
+  onCreateInterview,
+  onSetSelectedJD,
+  onDelete,
+  debouncedValue,
+  statusBgMap,
+  statusColors,
+  getStatusIcon,
+  isAdmin,
+}: {
+  req: RequirementWithLogs;
+  onViewDetails: (req: Requirement) => void;
+  onCreateInterview?: (id: string) => void;
+  onSetSelectedJD: (req: Requirement) => void;
+  onDelete: () => void;
+  debouncedValue: string;
+  statusBgMap: Record<RequirementStatus, string>;
+  statusColors: Record<RequirementStatus, { badge: string; label: string }>;
+  getStatusIcon: (status: RequirementStatus) => JSX.Element | undefined;
+  isAdmin: boolean;
+}) => {
+  const reqNumber = req.requirement_number || 1;
+
+  return (
+    <div
+      className={`card-base overflow-hidden flex flex-col h-full animate-fade-in ${statusBgMap[req.status]}`}
+    >
+      {/* HEADER: Job Title & Status */}
+      <div className="card-p-md pb-3 sm:pb-4 border-b border-gray-200">
+        {/* Title with Requirement Number */}
+        <div className="flex items-start gap-3 mb-3">
+          <div className="flex-shrink-0 text-gray-400 mt-0.5">
+            {getStatusIcon(req.status)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs sm:text-sm text-gray-500 font-semibold mb-1">
+              Req No: <span className="font-bold text-blue-600">{reqNumber}</span>
+            </p>
+            <h3 className="card-title">
+              <HighlightedText text={req.title} searchTerm={debouncedValue} />
+            </h3>
+          </div>
+        </div>
+
+        {/* Status Badge - Refined */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          <span className="badge-primary">
+            {statusColors[req.status].label}
+          </span>
+        </div>
+
+        {/* Company - Secondary Info */}
+        <p className="text-xs sm:text-sm text-gray-600">
+          <span className="text-gray-500">Company:</span> <span className="font-semibold text-gray-800"><HighlightedText text={req.company || 'N/A'} searchTerm={debouncedValue} /></span>
+        </p>
+      </div>
+
+      {/* KEY INFORMATION SECTION */}
+      <div className="card-p-md py-3 sm:py-4 bg-white bg-opacity-50 border-b border-gray-100">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Vendor Name */}
+          {req.vendor_company && (
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Vendor</span>
+              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_company} searchTerm={debouncedValue} /></span>
+            </div>
+          )}
+
+          {/* Vendor Email */}
+          {req.vendor_email && (
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Email</span>
+              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_email} searchTerm={debouncedValue} /></span>
+            </div>
+          )}
+
+          {/* Vendor Phone */}
+          {req.vendor_phone && (
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Phone</span>
+              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_phone} searchTerm={debouncedValue} /></span>
+            </div>
+          )}
+
+          {/* Tech Stack */}
+          {req.primary_tech_stack && (
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Tech</span>
+              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.primary_tech_stack.split(',')[0].trim()} searchTerm={debouncedValue} /></span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* METADATA SECTION */}
+      <div className="card-p-md py-3 sm:py-4 border-b border-gray-100 flex-1">
+        <div className="space-y-2 text-xs sm:text-sm">
+          {req.duration && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <span className="text-gray-400 text-sm">⏳</span>
+              <span className="font-medium">{req.duration}</span>
+            </div>
+          )}
+          {req.remote && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <span className="text-gray-400 text-sm">🏠</span>
+              <span className="font-medium">{req.remote}</span>
+            </div>
+          )}
+          {req.rate && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <span className="text-gray-400 text-sm">💰</span>
+              <span className="font-medium">{req.rate}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ACTION BUTTONS - Equal Size, Aligned Horizontally */}
+      <div className="card-p-md pt-3 sm:pt-4 bg-white bg-opacity-50">
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
+          <button
+            onClick={() => onViewDetails(req)}
+            className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
+            title="View full details"
+          >
+            <Eye className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">View</span>
+          </button>
+
+          <button
+            onClick={() => onCreateInterview?.(req.id)}
+            className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
+            title="Create interview for this requirement"
+          >
+            <Calendar className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline truncate">Interview</span>
+          </button>
+
+          {req.description && (
+            <button
+              onClick={() => onSetSelectedJD(req)}
+              className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs font-semibold min-w-0"
+              title="View job description"
+            >
+              <span className="text-sm flex-shrink-0">📄</span>
+              <span className="hidden sm:inline truncate">JD</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={onDelete}
+              className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 text-xs font-semibold min-w-0"
+              title="Delete requirement"
+            >
+              <Trash2 className="w-4 h-4 flex-shrink-0" />
+              <span className="hidden sm:inline truncate">Delete</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Virtualized Requirements List component for large datasets
+const VirtualizedRequirementsList = ({
+  requirements,
+  onViewDetails,
+  onCreateInterview,
+  onSetSelectedJD,
+  onDelete,
+  debouncedValue,
+  statusBgMap,
+  statusColors,
+  getStatusIcon,
+  isAdmin,
+}: {
+  requirements: RequirementWithLogs[];
+  onViewDetails: (req: Requirement) => void;
+  onCreateInterview?: (id: string) => void;
+  onSetSelectedJD: (req: Requirement) => void;
+  onDelete: () => void;
+  debouncedValue: string;
+  statusBgMap: Record<RequirementStatus, string>;
+  statusColors: Record<RequirementStatus, { badge: string; label: string }>;
+  getStatusIcon: (status: RequirementStatus) => JSX.Element | undefined;
+  isAdmin: boolean;
+}) => {
+  // For virtualized lists with grids, we need to calculate items per row
+  // Since cards are responsive, we'll use a virtualized list approach
+  const itemsPerRow = 4; // Default for xl:grid-cols-4
+  const itemHeight = 520; // Approximate height of a card
+  
+  return (
+    <div className="w-full border border-gray-200 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-responsive auto-rows-max">
+        {requirements.map((req: RequirementWithLogs) => (
+          <RequirementCard
+            key={req.id}
+            req={req}
+            onViewDetails={onViewDetails}
+            onCreateInterview={onCreateInterview}
+            onSetSelectedJD={onSetSelectedJD}
+            onDelete={onDelete}
+            debouncedValue={debouncedValue}
+            statusBgMap={statusBgMap}
+            statusColors={statusColors}
+            getStatusIcon={getStatusIcon}
+            isAdmin={isAdmin}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
@@ -154,9 +396,10 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
 
   const lastQueryKeyRef = useRef<string>('');
 
-  const loadRequirements = useCallback(async (opts?: { newPage?: number; force?: boolean }) => {
+  const loadRequirements = useCallback(async (opts?: { newPage?: number; force?: boolean; isLoadMore?: boolean }) => {
     if (!user) return;
     const requestedPage = opts?.newPage ?? page;
+    const isLoadMore = opts?.isLoadMore ?? false;
     const queryKey = JSON.stringify({
       page: requestedPage,
       search: debouncedValue,
@@ -173,7 +416,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     }
 
     try {
-      if (requestedPage === 0 && requirements.length === 0) {
+      if (requestedPage === 0) {
         setLoading(true);
       }
 
@@ -195,7 +438,12 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       });
 
       if (result.success && result.requirements) {
-        setRequirements(result.requirements);
+        // If this is a "Load More" action, append results; otherwise replace
+        if (isLoadMore) {
+          setRequirements(prev => [...prev, ...result.requirements]);
+        } else {
+          setRequirements(result.requirements);
+        }
         setTotalResults(result.total ?? null);
       } else {
         setError({ title: 'Failed to load requirements', message: result.error || 'An unexpected error occurred' });
@@ -205,13 +453,19 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     } finally {
       setLoading(false);
     }
-  }, [user, page, pageSize, debouncedValue, filterStatus, dateRange.from, dateRange.to, sortBy, sortOrder, requirements.length]);
+  }, [user, pageSize, debouncedValue, filterStatus, dateRange.from, dateRange.to, sortBy, sortOrder, page]);
+
+  // Effect to handle filter changes - resets to page 0
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedValue, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to]);
+
+  // Effect to handle page changes (for Load More functionality)
+  useEffect(() => {
+    loadRequirements({ newPage: page, isLoadMore: page > 0 });
+  }, [page, loadRequirements]);
 
   useEffect(() => {
-    // initial load or when filters change reset to first page
-    setPage(0);
-    loadRequirements({ newPage: 0, force: true });
-
     // Subscribe to real-time changes
     let unsubscribe: (() => void) | undefined;
     if (user) {
@@ -258,7 +512,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     return () => {
       unsubscribe?.();
     };
-  }, [loadRequirements, user, selectedRequirement?.id, showToast, debouncedValue, filterStatus]);
+  }, [user, selectedRequirement?.id, showToast, debouncedValue, filterStatus]);
 
   const handleDelete = useCallback(async () => {
     const requirement = selectedRequirement;
@@ -314,30 +568,10 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
 
   const hasMoreRequirements = totalResults !== null ? requirements.length < totalResults : false;
 
-  // Helper to highlight search terms
-  const HighlightedText = ({ text, searchTerm }: { text: string; searchTerm: string }) => {
-    if (!searchTerm.trim()) return <>{text}</>;
-    
-    const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
-    return (
-      <>
-        {parts.map((part, index) =>
-          part.toLowerCase() === searchTerm.toLowerCase() ? (
-            <mark key={index} className="bg-yellow-200 font-semibold">
-              {part}
-            </mark>
-          ) : (
-            <span key={index}>{part}</span>
-          )
-        )}
-      </>
-    );
-  };
-
   const handleLoadMore = () => {
     // Load next page using server-side pagination
-    const nextPage = page + 1;
-    setPage(nextPage);
+    // The effect above will listen to page changes and call loadRequirements
+    setPage(prevPage => prevPage + 1);
   };
 
   if (loading) {
@@ -629,7 +863,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
         </div>
       </div>
 
-      {/* Requirements Grid */}
+      {/* Requirements Grid - Virtualized when there are many items */}
       <div className="w-full">
         {filteredRequirements.length === 0 ? (
           <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-lg border border-gray-100 shadow-card">
@@ -644,169 +878,58 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
               Create First Requirement
             </button>
           </div>
+        ) : requirements.length > 100 ? (
+          // Use virtualized list for large datasets
+          <VirtualizedRequirementsList
+            requirements={requirements}
+            onViewDetails={handleViewDetails}
+            onCreateInterview={onCreateInterview}
+            onSetSelectedJD={setSelectedJDRequirement}
+            onDelete={handleDelete}
+            debouncedValue={debouncedValue}
+            statusBgMap={{
+              'NEW': 'status-new',
+              'IN_PROGRESS': 'status-in-progress',
+              'SUBMITTED': 'status-submitted',
+              'INTERVIEW': 'status-interview',
+              'OFFER': 'status-offer',
+              'REJECTED': 'status-rejected',
+              'CLOSED': 'status-closed',
+            }}
+            statusColors={statusColors}
+            getStatusIcon={getStatusIcon}
+            isAdmin={isAdmin}
+          />
         ) : (
+          // Standard grid for smaller datasets
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-responsive">
-            {requirements.map((req: RequirementWithLogs) => {
-              const statusBgMap: Record<typeof req.status, string> = {
-                'NEW': 'status-new',
-                'IN_PROGRESS': 'status-in-progress',
-                'SUBMITTED': 'status-submitted',
-                'INTERVIEW': 'status-interview',
-                'OFFER': 'status-offer',
-                'REJECTED': 'status-rejected',
-                'CLOSED': 'status-closed',
-              };
-
-              // Use requirement_number if available, otherwise use index + 1 as fallback
-              const reqNumber = req.requirement_number || (requirements.findIndex(r => r.id === req.id) + 1);
-
-              return (
-                <div
-                  key={req.id}
-                  className={`card-base overflow-hidden flex flex-col h-full animate-fade-in ${statusBgMap[req.status]}`}
-                >
-                  {/* HEADER: Job Title & Status */}
-                  <div className="card-p-md pb-3 sm:pb-4 border-b border-gray-200">
-                    {/* Title with Requirement Number */}
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className="flex-shrink-0 text-gray-400 mt-0.5">
-                        {getStatusIcon(req.status)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm text-gray-500 font-semibold mb-1">
-                          Req No: <span className="font-bold text-blue-600">{reqNumber}</span>
-                        </p>
-                        <h3 className="card-title">
-                          <HighlightedText text={req.title} searchTerm={debouncedValue} />
-                        </h3>
-                      </div>
-                    </div>
-
-                    {/* Status Badge - Refined */}
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      <span className="badge-primary">
-                        {statusColors[req.status].label}
-                      </span>
-                    </div>
-
-                    {/* Company - Secondary Info */}
-                    <p className="text-xs sm:text-sm text-gray-600">
-                      <span className="text-gray-500">Company:</span> <span className="font-semibold text-gray-800"><HighlightedText text={req.company || 'N/A'} searchTerm={debouncedValue} /></span>
-                    </p>
-                  </div>
-
-                  {/* KEY INFORMATION SECTION */}
-                  <div className="card-p-md py-3 sm:py-4 bg-white bg-opacity-50 border-b border-gray-100">
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Vendor Name */}
-                      {req.vendor_company && (
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Vendor</span>
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_company} searchTerm={debouncedValue} /></span>
-                        </div>
-                      )}
-
-                      {/* Vendor Email */}
-                      {req.vendor_email && (
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Email</span>
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_email} searchTerm={debouncedValue} /></span>
-                        </div>
-                      )}
-
-                      {/* Vendor Phone */}
-                      {req.vendor_phone && (
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Phone</span>
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_phone} searchTerm={debouncedValue} /></span>
-                        </div>
-                      )}
-
-                      {/* Tech Stack */}
-                      {req.primary_tech_stack && (
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Tech</span>
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.primary_tech_stack.split(',')[0].trim()} searchTerm={debouncedValue} /></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* METADATA SECTION */}
-                  <div className="card-p-md py-3 sm:py-4 border-b border-gray-100 flex-1">
-                    <div className="space-y-2 text-xs sm:text-sm">
-                      {req.duration && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-gray-400 text-sm">⏳</span>
-                          <span className="font-medium">{req.duration}</span>
-                        </div>
-                      )}
-                      {req.remote && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-gray-400 text-sm">🏠</span>
-                          <span className="font-medium">{req.remote}</span>
-                        </div>
-                      )}
-                      {req.rate && (
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <span className="text-gray-400 text-sm">💰</span>
-                          <span className="font-medium">{req.rate}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ACTION BUTTONS - Equal Size, Aligned Horizontally */}
-                  <div className="card-p-md pt-3 sm:pt-4 bg-white bg-opacity-50">
-                    <div className="flex flex-col sm:flex-row gap-2 w-full">
-                      <button
-                        onClick={() => handleViewDetails(req)}
-                        className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
-                        title="View full details"
-                      >
-                        <Eye className="w-4 h-4 flex-shrink-0" />
-                        <span className="hidden sm:inline truncate">View</span>
-                      </button>
-
-                      <button
-                        onClick={() => onCreateInterview?.(req.id)}
-                        className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
-                        title="Create interview for this requirement"
-                      >
-                        <Calendar className="w-4 h-4 flex-shrink-0" />
-                        <span className="hidden sm:inline truncate">Interview</span>
-                      </button>
-
-                      {req.description && (
-                        <button
-                          onClick={() => setSelectedJDRequirement(req)}
-                          className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs font-semibold min-w-0"
-                          title="View job description"
-                        >
-                          <span className="text-sm flex-shrink-0">📄</span>
-                          <span className="hidden sm:inline truncate">JD</span>
-                        </button>
-                      )}
-
-                      {isAdmin && (
-                        <button
-                          onClick={() => handleDelete()}
-                          className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 text-xs font-semibold min-w-0"
-                          title="Delete requirement"
-                        >
-                          <Trash2 className="w-4 h-4 flex-shrink-0" />
-                          <span className="hidden sm:inline truncate">Delete</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-              );
-            })}
+            {requirements.map((req: RequirementWithLogs) => (
+              <RequirementCard
+                key={req.id}
+                req={req}
+                onViewDetails={handleViewDetails}
+                onCreateInterview={onCreateInterview}
+                onSetSelectedJD={setSelectedJDRequirement}
+                onDelete={handleDelete}
+                debouncedValue={debouncedValue}
+                statusBgMap={{
+                  'NEW': 'status-new',
+                  'IN_PROGRESS': 'status-in-progress',
+                  'SUBMITTED': 'status-submitted',
+                  'INTERVIEW': 'status-interview',
+                  'OFFER': 'status-offer',
+                  'REJECTED': 'status-rejected',
+                  'CLOSED': 'status-closed',
+                }}
+                statusColors={statusColors}
+                getStatusIcon={getStatusIcon}
+                isAdmin={isAdmin}
+              />
+            ))}
           </div>
         )}
       </div>
+
 
       {/* Load More Section */}
       {hasMoreRequirements && (
@@ -826,7 +949,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
               </>
             ) : (
               <>
-                Load Next Page
+                Load More
               </>
             )}
           </button>

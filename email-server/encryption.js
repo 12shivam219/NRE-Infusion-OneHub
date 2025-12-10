@@ -17,7 +17,26 @@ const KEY_LENGTH = 32; // 256 bits
  * @returns {Buffer} 32-byte encryption key
  */
 function getEncryptionKey() {
-  const masterKey = process.env.ENCRYPTION_MASTER_KEY || 'loster-email-server-dev-key-change-in-prod';
+  const masterKey = process.env.ENCRYPTION_MASTER_KEY;
+  const nodeEnv = process.env.NODE_ENV || 'development';
+
+  if (!masterKey) {
+    // SECURITY: Fail strictly in production if encryption master key is missing
+    if (nodeEnv === 'production') {
+      throw new Error(
+        'CRITICAL SECURITY ERROR: ENCRYPTION_MASTER_KEY is not set in production. ' +
+        'This is a required environment variable. Generate one using crypto.randomBytes(32).toString(\'hex\') ' +
+        'and set it in your production environment variables before deploying.'
+      );
+    }
+
+    // Development-only fallback with warning
+    console.warn(
+      '⚠️  ENCRYPTION_MASTER_KEY not set. Using development key. ' +
+      'MUST set this in .env for production.'
+    );
+    return crypto.pbkdf2Sync('loster-email-server-dev-key-change-in-prod', 'loster-email-server', 100000, KEY_LENGTH, 'sha256');
+  }
 
   // Use PBKDF2 to derive a stable key from the master key
   return crypto.pbkdf2Sync(masterKey, 'loster-email-server', 100000, KEY_LENGTH, 'sha256');

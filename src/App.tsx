@@ -1,74 +1,55 @@
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
-import { Dashboard } from './components/dashboard/Dashboard';
-import { DocumentsPage } from './components/documents/DocumentsPage';
-import { CRMPage } from './components/crm/CRMPage';
-import { AdminPage } from './components/admin/AdminPage';
+import { LoadingSpinner } from './components/common/LoadingSpinner';
+import {
+  LazyDashboard,
+  LazyDocumentsPage,
+  LazyCRMPage,
+  LazyAdminPage,
+} from './lib/lazyLoader';
 
 type AuthView = 'login' | 'register';
-type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
 
 const AppContent = () => {
   const { user, isLoading, refreshUser, isAdmin, isMarketing } = useAuth();
+  const navigate = useNavigate();
   const [authView, setAuthView] = useState<AuthView>('login');
-  const [currentPage, setCurrentPage] = useState<AppPage>(() => {
-    // Load page preference from localStorage
-    const saved = localStorage.getItem('currentPage');
-    return (saved as AppPage) || 'dashboard';
-  });
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     // Load sidebar preference from localStorage
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : true; // Default: expanded (true means visible)
   });
 
+  // Redirect to default page on first login based on role
   useEffect(() => {
     if (user) {
-      // Only set default page on first login, not on every user refresh
-      const savedPage = localStorage.getItem('currentPage');
-      if (!savedPage) {
-        // First login - set default landing page based on role
-        const role = (user as { role?: string }).role;
+      const role = (user as { role?: string }).role;
+      // Check if we're on root path - if so, redirect to appropriate page
+      if (window.location.pathname === '/') {
         if (role === 'marketing' || role === 'user') {
-          // Marketing and user roles land on CRM
-          setCurrentPage('crm');
+          navigate('/crm', { replace: true });
         } else {
-          // Admin lands on dashboard
-          setCurrentPage('dashboard');
+          navigate('/dashboard', { replace: true });
         }
       }
     }
-  }, [user]); // Only run when user changes (login), not on every user refresh
-
-  // Save page preference to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('currentPage', currentPage);
-  }, [currentPage]);
+  }, [user, navigate]);
 
   // Save sidebar preference to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarOpen));
   }, [sidebarOpen]);
 
-  // Prevent non-admin users from navigating to Admin page
-  useEffect(() => {
-    if (currentPage === 'admin' && !isAdmin) {
-      setCurrentPage(isMarketing ? 'crm' : 'dashboard');
-    }
-  }, [currentPage, isAdmin, isMarketing]);
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -90,32 +71,53 @@ const AppContent = () => {
     }
   }
 
+  // Protected route wrapper for admin pages
+  const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+    if (!isAdmin) {
+      return <Navigate to="/crm" replace />;
+    }
+    return children;
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar 
-        currentPage={currentPage} 
-        onNavigate={setCurrentPage} 
+      <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} currentPage={currentPage} />
+        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
 
         <main className="flex-1 overflow-y-auto">
-          {/* Keep pages mounted to avoid reloading data when switching sections */}
-          <div className={currentPage === 'dashboard' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'dashboard'}>
-            <Dashboard />
-          </div>
-          <div className={currentPage === 'documents' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'documents'}>
-            <DocumentsPage />
-          </div>
-          <div className={currentPage === 'crm' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'crm'}>
-            <CRMPage />
-          </div>
-          <div className={currentPage === 'admin' ? 'block' : 'hidden'} aria-hidden={currentPage !== 'admin'}>
-            <AdminPage />
-          </div>
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><LoadingSpinner /></div>}>
+            <Routes>
+              <Route path="/dashboard" element={<LazyDashboard />} />
+              <Route path="/documents" element={<LazyDocumentsPage />} />
+              <Route path="/crm" element={<LazyCRMPage />} />
+              <Route
+                path="/admin"
+                element={
+                  <AdminRoute>
+                    <LazyAdminPage />
+                  </AdminRoute>
+                }
+              />
+              {/* Redirect root to default based on role */}
+              <Route
+                path="/"
+                element={
+                  isMarketing || (user as { role?: string }).role === 'user' ? (
+                    <Navigate to="/crm" replace />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              {/* Catch all - redirect to home */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
 

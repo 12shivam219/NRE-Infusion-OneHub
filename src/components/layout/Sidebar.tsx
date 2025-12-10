@@ -7,25 +7,23 @@ import {
   ChevronRight,
   ChevronLeft
 } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
-type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
-
 interface SidebarProps {
-  currentPage: AppPage;
-  onNavigate: (page: AppPage) => void;
   isOpen: boolean;
   onToggle: () => void;
 }
 
-export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarProps) => {
-  const { user, logout } = useAuth();
+export const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
+  const { user, logout, isAdmin } = useAuth();
+  const location = useLocation();
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['user', 'marketing', 'admin'] },
-    { id: 'documents', label: 'Resume Editor', icon: FileText, roles: ['user', 'admin'] },
-    { id: 'crm', label: 'Marketing & CRM', icon: Briefcase, roles: ['user', 'marketing', 'admin'] },
-    { id: 'admin', label: 'Admin Panel', icon: Shield, roles: ['admin'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['user', 'marketing', 'admin'] },
+    { id: 'documents', label: 'Resume Editor', icon: FileText, path: '/documents', roles: ['user', 'admin'] },
+    { id: 'crm', label: 'Marketing & CRM', icon: Briefcase, path: '/crm', roles: ['user', 'marketing', 'admin'] },
+    { id: 'admin', label: 'Admin Panel', icon: Shield, path: '/admin', roles: ['admin'] },
   ];
 
   const filteredItems = menuItems.filter(item => {
@@ -33,6 +31,10 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
     const userRole = user?.role;
     return item.roles.includes(userRole as string);
   });
+
+  const getIsActive = (path: string) => {
+    return location.pathname === path;
+  };
 
   return (
     <>
@@ -70,13 +72,13 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
         <nav className="flex-1 p-3 space-y-2">
           {filteredItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentPage === item.id;
+            const isActive = getIsActive(item.path);
 
             return (
-              <button
+              <Link
                 key={item.id}
-                  onClick={() => onNavigate(item.id as AppPage)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                   isActive
                     ? 'bg-blue-600 text-white'
                     : 'text-slate-300 hover:bg-slate-800'
@@ -85,7 +87,7 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 {isOpen && <span className="font-medium">{item.label}</span>}
-              </button>
+              </Link>
             );
           })}
         </nav>
@@ -140,16 +142,14 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
           <nav className="flex-1 p-3 space-y-2">
             {filteredItems.map((item) => {
               const Icon = item.icon;
-              const isActive = currentPage === item.id;
+              const isActive = getIsActive(item.path);
 
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => {
-                    onNavigate(item.id as AppPage);
-                    onToggle();
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                  to={item.path}
+                  onClick={onToggle}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
                     isActive
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-300 hover:bg-slate-800'
@@ -157,7 +157,7 @@ export const Sidebar = ({ currentPage, onNavigate, isOpen, onToggle }: SidebarPr
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="font-medium">{item.label}</span>
-                </button>
+                </Link>
               );
             })}
           </nav>

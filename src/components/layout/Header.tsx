@@ -1,35 +1,35 @@
 import { useState } from 'react';
 import { Bell, Menu } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
 
-type AppPage = 'dashboard' | 'documents' | 'crm' | 'admin';
-
 interface HeaderProps {
   onMenuClick?: () => void;
-  currentPage?: AppPage;
 }
 
-const getPageTitle = (page?: AppPage) => {
-  switch (page) {
-    case 'documents':
+const getPageTitle = (pathname: string) => {
+  switch (pathname) {
+    case '/documents':
       return 'Resume Editor';
-    case 'crm':
+    case '/crm':
       return 'Marketing & CRM';
-    case 'admin':
+    case '/admin':
       return 'Admin Panel';
-    case 'dashboard':
+    case '/dashboard':
+    case '/':
     default:
       return 'Dashboard';
   }
 };
 
-export const Header = ({ onMenuClick, currentPage }: HeaderProps) => {
+export const Header = ({ onMenuClick }: HeaderProps) => {
   const { user } = useAuth();
   const { notifications, unreadCount, markAsRead } = useNotifications();
+  const { pathname } = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const title = getPageTitle(currentPage);
+  const title = getPageTitle(pathname);
 
   const handleNotificationClick = (notificationId: string, alreadyRead: boolean) => {
     if (!alreadyRead) {

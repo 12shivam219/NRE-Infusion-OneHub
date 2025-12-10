@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import bodyParser from 'body-parser';
 import rateLimit from 'express-rate-limit';
+import sanitizeHtml from 'sanitize-html';
 import { encryptPassword, decryptPassword, isEncrypted } from './encryption.js';
 
 dotenv.config();
@@ -54,17 +55,16 @@ const emailLimiter = rateLimit({
 
 app.use(bodyParser.json({ limit: '10mb' }));
 
-// SECURITY: Function to sanitize HTML content
-function sanitizeHtml(text) {
-  if (typeof text !== 'string') return '';
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-    .trim();
-}
+// SECURITY: HTML sanitization options using sanitize-html library
+// Battle-tested library that properly handles XSS prevention
+const SANITIZE_OPTIONS = {
+  allowedTags: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'div', 'span'],
+  allowedAttributes: {
+    'a': ['href', 'title']
+  },
+  allowedSchemes: ['http', 'https', 'mailto'],
+  disallowedTagsMode: 'escape'
+};
 
 // SECURITY: Validate email format
 function isValidEmail(email) {
@@ -222,9 +222,13 @@ app.post('/api/send-email', emailLimiter, authenticateRequest, async (req, res) 
       return res.status(503).json({ success: false, error: 'Service unavailable' });
     }
 
-    // SECURITY: Sanitize HTML content to prevent injection
-    const sanitizedBody = sanitizeHtml(body);
-    const sanitizedSubject = sanitizeHtml(subject);
+    // SECURITY: Sanitize HTML content to prevent XSS injection
+    // Using battle-tested sanitize-html library instead of regex
+    const sanitizedBody = sanitizeHtml(body, SANITIZE_OPTIONS);
+    const sanitizedSubject = sanitizeHtml(subject, {
+      allowedTags: [],
+      allowedAttributes: {}
+    });
 
     // Create email options
     const mailOptions = {
@@ -251,7 +255,102 @@ app.post('/api/send-email', emailLimiter, authenticateRequest, async (req, res) 
   }
 });
 
-// Bulk send emails with rotation
+// In-memory store for bulk email campaign status
+// In production, this should be replaced with a database or Redis
+const campaignStatus = new Map();
+
+// Helper function to generate unique campaign ID
+function generateCampaignId() {
+  return `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Background worker function - processes emails asynchronously
+async function processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts) {
+  const campaign = campaignStatus.get(campaignId);
+  if (!campaign) return;
+
+  campaign.startedAt = new Date();
+  campaign.status = 'processing';
+
+  for (let i = 0; i < emails.length; i++) {
+    const recipient = emails[i];
+
+    // Update progress
+    campaign.processed = i + 1;
+    campaign.progress = Math.round((i / emails.length) * 100);
+
+    // Determine which account to use based on rotation
+    let accountIndex = 0;
+    if (rotationConfig && rotationConfig.emailsPerAccount) {
+      accountIndex = Math.floor(i / rotationConfig.emailsPerAccount) % accounts.length;
+    } else {
+      accountIndex = i % accounts.length;
+    }
+
+    const account = accounts[accountIndex];
+
+    try {
+      // SECURITY: Sanitize HTML content
+      const sanitizedBody = sanitizeHtml(body, SANITIZE_OPTIONS);
+      const sanitizedSubject = sanitizeHtml(subject, {
+        allowedTags: [],
+        allowedAttributes: {}
+      });
+
+      const mailOptions = {
+        from: account.email,
+        to: typeof recipient === 'string' ? recipient : recipient.email,
+        subject: sanitizedSubject,
+        html: `<p style="font-family: Arial, sans-serif; white-space: pre-wrap;">${sanitizedBody.replace(/\n/g, '<br>')}</p>`,
+        text: body,
+      };
+
+      const info = await account.transporter.sendMail(mailOptions);
+
+      campaign.sent++;
+      campaign.details.push({
+        email: typeof recipient === 'string' ? recipient : recipient.email,
+        status: 'sent',
+        fromAccount: account.email,
+        messageId: info.messageId,
+        sentAt: new Date().toISOString(),
+      });
+
+      if (NODE_ENV === 'development') {
+        console.log(`[${i + 1}/${emails.length}] Email sent to ${typeof recipient === 'string' ? recipient : recipient.email} from ${account.email}`);
+      }
+
+      // Add delay between emails to avoid rate limiting (2 seconds)
+      if (i < emails.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } catch (error) {
+      campaign.failed++;
+      campaign.details.push({
+        email: typeof recipient === 'string' ? recipient : recipient.email,
+        status: 'failed',
+        fromAccount: account.email,
+        error: error.message,
+        failedAt: new Date().toISOString(),
+      });
+
+      console.error(`Failed to send email to ${typeof recipient === 'string' ? recipient : recipient.email}:`, error.message);
+    }
+  }
+
+  campaign.status = 'completed';
+  campaign.completedAt = new Date();
+
+  // Keep campaign status for 24 hours then clean up
+  setTimeout(() => {
+    campaignStatus.delete(campaignId);
+    if (NODE_ENV === 'development') {
+      console.log(`Campaign ${campaignId} cleaned up from memory`);
+    }
+  }, 24 * 60 * 60 * 1000);
+}
+
+// Bulk send emails with rotation - returns immediately with 202 Accepted
 app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req, res) => {
   try {
     const { emails, subject, body, rotationConfig } = req.body;
@@ -285,14 +384,6 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
       });
     }
 
-    const results = {
-      success: true,
-      total: emails.length,
-      sent: 0,
-      failed: 0,
-      details: [],
-    };
-
     // Get available accounts
     const accounts = Array.from(emailAccounts.values());
     if (accounts.length === 0) {
@@ -302,66 +393,91 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
       });
     }
 
-    // Process emails with rotation
-    for (let i = 0; i < emails.length; i++) {
-      const recipient = emails[i];
-      
-      // Determine which account to use based on rotation
-      let accountIndex = 0;
-      if (rotationConfig && rotationConfig.emailsPerAccount) {
-        accountIndex = Math.floor(i / rotationConfig.emailsPerAccount) % accounts.length;
-      } else {
-        accountIndex = i % accounts.length;
-      }
+    // Generate unique campaign ID
+    const campaignId = generateCampaignId();
 
-      const account = accounts[accountIndex];
+    // Initialize campaign status
+    campaignStatus.set(campaignId, {
+      id: campaignId,
+      status: 'queued',
+      total: emails.length,
+      sent: 0,
+      failed: 0,
+      processed: 0,
+      progress: 0,
+      details: [],
+      createdAt: new Date(),
+      startedAt: null,
+      completedAt: null,
+    });
 
-      try {
-        const mailOptions = {
-          from: account.email,
-          to: recipient.email,
-          subject: subject,
-          html: `<p>${body.replace(/\n/g, '<br>')}</p>`,
-          text: body,
-        };
+    // Return immediately with 202 Accepted status
+    res.status(202).json({
+      success: true,
+      message: 'Email campaign queued for processing',
+      campaignId: campaignId,
+      total: emails.length,
+      statusUrl: `/api/campaign-status/${campaignId}`,
+    });
 
-        const info = await account.transporter.sendMail(mailOptions);
-
-        results.sent++;
-        results.details.push({
-          email: recipient.email,
-          status: 'sent',
-          fromAccount: account.email,
-          messageId: info.messageId,
-        });
-
-        console.log(`[${i + 1}/${emails.length}] Email sent to ${recipient.email} from ${account.email}`);
-
-        // Add delay between emails to avoid rate limiting (2 seconds)
-        if (i < emails.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-      } catch (error) {
-        results.failed++;
-        results.details.push({
-          email: recipient.email,
-          status: 'failed',
-          fromAccount: account.email,
-          error: error.message,
-        });
-
-        console.error(`Failed to send email to ${recipient.email}:`, error.message);
-      }
-    }
-
-    res.json(results);
+    // Process emails in background (no await - fire and forget)
+    processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts).catch(
+      error => console.error(`Error processing campaign ${campaignId}:`, error)
+    );
   } catch (error) {
-    console.error('Error in bulk send:', error);
+    console.error('Error in bulk send endpoint:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to process bulk emails',
     });
   }
+});
+
+// Get campaign status endpoint for polling
+app.get('/api/campaign-status/:campaignId', (req, res) => {
+  const { campaignId } = req.params;
+
+  const campaign = campaignStatus.get(campaignId);
+  if (!campaign) {
+    return res.status(404).json({
+      success: false,
+      error: 'Campaign not found or has expired',
+    });
+  }
+
+  // Return campaign status without details by default (for polling efficiency)
+  // Client can request details separately if needed
+  res.json({
+    success: true,
+    id: campaign.id,
+    status: campaign.status,
+    total: campaign.total,
+    processed: campaign.processed,
+    sent: campaign.sent,
+    failed: campaign.failed,
+    progress: campaign.progress,
+    createdAt: campaign.createdAt,
+    startedAt: campaign.startedAt,
+    completedAt: campaign.completedAt,
+  });
+});
+
+// Get campaign details endpoint (with email sending details)
+app.get('/api/campaign-details/:campaignId', (req, res) => {
+  const { campaignId } = req.params;
+
+  const campaign = campaignStatus.get(campaignId);
+  if (!campaign) {
+    return res.status(404).json({
+      success: false,
+      error: 'Campaign not found or has expired',
+    });
+  }
+
+  res.json({
+    success: true,
+    ...campaign,
+  });
 });
 
 // Get configured email accounts

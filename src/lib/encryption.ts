@@ -12,11 +12,22 @@ import CryptoJS from 'crypto-js';
  */
 function getEncryptionKey(): string {
   const key = import.meta.env.VITE_ENCRYPTION_KEY;
+  const isDev = import.meta.env.DEV;
+
   if (!key) {
+    // SECURITY: Fail strictly in production if encryption key is missing
+    if (!isDev) {
+      throw new Error(
+        'CRITICAL SECURITY ERROR: VITE_ENCRYPTION_KEY is not set in production. ' +
+        'This is a required environment variable. Set it before deploying to production.'
+      );
+    }
+    
+    // Development-only fallback
     console.warn(
-      '⚠️  VITE_ENCRYPTION_KEY not set. Using development key. Set this in .env for production.'
+      '⚠️  VITE_ENCRYPTION_KEY not set. Using development key. ' +
+      'MUST set this in .env for production.'
     );
-    // Default key for development only
     return 'loster-crm-dev-key-change-in-production';
   }
   return key;
