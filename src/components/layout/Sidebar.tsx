@@ -16,7 +16,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
 
   const menuItems = [

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, Plus, Mail, Phone, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Search, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant, getConsultantsPage } from '../../lib/api/consultants';
 import { subscribeToConsultants } from '../../lib/api/realtimeSync';
@@ -13,12 +14,6 @@ import { useToast } from '../../contexts/ToastContext';
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
 type RealtimeUpdate<T> = { type: 'INSERT' | 'UPDATE' | 'DELETE'; record: T };
-
-const statusColors: Record<string, string> = {
-  'Active': 'bg-green-100 text-green-800',
-  'Not Active': 'bg-gray-100 text-gray-800',
-  'Recently Placed': 'bg-blue-100 text-blue-800',
-};
 
 interface ConsultantProfilesProps {
   onQuickAdd?: () => void;
@@ -240,155 +235,18 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
       </div>
 
       {/* Consultant Cards Grid with Scrolling Container */}
-      <div className="max-h-[600px] overflow-y-auto border border-gray-200 rounded-lg p-2">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {consultants.length === 0 ? (
-            <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No consultants found</p>
-            </div>
-          ) : (
-            consultants.map(consultant => (
-            <div
-              key={consultant.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-lg transition cursor-pointer"
-              onClick={() => handleViewDetails(consultant)}
-            >
-              {/* Status Badge */}
-              <div className="flex items-start justify-between mb-4 gap-2">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex-1 break-words">{consultant.name}</h3>
-                <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 ${statusColors[consultant.status] || 'bg-gray-100 text-gray-800'}`}>
-                  {consultant.status === 'Active' ? '🟢' : consultant.status === 'Recently Placed' ? '🔵' : '🔴'} <span className="hidden sm:inline">{consultant.status}</span>
-                </span>
-              </div>
-
-              {/* Contact Info */}
-              <div className="space-y-2 text-xs sm:text-sm mb-4">
-                {consultant.email && (
-                  <div className="flex items-center gap-2 text-gray-600 truncate">
-                    <Mail className="w-4 h-4 flex-shrink-0" />
-                    <a href={`mailto:${consultant.email}`} className="hover:text-blue-600 truncate">
-                      {consultant.email}
-                    </a>
-                  </div>
-                )}
-                {consultant.phone && (
-                  <div className="flex items-center gap-2 text-gray-600 truncate">
-                    <Phone className="w-4 h-4 flex-shrink-0" />
-                    <a href={`tel:${consultant.phone}`} className="hover:text-blue-600 truncate">
-                      {consultant.phone}
-                    </a>
-                  </div>
-                )}
-                {consultant.location && (
-                  <div className="flex items-center gap-2 text-gray-600 truncate">
-                    <span className="text-xs font-medium flex-shrink-0">📍</span>
-                    <span className="truncate">{consultant.location}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Skills & Experience */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 py-4 border-y border-gray-100 mb-4">
-                {consultant.primary_skills && (
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Skills</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{consultant.primary_skills}</p>
-                  </div>
-                )}
-                {consultant.total_experience && (
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Experience</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{consultant.total_experience}</p>
-                  </div>
-                )}
-                {consultant.availability && (
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Available</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{consultant.availability}</p>
-                  </div>
-                )}
-                {consultant.expected_rate && (
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Rate</p>
-                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{consultant.expected_rate}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Additional Info */}
-              <div className="space-y-2 text-xs sm:text-sm mb-4">
-                {consultant.visa_status && (
-                  <p className="text-gray-600 truncate">Visa: <span className="font-medium">{consultant.visa_status}</span></p>
-                )}
-                {consultant.preferred_work_type && (
-                  <p className="text-gray-600 truncate">Type: <span className="font-medium">{consultant.preferred_work_type}</span></p>
-                )}
-                {consultant.preferred_work_location && (
-                  <p className="text-gray-600 truncate">Location: <span className="font-medium">{consultant.preferred_work_location}</span></p>
-                )}
-              </div>
-
-              {/* Links */}
-              {(consultant.linkedin_profile || consultant.portfolio_link) && (
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {consultant.linkedin_profile && (
-                    <a
-                      href={consultant.linkedin_profile}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs px-2 sm:px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      LinkedIn
-                    </a>
-                  )}
-                  {consultant.portfolio_link && (
-                    <a
-                      href={consultant.portfolio_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs px-2 sm:px-3 py-1 bg-purple-100 text-purple-600 rounded hover:bg-purple-200"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Portfolio
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="pt-4 border-t border-gray-200 flex gap-2">
-                <select
-                  value={consultant.status}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    handleStatusChange(consultant.id, e.target.value);
-                  }}
-                  className="flex-1 px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg"
-                >
-                  <option>Active</option>
-                  <option>Not Active</option>
-                  <option>Recently Placed</option>
-                </select>
-                {isAdmin && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(consultant.id);
-                    }}
-                    className="px-3 py-2 text-xs sm:text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-1"
-                    title="Delete consultant"
-                  >
-                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                    <span className="hidden xs:inline">Delete</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
-        )}
+      {consultants.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-gray-500">No consultants found</p>
         </div>
-      </div>
+      ) : (
+        <ConsultantGridVirtualizer 
+          consultants={consultants}
+          onViewDetails={handleViewDetails}
+          onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
+        />
+      )}
 
       {/* Pagination Controls */}
       {totalResults && totalResults > itemsPerPage && (
@@ -434,6 +292,90 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         createdBy={selectedCreatedBy}
         updatedBy={selectedUpdatedBy}
       />
+    </div>
+  );
+};
+
+interface ConsultantGridVirtualizerProps {
+  consultants: Consultant[];
+  onViewDetails: (consultant: Consultant) => void;
+  onDelete: (id: string) => Promise<void>;
+  onStatusChange: (id: string, status: string) => Promise<void>;
+}
+
+const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onStatusChange }: ConsultantGridVirtualizerProps) => {
+  const { isAdmin } = useAuth();
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: consultants.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 350,
+    overscan: 5,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  return (
+    <div
+      ref={parentRef}
+      className="max-h-[600px] overflow-y-auto border border-gray-200 rounded-lg p-2"
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '1.5rem',
+          height: `${virtualizer.getTotalSize()}px`,
+        }}
+      >
+        {virtualItems.map((virtualItem) => {
+          const consultant = consultants[virtualItem.index];
+          return (
+            <div
+              key={virtualItem.key}
+              className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-lg transition cursor-pointer"
+              onClick={() => onViewDetails(consultant)}
+            >
+              <div className="flex items-start justify-between mb-4 gap-2">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex-1 break-words">{consultant.name}</h3>
+                <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 bg-gray-100">
+                  {consultant.status === 'Active' ? '🟢' : consultant.status === 'Recently Placed' ? '🔵' : '🔴'}
+                </span>
+              </div>
+              <div className="space-y-1 text-xs sm:text-sm mb-3">
+                {consultant.email && <p className="text-gray-600 truncate">{consultant.email}</p>}
+                {consultant.primary_skills && <p className="text-gray-700 font-medium">{consultant.primary_skills}</p>}
+              </div>
+              <div className="pt-4 border-t border-gray-200 flex gap-2">
+                <select
+                  value={consultant.status}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onStatusChange(consultant.id, e.target.value);
+                  }}
+                  className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg"
+                >
+                  <option>Active</option>
+                  <option>Not Active</option>
+                  <option>Recently Placed</option>
+                </select>
+                {isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(consultant.id);
+                    }}
+                    className="px-3 py-2 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };

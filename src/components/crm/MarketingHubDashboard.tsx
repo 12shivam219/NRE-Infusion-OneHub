@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { TrendingUp, Download, Plus, BarChart3, Calendar, UserPlus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getRequirements } from '../../lib/api/requirements';
+import { getRequirementsPage } from '../../lib/api/requirements';
 import { getInterviews } from '../../lib/api/interviews';
-import { getConsultants } from '../../lib/api/consultants';
+import { getConsultantsPage } from '../../lib/api/consultants';
 import type { Database } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -26,12 +26,12 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
   const loadData = useCallback(async () => {
     if (!user) return;
     const [reqResult, intResult, conResult] = await Promise.all([
-      getRequirements(user.id),
+      getRequirementsPage({ userId: user.id }),
       getInterviews(user.id),
-      getConsultants(user.id),
+      getConsultantsPage({ userId: user.id }),
     ]);
     if (reqResult.success && reqResult.requirements) setRequirements(reqResult.requirements);
-    if (intResult.success && intResult.interviews) setInterviews(intResult.interviews);
+    if (intResult.success && intResult.interviews) setInterviews(intResult.interviews.slice(0, 100));
     if (conResult.success && conResult.consultants) setConsultants(conResult.consultants);
     setLoading(false);
   }, [user]);

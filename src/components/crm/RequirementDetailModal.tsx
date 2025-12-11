@@ -24,8 +24,6 @@ export const RequirementDetailModal = ({
   requirement,
   onClose,
   onUpdate,
-  createdBy,
-  updatedBy,
 }: RequirementDetailModalProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();

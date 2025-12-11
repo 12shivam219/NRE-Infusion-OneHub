@@ -23,8 +23,6 @@ export const ConsultantDetailModal = ({
   consultant,
   onClose,
   onUpdate,
-  createdBy,
-  updatedBy,
 }: ConsultantDetailModalProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();

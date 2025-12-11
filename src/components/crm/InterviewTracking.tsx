@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Plus, Search, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getInterviews, updateInterview, deleteInterview } from '../../lib/api/interviews';
@@ -155,7 +156,8 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
     setSelectedUpdatedBy(null);
   };
 
-  const getRequirementTitle = (requirementId: string) => {
+  const getRequirementTitle = (requirementId: string | null) => {
+    if (!requirementId) return 'Unknown';
     const req = requirements.find(r => r.id === requirementId);
     return req ? `${req.title} - ${req.company}` : 'Unknown';
   };
@@ -350,21 +352,14 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
           </div>
         ) : (
           <>
-            <div className="max-h-[700px] overflow-y-auto border border-gray-200 rounded-lg p-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
-                {paginatedInterviews.map(interview => (
-                  <InterviewCard
-                    key={interview.id}
-                    interview={interview}
-                    requirementTitle={getRequirementTitle(interview.requirement_id)}
-                    statusColor={interviewStatusColors[interview.status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
-                    onStatusChange={handleStatusChange}
-                    onDelete={handleDelete}
-                    onViewDetails={handleViewDetails}
-                  />
-                ))}
-              </div>
-            </div>
+            <InterviewListVirtualizer 
+              interviews={paginatedInterviews}
+              getRequirementTitle={getRequirementTitle}
+              onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
+              onViewDetails={handleViewDetails}
+            />
+
 
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-6 sm:mt-8 flex-wrap">
@@ -446,6 +441,60 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
         createdBy={selectedCreatedBy}
         updatedBy={selectedUpdatedBy}
       />
+    </div>
+  );
+};
+
+interface InterviewListVirtualizerProps {
+  interviews: Interview[];
+  getRequirementTitle: (id: string | null) => string;
+  onStatusChange: (id: string, newStatus: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  onViewDetails: (interview: Interview) => void;
+}
+
+const InterviewListVirtualizer = ({ interviews, getRequirementTitle, onStatusChange, onDelete, onViewDetails }: InterviewListVirtualizerProps) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: interviews.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 280,
+    overscan: 10,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  return (
+    <div
+      ref={parentRef}
+      className="max-h-[700px] overflow-y-auto border border-gray-200 rounded-lg"
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: '1rem',
+          padding: '0.5rem',
+          height: `${virtualizer.getTotalSize()}px`,
+        }}
+      >
+        {virtualItems.map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            data-index={virtualItem.index}
+          >
+            <InterviewCard
+              interview={interviews[virtualItem.index]}
+              requirementTitle={getRequirementTitle(interviews[virtualItem.index].requirement_id)}
+              statusColor={interviewStatusColors[interviews[virtualItem.index].status] || { badge: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-500' }}
+              onStatusChange={onStatusChange}
+              onDelete={onDelete}
+              onViewDetails={onViewDetails}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

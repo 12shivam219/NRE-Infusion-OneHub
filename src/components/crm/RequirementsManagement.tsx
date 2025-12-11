@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { FixedSizeList as List } from 'react-window';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Search, Plus, Trash2, Download, Eye, Sparkles, Cog, Calendar, CheckCircle, XCircle, Lock, ArrowUpDown, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
@@ -63,7 +63,7 @@ const HighlightedText = ({ text, searchTerm }: { text: string; searchTerm: strin
 };
 
 // RequirementCard component
-const RequirementCard = ({
+const RequirementCardComponent = ({
   req,
   onViewDetails,
   onCreateInterview,
@@ -74,6 +74,7 @@ const RequirementCard = ({
   statusColors,
   getStatusIcon,
   isAdmin,
+  measureElement,
 }: {
   req: RequirementWithLogs;
   onViewDetails: (req: Requirement) => void;
@@ -85,11 +86,25 @@ const RequirementCard = ({
   statusColors: Record<RequirementStatus, { badge: string; label: string }>;
   getStatusIcon: (status: RequirementStatus) => JSX.Element | undefined;
   isAdmin: boolean;
+  measureElement?: (el: HTMLElement | null) => void;
 }) => {
   const reqNumber = req.requirement_number || 1;
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!measureElement) return;
+    // initial measure
+    measureElement(cardRef.current);
+    const ro = new ResizeObserver(() => {
+      measureElement(cardRef.current);
+    });
+    if (cardRef.current) ro.observe(cardRef.current);
+    return () => ro.disconnect();
+  }, [measureElement, req.id]);
 
   return (
     <div
+      ref={cardRef}
       className={`card-base overflow-hidden flex flex-col h-full animate-fade-in ${statusBgMap[req.status]}`}
     >
       {/* HEADER: Job Title & Status */}
@@ -231,7 +246,10 @@ const RequirementCard = ({
   );
 };
 
-// Virtualized Requirements List component for large datasets
+const RequirementCard = memo(RequirementCardComponent);
+
+// ⚡ Virtualized Requirements List using TanStack React Virtual
+// Row-based multi-column virtualization: each virtual item is a "row" containing N cards
 const VirtualizedRequirementsList = ({
   requirements,
   onViewDetails,
@@ -243,6 +261,9 @@ const VirtualizedRequirementsList = ({
   statusColors,
   getStatusIcon,
   isAdmin,
+  loadMore,
+  hasMore,
+  isLoading,
 }: {
   requirements: RequirementWithLogs[];
   onViewDetails: (req: Requirement) => void;
@@ -254,30 +275,138 @@ const VirtualizedRequirementsList = ({
   statusColors: Record<RequirementStatus, { badge: string; label: string }>;
   getStatusIcon: (status: RequirementStatus) => JSX.Element | undefined;
   isAdmin: boolean;
+  loadMore: () => void;
+  hasMore: boolean;
+  isLoading: boolean;
 }) => {
-  // For virtualized lists with grids, we need to calculate items per row
-  // Since cards are responsive, we'll use a virtualized list approach
-  const itemsPerRow = 4; // Default for xl:grid-cols-4
-  const itemHeight = 520; // Approximate height of a card
-  
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Responsive column detection to match the grid used in non-virtualized mode
+  const [columns, setColumns] = useState<number>(1);
+  useEffect(() => {
+    const calcColumns = () => {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
+      if (w >= 1280) setColumns(4);
+      else if (w >= 1024) setColumns(3);
+      else if (w >= 640) setColumns(2);
+      else setColumns(1);
+    };
+    calcColumns();
+    window.addEventListener('resize', calcColumns);
+    return () => window.removeEventListener('resize', calcColumns);
+  }, []);
+
+  const itemsPerRow = Math.max(1, columns);
+  const rowCount = Math.max(0, Math.ceil(requirements.length / itemsPerRow));
+  const estimatedRowHeight = 560;
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => estimatedRowHeight,
+    measureElement: (el: Element | null) => {
+      if (!el) return estimatedRowHeight;
+      return (el as HTMLElement).getBoundingClientRect().height || estimatedRowHeight;
+    },
+    overscan: 6,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+
+  // Keep a map of ResizeObservers for each virtual row so we can re-measure when size changes
+  const rowObserversRef = useRef<Map<number, ResizeObserver>>(new Map());
+
+  // Cleanup observers on unmount
+  useEffect(() => {
+    const observers = rowObserversRef.current;
+    return () => {
+      observers.forEach((ro) => ro.disconnect());
+      observers.clear();
+    };
+  }, []);
+
+  // Infinite load: when the last visible row approaches the end, trigger loadMore
+  useEffect(() => {
+    if (!hasMore || isLoading) return;
+    if (!virtualItems.length) return;
+    const lastVisible = virtualItems[virtualItems.length - 1];
+    if (lastVisible && lastVisible.index >= rowCount - 1 - 2) {
+      loadMore();
+    }
+  }, [virtualItems, rowCount, hasMore, isLoading, loadMore]);
+
   return (
-    <div className="w-full border border-gray-200 rounded-lg overflow-hidden">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-responsive auto-rows-max">
-        {requirements.map((req: RequirementWithLogs) => (
-          <RequirementCard
-            key={req.id}
-            req={req}
-            onViewDetails={onViewDetails}
-            onCreateInterview={onCreateInterview}
-            onSetSelectedJD={onSetSelectedJD}
-            onDelete={onDelete}
-            debouncedValue={debouncedValue}
-            statusBgMap={statusBgMap}
-            statusColors={statusColors}
-            getStatusIcon={getStatusIcon}
-            isAdmin={isAdmin}
-          />
-        ))}
+    <div ref={parentRef} className="w-full max-h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden">
+      <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+        {virtualItems.map((virtualRow) => {
+          const rowIndex = virtualRow.index;
+          const startIdx = rowIndex * itemsPerRow;
+
+          return (
+            <div
+              key={virtualRow.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+              className="px-4 py-4"
+              ref={(el) => {
+                // Attach a ResizeObserver to each virtual row so we re-measure when its height changes
+                const existing = rowObserversRef.current.get(rowIndex);
+                if (!el) {
+                  if (existing) {
+                    existing.disconnect();
+                    rowObserversRef.current.delete(rowIndex);
+                  }
+                  return;
+                }
+
+                // Measure immediately
+                virtualizer.measureElement(el as HTMLElement | null);
+
+                // Disconnect previous observer for this row (if any)
+                if (existing) existing.disconnect();
+
+                // Create new ResizeObserver and observe
+                const ro = new ResizeObserver(() => {
+                  virtualizer.measureElement(el as HTMLElement | null);
+                });
+                ro.observe(el);
+                rowObserversRef.current.set(rowIndex, ro);
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${itemsPerRow}, minmax(0, 1fr))`, gap: '1rem' }}>
+                {Array.from({ length: itemsPerRow }).map((_, colIndex) => {
+                  const idx = startIdx + colIndex;
+                  const req = requirements[idx];
+                  if (!req) {
+                    return <div key={`empty-${rowIndex}-${colIndex}`} />;
+                  }
+
+                  return (
+                    <div key={req.id} className="w-full h-full">
+                      <RequirementCard
+                        req={req}
+                        onViewDetails={onViewDetails}
+                        onCreateInterview={onCreateInterview}
+                        onSetSelectedJD={onSetSelectedJD}
+                        onDelete={onDelete}
+                        debouncedValue={debouncedValue}
+                        statusBgMap={statusBgMap}
+                        statusColors={statusColors}
+                        getStatusIcon={getStatusIcon}
+                        isAdmin={isAdmin}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -298,6 +427,8 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((savedFilters?.sortOrder as 'asc' | 'desc') || 'desc');
   const [page, setPage] = useState(0);
   const [totalResults, setTotalResults] = useState<number | null>(null);
+  const [useSyntheticData, setUseSyntheticData] = useState(false);
+  const [syntheticCount] = useState(10000);
   const [showReport, setShowReport] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
   const [selectedJDRequirement, setSelectedJDRequirement] = useState<Requirement | null>(null);
@@ -312,7 +443,41 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     to: savedFilters?.dateRangeTo || '' 
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const pageSize = 20;
+  const pageSize = 50;
+
+  // Dev helper: generate synthetic requirements for stress testing
+  const generateSyntheticRequirements = useCallback((count: number) => {
+    const statuses: RequirementStatus[] = ['NEW','IN_PROGRESS','SUBMITTED','INTERVIEW','OFFER','REJECTED','CLOSED'];
+    return Array.from({ length: count }).map((_, i) => {
+      const id = `synthetic-${i}`;
+      const status = statuses[i % statuses.length];
+      const title = `Synthetic Requirement ${i + 1}`;
+      const company = `Company ${Math.floor(i % 500) + 1}`;
+      const createdAt = new Date(Date.now() - (i * 1000 * 60)).toISOString();
+      return ({
+        id,
+        user_id: 'synthetic',
+        requirement_number: i + 1,
+        title,
+        company,
+        description: `This is a synthetic description for ${title}`,
+        location: 'Remote',
+        status: status as RequirementStatus,
+        vendor_company: `Vendor ${i % 50}`,
+        vendor_email: `vendor${i}@example.com`,
+        vendor_phone: `+1-555-${String(1000 + (i % 9000)).padStart(4,'0')}`,
+        primary_tech_stack: ['React','TypeScript','Node.js','AWS'][i % 4],
+        duration: '3 months',
+        remote: 'Yes',
+        rate: `$${50 + (i % 150)}`,
+        created_at: createdAt,
+        updated_at: createdAt,
+        created_by: 'synthetic',
+        updated_by: 'synthetic',
+        logs: [],
+      } as unknown) as RequirementWithLogs;
+    });
+  }, []);
 
   // Initialize debounced search with saved value
   useEffect(() => {
@@ -320,6 +485,13 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       setDebouncedValue(savedFilters.searchTerm);
     }
   }, [isLoaded, savedFilters]);
+
+  // If synthetic mode is enabled, ensure loadRequirements doesn't overwrite synthetic data
+  useEffect(() => {
+    if (!useSyntheticData) return;
+    // keep totalResults in sync if requirements length changes
+    setTotalResults(requirements.length);
+  }, [useSyntheticData, requirements.length]);
 
   // Save filters only on debounced search changes - cleanup timeout properly
   useEffect(() => {
@@ -409,6 +581,10 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       sortBy,
       sortOrder,
       userId: user.id,
+      // include client-side advanced filters in the query key so changes force a reload
+      minRate,
+      maxRate,
+      remoteFilter,
     });
 
     if (!opts?.force && lastQueryKeyRef.current === queryKey) {
@@ -440,9 +616,9 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       if (result.success && result.requirements) {
         // If this is a "Load More" action, append results; otherwise replace
         if (isLoadMore) {
-          setRequirements(prev => [...prev, ...result.requirements]);
+          setRequirements(prev => [...prev, ...(result.requirements || [])]);
         } else {
-          setRequirements(result.requirements);
+          setRequirements(result.requirements || []);
         }
         setTotalResults(result.total ?? null);
       } else {
@@ -453,7 +629,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     } finally {
       setLoading(false);
     }
-  }, [user, pageSize, debouncedValue, filterStatus, dateRange.from, dateRange.to, sortBy, sortOrder, page]);
+  }, [user, pageSize, debouncedValue, filterStatus, dateRange.from, dateRange.to, sortBy, sortOrder, page, minRate, maxRate, remoteFilter]);
 
   // Effect to handle filter changes - resets to page 0
   useEffect(() => {
@@ -462,8 +638,9 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
 
   // Effect to handle page changes (for Load More functionality)
   useEffect(() => {
+    if (useSyntheticData) return; // skip server loads when using synthetic data
     loadRequirements({ newPage: page, isLoadMore: page > 0 });
-  }, [page, loadRequirements]);
+  }, [page, loadRequirements, useSyntheticData]);
 
   useEffect(() => {
     // Subscribe to real-time changes
@@ -543,7 +720,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
         showToast({ type: 'error', title: 'Error', message: 'Failed to delete requirement' });
       }
     }
-  }, [selectedRequirement, isAdmin, showToast, loadRequirements]);
+  }, [selectedRequirement, isAdmin, showToast, loadRequirements, user?.id]);
 
   const handleViewDetails = (req: Requirement) => {
     setSelectedRequirement(req);
@@ -620,6 +797,27 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
             >
               <Plus className="w-4 h-4" />
               Create Requirement
+            </button>
+            {/* Dev-only synthetic data toggle */}
+            <button
+              onClick={() => {
+                if (!useSyntheticData) {
+                  const items = generateSyntheticRequirements(syntheticCount);
+                  setRequirements(items);
+                  setTotalResults(items.length);
+                  setUseSyntheticData(true);
+                  setPage(0);
+                } else {
+                  setUseSyntheticData(false);
+                  setPage(0);
+                  // reload from server
+                  loadRequirements({ newPage: 0, force: true });
+                }
+              }}
+              title="Toggle synthetic 10K test data"
+              className={`px-3 py-2 sm:py-2.5 border rounded-lg text-sm font-medium ${useSyntheticData ? 'bg-yellow-100 border-yellow-300 text-yellow-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            >
+              Dev: Synthetic
             </button>
           </div>
         </div>
@@ -899,6 +1097,9 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
             statusColors={statusColors}
             getStatusIcon={getStatusIcon}
             isAdmin={isAdmin}
+            loadMore={handleLoadMore}
+            hasMore={hasMoreRequirements}
+            isLoading={loading}
           />
         ) : (
           // Standard grid for smaller datasets

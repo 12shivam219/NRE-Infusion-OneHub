@@ -61,8 +61,6 @@ export const InterviewDetailModal = ({
   interview,
   onClose,
   onUpdate,
-  createdBy,
-  updatedBy,
 }: InterviewDetailModalProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
