@@ -6,73 +6,56 @@
 
 import CryptoJS from 'crypto-js';
 
-/**
- * Get encryption key from environment or use a default for development
- * In production, this should be a strong, unique key stored securely
- */
-function getEncryptionKey(): string {
-  const key = import.meta.env.VITE_ENCRYPTION_KEY;
-  const isDev = import.meta.env.DEV;
+const EMAIL_SERVER_URL = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+const EMAIL_SERVER_API_KEY = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
 
-  if (!key) {
-    // SECURITY: Fail strictly in production if encryption key is missing
-    if (!isDev) {
-      throw new Error(
-        'CRITICAL SECURITY ERROR: VITE_ENCRYPTION_KEY is not set in production. ' +
-        'This is a required environment variable. Set it before deploying to production.'
-      );
-    }
-    
-    // Development-only fallback
-    console.warn(
-      '⚠️  VITE_ENCRYPTION_KEY not set. Using development key. ' +
-      'MUST set this in .env for production.'
-    );
-    return 'loster-crm-dev-key-change-in-production';
+async function callEmailServer(path: string, body: any) {
+  const url = `${EMAIL_SERVER_URL}${path}`;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (EMAIL_SERVER_API_KEY) {
+    headers['Authorization'] = `Bearer ${EMAIL_SERVER_API_KEY}`;
   }
-  return key;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || `Email server request failed: ${res.status}`);
+  }
+  return payload;
 }
 
 /**
- * Encrypt sensitive data (passwords, app credentials)
- * @param plainText - The data to encrypt
- * @returns Encrypted string in Base64 format
+ * Encrypt sensitive data using email server (server-side key)
+ * This prevents exposing any secret to the browser bundle.
  */
-export function encryptData(plainText: string): string {
-  try {
-    const key = getEncryptionKey();
-    const encrypted = CryptoJS.AES.encrypt(plainText, key).toString();
-    // Convert to Base64 for safe transmission and storage
-    return btoa(encrypted);
-  } catch (error) {
-    console.error('Encryption error:', error);
-    throw new Error('Failed to encrypt data');
+export async function encryptData(plainText: string): Promise<string> {
+  if (!plainText || typeof plainText !== 'string') {
+    throw new Error('plainText is required');
   }
+  const resp = await callEmailServer('/api/encrypt-password', { plainText });
+  if (!resp.success || !resp.encrypted) {
+    throw new Error(resp.error || 'Encryption failed');
+  }
+  return resp.encrypted;
 }
 
 /**
- * Decrypt sensitive data (passwords, app credentials)
- * @param encryptedText - The encrypted data (Base64 format)
- * @returns Decrypted plain text
+ * Decrypt sensitive data via email server (server-side key)
  */
-export function decryptData(encryptedText: string): string {
-  try {
-    const key = getEncryptionKey();
-    // Decode from Base64
-    const decrypted = atob(encryptedText);
-    // Decrypt using AES
-    const bytes = CryptoJS.AES.decrypt(decrypted, key);
-    const plainText = bytes.toString(CryptoJS.enc.Utf8);
-
-    if (!plainText) {
-      throw new Error('Decryption resulted in empty string');
-    }
-
-    return plainText;
-  } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data. Key may be invalid.');
+export async function decryptData(encryptedText: string): Promise<string> {
+  if (!encryptedText || typeof encryptedText !== 'string') {
+    throw new Error('encryptedText is required');
   }
+  const resp = await callEmailServer('/api/decrypt-password', { encrypted: encryptedText });
+  if (!resp.success || typeof resp.plainText !== 'string') {
+    throw new Error(resp.error || 'Decryption failed');
+  }
+  return resp.plainText;
 }
 
 /**
@@ -84,9 +67,12 @@ export function isEncrypted(text: string): boolean {
   if (!text || typeof text !== 'string') {
     return false;
   }
-  // Check if it's a valid Base64 string (encrypted format)
+  // Accept both legacy Base64 (frontend) and backend hex:hex:hex formats
   try {
-    return /^[A-Za-z0-9+/=]+$/.test(text) && text.length > 20;
+    const looksBase64 = /^[A-Za-z0-9+/=]+$/.test(text) && text.length > 20;
+    const parts = text.split(':');
+    const looksBackend = parts.length === 3 && parts.every(p => /^[0-9a-fA-F]+$/.test(p));
+    return looksBase64 || looksBackend;
   } catch {
     return false;
   }

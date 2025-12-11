@@ -11,22 +11,9 @@ type UserUpdate = Database['public']['Tables']['users']['Update'];
 type ErrorReportUpdate = Database['public']['Tables']['error_reports']['Update'];
 
 // Placeholder types for user_sessions table which does not exist in the current schema
-type UserSession = {
-  id: string;
-  user_id: string;
-  revoked: boolean;
-  last_activity: string;
-  created_at: string;
-  browser?: string | null;
-  os?: string | null;
-  device?: string | null;
-  ip_address?: string | null;
-  location?: string | null;
-};
+type UserSession = Database['public']['Tables']['user_sessions']['Row'];
 
-type SessionUpdate = {
-  revoked: boolean;
-};
+type SessionUpdate = Database['public']['Tables']['user_sessions']['Update'];
 
 const DOCUMENTS_BUCKET = 'documents';
 const ATTACHMENT_URL_EXPIRY_SECONDS = 60 * 60;

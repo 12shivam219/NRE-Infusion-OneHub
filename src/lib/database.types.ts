@@ -97,6 +97,44 @@ export interface Database {
           created_at?: string;
         };
       };
+      user_sessions: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          revoked: boolean;
+          last_activity: string;
+          created_at: string;
+          browser: string | null;
+          os: string | null;
+          device: string | null;
+          ip_address: string | null;
+          location: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          revoked?: boolean;
+          last_activity?: string;
+          created_at?: string;
+          browser?: string | null;
+          os?: string | null;
+          device?: string | null;
+          ip_address?: string | null;
+          location?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          revoked?: boolean;
+          last_activity?: string;
+          created_at?: string;
+          browser?: string | null;
+          os?: string | null;
+          device?: string | null;
+          ip_address?: string | null;
+          location?: string | null;
+        };
+      };
       activity_logs: {
         Row: {
           id: string;

@@ -47,19 +47,8 @@ type ErrorReport = Database['public']['Tables']['error_reports']['Row'];
 type ActivityLog = Database['public']['Tables']['activity_logs']['Row'];
 type Attachment = Database['public']['Tables']['attachments']['Row'];
 
-// Placeholder type for user_sessions which does not exist in the current schema
-type UserSession = {
-  id: string;
-  user_id: string;
-  revoked: boolean;
-  last_activity: string;
-  created_at: string;
-  browser?: string | null;
-  os?: string | null;
-  device?: string | null;
-  ip_address?: string | null;
-  location?: string | null;
-};
+// `user_sessions` table type from DB schema
+type UserSession = Database['public']['Tables']['user_sessions']['Row'];
 
 type TabType = 'dashboard' | 'approvals' | 'security' | 'errors' | 'email-accounts';
 

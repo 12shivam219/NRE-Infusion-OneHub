@@ -1,11 +1,27 @@
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import Redis from 'ioredis';
 
 dotenv.config();
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const REDIS_URL = process.env.REDIS_URL;
+
+// Redis client used for distributed locking (optional)
+let redis = null;
+const instanceId = `${process.pid}-${Date.now()}`;
+
+if (REDIS_URL) {
+  try {
+    redis = new Redis(REDIS_URL);
+    redis.on('error', (err) => console.error('Redis error:', err));
+  } catch (err) {
+    console.error('Failed to initialize Redis client:', err.message);
+    redis = null;
+  }
+}
 
 let supabase = null;
 
@@ -439,16 +455,53 @@ async function startSyncScheduler() {
     userSyncMap.get(frequency).push(user.user_id);
   }
 
-  // Schedule sync for each frequency
+  // Schedule sync for each frequency. Use a Redis-based distributed lock when available so
+  // only one instance performs the sync per frequency interval.
   for (const [frequency, users] of userSyncMap) {
     setInterval(async () => {
-      console.log(`Running sync for ${users.length} users (${frequency}min interval)`);
+      const lockKey = `gmail_sync_lock:${frequency}`;
+      const lockTtl = Math.max(60, frequency * 60 + 60); // seconds
+      let acquired = true;
 
-      for (const userId of users) {
+      if (redis) {
         try {
-          await syncGmailEmails(userId);
-        } catch (error) {
-          console.error(`Failed to sync user ${userId}:`, error.message);
+          const res = await redis.set(lockKey, instanceId, 'NX', 'EX', lockTtl);
+          if (!res) {
+            console.log(`Another instance holds lock for frequency ${frequency} — skipping this run.`);
+            acquired = false;
+          } else {
+            console.log(`Acquired lock ${lockKey} as ${instanceId}`);
+          }
+        } catch (err) {
+          console.error('Redis lock error — proceeding without lock:', err.message);
+        }
+      } else {
+        console.warn('No REDIS_URL configured — scheduler may run on every instance.');
+      }
+
+      if (!acquired) return;
+
+      try {
+        console.log(`Running sync for ${users.length} users (${frequency}min interval)`);
+
+        for (const userId of users) {
+          try {
+            await syncGmailEmails(userId);
+          } catch (error) {
+            console.error(`Failed to sync user ${userId}:`, error.message);
+          }
+        }
+      } finally {
+        if (redis) {
+          try {
+            const cur = await redis.get(lockKey);
+            if (cur === instanceId) {
+              await redis.del(lockKey);
+              console.log(`Released lock ${lockKey}`);
+            }
+          } catch (err) {
+            console.error('Error releasing Redis lock:', err.message);
+          }
         }
       }
     }, frequency * 60 * 1000); // Convert minutes to milliseconds

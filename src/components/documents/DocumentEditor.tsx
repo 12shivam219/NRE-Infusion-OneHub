@@ -15,6 +15,21 @@ interface DocumentEditorProps {
   onSave?: (documents: Document[]) => Promise<void>;
 }
 
+// Memory management utilities
+const getDeviceMemoryGB = (): number => {
+  // Check for deviceMemory API (Chrome 63+)
+  const nav = navigator as { deviceMemory?: number };
+  if (nav.deviceMemory) {
+    return nav.deviceMemory;
+  }
+  // Fallback: assume 4GB for unknown devices
+  return 4;
+};
+
+const isLowMemoryDevice = (): boolean => {
+  return getDeviceMemoryGB() < 4;
+};
+
 // Blob cache using IndexedDB for fast re-access
 const CACHE_DB_NAME = 'DocumentEditorCache';
 const CACHE_STORE_NAME = 'blobs';
@@ -88,6 +103,31 @@ const setCachedBlob = async (storagePath: string, blob: Blob) => {
   }
 };
 
+/** Clear old cached blobs (keep only recent ones) - helps with memory management on unmount */
+const pruneOldCache = async (maxAgeMs = 24 * 60 * 60 * 1000) => {
+  try {
+    const db = await openCacheDB();
+    const tx = db.transaction(CACHE_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(CACHE_STORE_NAME);
+    const now = Date.now();
+    const cutoffTime = now - maxAgeMs;
+
+    const request = store.openCursor();
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest).result;
+      if (cursor) {
+        if (cursor.value.timestamp < cutoffTime) {
+          cursor.delete();
+          console.log(`Pruned old cache: ${cursor.value.storagePath}`);
+        }
+        cursor.continue();
+      }
+    };
+  } catch (error) {
+    console.warn('Cache pruning failed:', error);
+  }
+};
+
 /** Save document version for history */
 const saveDocumentVersion = async (docId: string, filename: string, blob: Blob, versionNumber: number) => {
   try {
@@ -145,6 +185,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
   const editedDocsRef = useRef<Map<string, boolean>>(new Map());
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastAutoSaveRef = useRef<Map<string, number>>(new Map()); // Track last save time per doc
+  const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editedCount, setEditedCount] = useState(0);
@@ -153,6 +194,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
+  const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
 
   // Determine grid layout
   const getGridClass = () => {
@@ -178,6 +220,29 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
   }, [layout]);
 
   const documentsToDisplay = useMemo(() => documents.slice(0, getMaxDocuments()), [documents, getMaxDocuments]);
+
+  // MEMORY WARNING EFFECT: Alert user about memory constraints on low-end devices
+  useEffect(() => {
+    const deviceMemory = getDeviceMemoryGB();
+    const isLowMemory = isLowMemoryDevice();
+    const estimatedMemoryUsage = documentsToDisplay.length * 5; // ~5MB per document
+
+    if (isLowMemory) {
+      const warningMsg = `Low-memory device detected (${deviceMemory}GB). Estimated memory usage: ~${estimatedMemoryUsage}MB. The editor will auto-save and clean up aggressively.`;
+      console.warn('⚠️', warningMsg);
+      setMemoryWarning(warningMsg);
+
+      showToast({
+        type: 'info',
+        title: 'Low Memory Warning',
+        message: `This device has limited memory (${deviceMemory}GB). Auto-saving is enabled to prevent data loss.`,
+      });
+    } else if (estimatedMemoryUsage > deviceMemory * 0.5) {
+      const warningMsg = `High memory usage anticipated: ${estimatedMemoryUsage}MB on a ${deviceMemory}GB device.`;
+      console.warn('⚠️', warningMsg);
+      setMemoryWarning(warningMsg);
+    }
+  }, [documentsToDisplay.length, showToast]);
 
   // Phase 1: Load document blobs MUCH FASTER with parallel fetching and caching
   useEffect(() => {
@@ -392,6 +457,73 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
       }
     };
   }, [loading, editedCount, documentsToDisplay, showToast]);
+
+  // AGGRESSIVE MEMORY CLEANUP: Clear blobs and resources when component unmounts or docs change
+  useEffect(() => {
+    // Capture refs in the effect body to avoid stale warnings
+    const editedDocsMap = editedDocsRef.current;
+    const lastSavesMap = lastAutoSaveRef.current;
+    const superdocRefs = superdocInstances.current;
+    
+    return () => {
+      console.log('🧹 DocumentEditor unmounting - aggressive cleanup starting...');
+
+      // 1. Immediately clear all SuperDoc instances
+      superdocRefs.forEach((instance: SuperDoc | undefined, i: number) => {
+        try {
+          instance?.destroy?.();
+          console.log(`Destroyed SuperDoc instance ${i}`);
+        } catch (error) {
+          console.error(`Error destroying SuperDoc instance ${i}:`, error);
+        }
+      });
+      superdocInstances.current = [];
+      
+      // Clear Maps
+      editedDocsMap?.clear();
+      lastSavesMap?.clear();
+
+      // 2. Clear all state holding blobs (force garbage collection)
+      setDocumentBlobs([]);
+      setEditedCount(0);
+
+      // 3. Revoke all PDF object URLs immediately
+      Object.values(pdfUrls).forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+          console.log(`Revoked object URL: ${url}`);
+        } catch (error) {
+          console.error('Error revoking object URL:', error);
+        }
+      });
+      setPdfUrls({});
+
+      // 4. Clear auto-save timer
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+
+      // 5. Clear cleanup timeout if pending
+      if (cleanupTimeoutRef.current) {
+        clearTimeout(cleanupTimeoutRef.current);
+        cleanupTimeoutRef.current = null;
+      }
+
+      // 6. Async cleanup of IndexedDB cache (non-blocking)
+      cleanupTimeoutRef.current = setTimeout(async () => {
+        try {
+          // Prune old cache entries (>24 hours)
+          await pruneOldCache(24 * 60 * 60 * 1000);
+          console.log('✓ Cache pruned successfully');
+        } catch (error) {
+          console.error('Error pruning cache:', error);
+        }
+      }, 100);
+
+      console.log('✓ Memory cleanup complete');
+    };
+  }, [pdfUrls]);
 
   // Phase 3: Initialize SuperDoc editors AFTER DOM is rendered - OPTIMIZED for speed
   useEffect(() => {
@@ -731,6 +863,22 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
               <button
                 onClick={() => setFileSizeError(null)}
                 className="ml-auto text-red-500 hover:text-red-700"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {memoryWarning && (
+            <div className="mx-4 mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-900">Memory Usage Warning</p>
+                <p className="text-sm text-yellow-700">{memoryWarning}</p>
+              </div>
+              <button
+                onClick={() => setMemoryWarning(null)}
+                className="ml-auto text-yellow-500 hover:text-yellow-700"
               >
                 ✕
               </button>

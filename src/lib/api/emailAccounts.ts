@@ -78,7 +78,7 @@ export const addEmailAccount = async (
     // SECURITY: Encrypt the app password before storing in database
     let encryptedPassword: string;
     try {
-      encryptedPassword = encryptData(appPassword);
+      encryptedPassword = await encryptData(appPassword);
     } catch (encryptError) {
       const appError = handleApiError(encryptError, {
         component: 'addEmailAccount',
