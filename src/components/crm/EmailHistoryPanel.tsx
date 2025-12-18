@@ -85,7 +85,7 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
   function getSourceBadge(sentVia: string) {
     if (sentVia === 'gmail_synced') {
       return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-50 text-primary-800">
           Gmail Auto-Sync
         </span>
       );
@@ -118,9 +118,10 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
       label = 'Low';
     }
 
+    const badgeColor = color === 'blue' ? 'primary' : color;
     return (
       <span
-        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${color}-100 text-${color}-800`}
+        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-${badgeColor}-100 text-${badgeColor}-800`}
       >
         {label} ({confidence}%)
       </span>
@@ -130,7 +131,7 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
       </div>
     );
   }

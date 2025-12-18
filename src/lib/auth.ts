@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseAuthStorageKey } from './supabase';
 import type { UserRole, UserStatus } from './database.types';
 
 export interface User {
@@ -186,19 +186,6 @@ export const login = async (
       };
     }
 
-    // Reset failed login attempts (silently fail if columns don't exist)
-    try {
-      await supabase
-        .from('users')
-        .update({
-          failed_login_attempts: 0,
-          locked_until: null,
-        })
-        .eq('id', authData.user.id);
-    } catch {
-      // Continue even if this fails - these columns might not exist
-    }
-
     // Log successful login (silently fail if table doesn't exist)
     try {
       await supabase.from('login_history').insert({
@@ -304,6 +291,11 @@ export const logout = async (): Promise<void> => {
   // Clear both sessionStorage and localStorage (for fallback compatibility)
   sessionStorage.removeItem('user');
   localStorage.removeItem('user');
+
+  if (supabaseAuthStorageKey) {
+    sessionStorage.removeItem(supabaseAuthStorageKey);
+    localStorage.removeItem(supabaseAuthStorageKey);
+  }
 };
 
 export const getCurrentUser = (): User | null => {

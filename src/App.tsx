@@ -1,12 +1,17 @@
 import { Suspense, useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthProvider';
 import { useAuth } from './hooks/useAuth';
+import { useToast } from './contexts/ToastContext';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
 import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
+import { OfflineIndicator } from './components/common/OfflineIndicator';
+import { SyncErrorHandler } from './components/common/SyncErrorHandler';
+import { SyncQueueModal } from './components/common/SyncQueueModal';
+import { SkipLinks } from './components/common/SkipLinks';
 import {
   LazyDashboard,
   LazyDocumentsPage,
@@ -16,39 +21,54 @@ import {
 
 type AuthView = 'login' | 'register';
 
+// Protected route wrapper for admin pages
+const AdminRoute = ({ children, isAdmin }: { children: React.ReactNode; isAdmin: boolean }) => {
+  if (!isAdmin) {
+    return <Navigate to="/crm" replace />;
+  }
+  return children;
+};
+
 const AppContent = () => {
   const { user, isLoading, refreshUser, isAdmin, isMarketing } = useAuth();
-  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [authView, setAuthView] = useState<AuthView>('login');
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
+  const [hasShownOfflineToast, setHasShownOfflineToast] = useState(false);
+  // Sidebar state: true = expanded, false = collapsed
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(() => {
     // Load sidebar preference from localStorage
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved ? JSON.parse(saved) : true; // Default: expanded (true means visible)
+    const saved = localStorage.getItem('sidebarExpanded');
+    return saved ? JSON.parse(saved) : true; // Default: expanded
   });
-
-  // Redirect to default page on first login based on role
-  useEffect(() => {
-    if (user) {
-      const role = (user as { role?: string }).role;
-      // Check if we're on root path - if so, redirect to appropriate page
-      if (window.location.pathname === '/') {
-        if (role === 'marketing' || role === 'user') {
-          navigate('/crm', { replace: true });
-        } else {
-          navigate('/dashboard', { replace: true });
-        }
-      }
-    }
-  }, [user, navigate]);
 
   // Save sidebar preference to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarOpen));
-  }, [sidebarOpen]);
+    localStorage.setItem('sidebarExpanded', JSON.stringify(isSidebarExpanded));
+  }, [isSidebarExpanded]);
+
+  // Listen for offline mode activation and show toast notification
+  useEffect(() => {
+    const handleOfflineActivation = () => {
+      if (!hasShownOfflineToast && user) {
+        showToast({
+          type: 'info',
+          title: 'Offline Mode Active',
+          message: 'You can continue working offline. Changes will sync automatically when you\'re back online.',
+          durationMs: 6000,
+        });
+        setHasShownOfflineToast(true);
+      }
+    };
+
+    window.addEventListener('offline-mode-activated', handleOfflineActivation);
+    return () => {
+      window.removeEventListener('offline-mode-activated', handleOfflineActivation);
+    };
+  }, [user, hasShownOfflineToast, showToast]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
@@ -71,25 +91,18 @@ const AppContent = () => {
     }
   }
 
-  // Protected route wrapper for admin pages
-  const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-    if (!isAdmin) {
-      return <Navigate to="/crm" replace />;
-    }
-    return children;
-  };
-
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen">
+      <SkipLinks />
       <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        isOpen={isSidebarExpanded}
+        onToggle={() => setIsSidebarExpanded(!isSidebarExpanded)}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+        <Header onMenuClick={() => setIsSidebarExpanded(!isSidebarExpanded)} />
 
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-content" role="main" className="flex-1 overflow-y-auto">
           <Suspense fallback={<div className="flex items-center justify-center h-full"><LoadingSpinner /></div>}>
             <Routes>
               <Route path="/dashboard" element={<LazyDashboard />} />
@@ -98,7 +111,7 @@ const AppContent = () => {
               <Route
                 path="/admin"
                 element={
-                  <AdminRoute>
+                  <AdminRoute isAdmin={isAdmin}>
                     <LazyAdminPage />
                   </AdminRoute>
                 }
@@ -107,7 +120,7 @@ const AppContent = () => {
               <Route
                 path="/"
                 element={
-                  isMarketing || (user as { role?: string }).role === 'user' ? (
+                  isMarketing || user?.role === 'user' ? (
                     <Navigate to="/crm" replace />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -120,13 +133,6 @@ const AppContent = () => {
           </Suspense>
         </main>
       </div>
-
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 };
@@ -135,6 +141,10 @@ function App() {
   return (
     <AuthProvider>
       <AppContent />
+      <SyncQueueModal />
+      {/* Offline indicator and sync error handler shown even before authentication */}
+      <OfflineIndicator />
+      <SyncErrorHandler />
     </AuthProvider>
   );
 }

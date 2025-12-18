@@ -82,3 +82,24 @@ export const debounce = <T extends (...args: unknown[]) => unknown>(
 export const classNames = (...classes: (string | boolean | undefined)[]): string => {
   return classes.filter(Boolean).join(' ');
 };
+
+/**
+ * Utility function to merge class names (similar to clsx)
+ * Handles conditional classes and arrays
+ */
+export const cn = (...classes: (string | boolean | undefined | null | Record<string, boolean>)[]): string => {
+  return classes
+    .filter(Boolean)
+    .map((cls) => {
+      if (typeof cls === 'string') return cls;
+      if (typeof cls === 'object' && cls !== null) {
+        return Object.entries(cls)
+          .filter(([, value]) => value)
+          .map(([key]) => key)
+          .join(' ');
+      }
+      return '';
+    })
+    .filter(Boolean)
+    .join(' ');
+};

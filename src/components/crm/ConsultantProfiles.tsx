@@ -7,9 +7,28 @@ import { subscribeToConsultants } from '../../lib/api/realtimeSync';
 import { debounce } from '../../lib/utils';
 import { SkeletonCard } from '../common/SkeletonCard';
 import { ConsultantDetailModal } from './ConsultantDetailModal';
-import {ErrorAlert} from '../common/ErrorAlert';
+import { ErrorAlert } from '../common/ErrorAlert';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { EmptyStateNoData } from '../common/EmptyState';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Pagination from '@mui/material/Pagination';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import Divider from '@mui/material/Divider';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
@@ -34,6 +53,8 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [totalResults, setTotalResults] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [consultantToDelete, setConsultantToDelete] = useState<string | null>(null);
   const itemsPerPage = 9;
 
   const handleDebouncedSearch = useMemo(
@@ -116,7 +137,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
     return () => { unsubscribe?.(); };
   }, [user, loadConsultants, showToast]);
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDeleteClick = useCallback((id: string) => {
     if (!isAdmin) {
       showToast({
         type: 'error',
@@ -125,21 +146,26 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
       });
       return;
     }
+    setConsultantToDelete(id);
+    setShowDeleteConfirm(true);
+  }, [isAdmin, showToast]);
 
-    if (confirm('Are you sure you want to delete this consultant?')) {
-      try {
-        const result = await deleteConsultant(id, user?.id);
-        if (result.success) {
-          showToast({ type: 'success', title: 'Consultant deleted', message: 'The consultant has been removed.' });
-          await loadConsultants(0);
-        } else if (result.error) {
-          setError({ title: 'Failed to delete', message: result.error });
-        }
-      } catch {
-        setError({ title: 'Error', message: 'Failed to delete consultant' });
+  const handleDelete = useCallback(async () => {
+    if (!consultantToDelete) return;
+    try {
+      const result = await deleteConsultant(consultantToDelete, user?.id);
+      if (result.success) {
+        showToast({ type: 'success', title: 'Consultant deleted', message: 'The consultant has been removed.' });
+        setShowDeleteConfirm(false);
+        setConsultantToDelete(null);
+        await loadConsultants(0);
+      } else if (result.error) {
+        setError({ title: 'Failed to delete', message: result.error });
       }
+    } catch {
+      setError({ title: 'Error', message: 'Failed to delete consultant' });
     }
-  }, [loadConsultants, isAdmin, showToast]);
+  }, [consultantToDelete, loadConsultants, showToast, user?.id]);
 
   const handleStatusChange = useCallback(async (id: string, newStatus: string) => {
     try {
@@ -165,19 +191,27 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Consultant Profiles</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+          Consultant Profiles
+        </Typography>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+            gap: 2,
+          }}
+        >
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
-        </div>
-      </div>
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* Error Alert */}
       {error && (
         <ErrorAlert
@@ -188,99 +222,113 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         />
       )}
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Consultant Profiles</h2>
-        <button
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        justifyContent="space-between"
+        spacing={2}
+      >
+        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+          Consultant Profiles
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
           onClick={onQuickAdd}
-          className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
+          startIcon={<Plus className="w-4 h-4" />}
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          <Plus className="w-4 h-4" />
           Quick Add
-        </button>
-      </div>
+        </Button>
+      </Stack>
 
       {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={searchTerm}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSearchTerm(value);
-              if (value.length > 100) {
-                setSearchError('Search term too long.');
-              } else {
-                setSearchError(null);
-                handleDebouncedSearch(value);
-              }
-            }}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm"
-            aria-label="Search consultants"
-        />
-        {searchError && <p className="text-xs text-red-600 mt-2">{searchError}</p>}
-        </div>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-        >
-          <option value="ALL">All Status</option>
-          <option value="Active">Active</option>
-          <option value="Not Active">Not Active</option>
-          <option value="Recently Placed">Recently Placed</option>
-        </select>
-      </div>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
+          <Box sx={{ flex: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Search"
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearchTerm(value);
+                if (value.length > 100) {
+                  setSearchError('Search term too long.');
+                } else {
+                  setSearchError(null);
+                  handleDebouncedSearch(value);
+                }
+              }}
+              error={Boolean(searchError)}
+              helperText={searchError ?? ' '}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search className="w-5 h-5" />
+                  </InputAdornment>
+                ),
+              }}
+              aria-label="Search consultants"
+            />
+          </Box>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel id="consultant-status-label">Status</InputLabel>
+            <Select
+              labelId="consultant-status-label"
+              value={filterStatus}
+              label="Status"
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <MenuItem value="ALL">All Status</MenuItem>
+              <MenuItem value="Active">Active</MenuItem>
+              <MenuItem value="Not Active">Not Active</MenuItem>
+              <MenuItem value="Recently Placed">Recently Placed</MenuItem>
+            </Select>
+          </FormControl>
+        </Stack>
+      </Paper>
 
       {/* Consultant Cards Grid with Scrolling Container */}
       {consultants.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-gray-500">No consultants found</p>
-        </div>
+        <EmptyStateNoData type="consultants" onCreate={onQuickAdd} />
       ) : (
         <ConsultantGridVirtualizer 
           consultants={consultants}
           onViewDetails={handleViewDetails}
-          onDelete={handleDelete}
+          onDelete={async (id: string) => {
+            handleDeleteClick(id);
+            // Return promise to match expected type
+            return Promise.resolve();
+          }}
           onStatusChange={handleStatusChange}
         />
       )}
 
       {/* Pagination Controls */}
       {totalResults && totalResults > itemsPerPage && (
-        <div className="flex items-center justify-between mt-6 px-4 py-4 bg-gray-50 rounded-lg">
-          <span className="text-sm text-gray-600">
-            Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalResults)} of {totalResults}
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setCurrentPage(prev => Math.max(0, prev - 1));
-                loadConsultants(Math.max(0, currentPage - 1));
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
+            <Typography variant="body2" color="text.secondary">
+              Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalResults)} of {totalResults}
+            </Typography>
+            <Pagination
+              count={totalPages}
+              page={currentPage + 1}
+              onChange={(_, page) => {
+                const nextPage = Math.max(1, Math.min(page, totalPages));
+                setCurrentPage(nextPage - 1);
+                loadConsultants(nextPage - 1);
               }}
-              disabled={currentPage === 0}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Previous
-            </button>
-            <span className="px-4 py-2 text-sm text-gray-600">
-              Page {currentPage + 1} of {totalPages}
-            </span>
-            <button
-              onClick={() => {
-                const nextPage = Math.min(totalPages - 1, currentPage + 1);
-                setCurrentPage(nextPage);
-                loadConsultants(nextPage);
-              }}
-              disabled={currentPage >= totalPages - 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+              color="primary"
+              showFirstButton
+              showLastButton
+            />
+          </Stack>
+        </Paper>
       )}
 
       {/* Detail Modal */}
@@ -292,7 +340,22 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         createdBy={selectedCreatedBy}
         updatedBy={selectedUpdatedBy}
       />
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setConsultantToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        title="Delete Consultant"
+        message="Are you sure you want to delete this consultant? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
+    </Box>
   );
 };
 
@@ -317,9 +380,10 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <div
+    <Paper
+      variant="outlined"
       ref={parentRef}
-      className="max-h-[600px] overflow-y-auto border border-gray-200 rounded-lg p-2"
+      sx={{ maxHeight: 600, overflowY: 'auto', p: 1 }}
     >
       <div
         style={{
@@ -331,51 +395,78 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
       >
         {virtualItems.map((virtualItem) => {
           const consultant = consultants[virtualItem.index];
+          const statusEmoji =
+            consultant.status === 'Active'
+              ? '🟢'
+              : consultant.status === 'Recently Placed'
+              ? '🔵'
+              : '🔴';
           return (
             <div
               key={virtualItem.key}
-              className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-lg transition cursor-pointer"
               onClick={() => onViewDetails(consultant)}
             >
-              <div className="flex items-start justify-between mb-4 gap-2">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 flex-1 break-words">{consultant.name}</h3>
-                <span className="px-2 sm:px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 bg-gray-100">
-                  {consultant.status === 'Active' ? '🟢' : consultant.status === 'Recently Placed' ? '🔵' : '🔴'}
-                </span>
-              </div>
-              <div className="space-y-1 text-xs sm:text-sm mb-3">
-                {consultant.email && <p className="text-gray-600 truncate">{consultant.email}</p>}
-                {consultant.primary_skills && <p className="text-gray-700 font-medium">{consultant.primary_skills}</p>}
-              </div>
-              <div className="pt-4 border-t border-gray-200 flex gap-2">
-                <select
-                  value={consultant.status}
-                  onChange={(e) => {
-                    e.stopPropagation();
-                    onStatusChange(consultant.id, e.target.value);
-                  }}
-                  className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg"
-                >
-                  <option>Active</option>
-                  <option>Not Active</option>
-                  <option>Recently Placed</option>
-                </select>
-                {isAdmin && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete(consultant.id);
-                    }}
-                    className="px-3 py-2 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
+              <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 } }}>
+                <CardContent>
+                  <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                    <Typography variant="subtitle1" sx={{ fontWeight: 800, pr: 1, wordBreak: 'break-word' }}>
+                      {consultant.name}
+                    </Typography>
+                    <Chip size="small" variant="outlined" label={`${statusEmoji} ${consultant.status ?? ''}`} />
+                  </Stack>
+
+                  <Stack spacing={0.5} sx={{ mt: 1 }}>
+                    {consultant.email ? (
+                      <Typography variant="body2" color="text.secondary" noWrap>
+                        {consultant.email}
+                      </Typography>
+                    ) : null}
+                    {consultant.primary_skills ? (
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {consultant.primary_skills}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <FormControl size="small" sx={{ flex: 1 }}>
+                      <InputLabel id={`consultant-status-${consultant.id}`}>Status</InputLabel>
+                      <Select
+                        labelId={`consultant-status-${consultant.id}`}
+                        value={consultant.status ?? ''}
+                        label="Status"
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          onStatusChange(consultant.id, String(e.target.value));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MenuItem value="Active">Active</MenuItem>
+                        <MenuItem value="Not Active">Not Active</MenuItem>
+                        <MenuItem value="Recently Placed">Recently Placed</MenuItem>
+                      </Select>
+                    </FormControl>
+                    {isAdmin ? (
+                      <IconButton
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDelete(consultant.id);
+                        }}
+                        title="Delete consultant"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </IconButton>
+                    ) : null}
+                  </Stack>
+                </CardContent>
+              </Card>
             </div>
           );
         })}
       </div>
-    </div>
+    </Paper>
   );
 };

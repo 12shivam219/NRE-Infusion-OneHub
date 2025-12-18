@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { getNotifications, getUnreadCount, markAsRead, markAllAsRead } from '../lib/api/notifications';
 import type { Database } from '../lib/database.types';
+import { supabase } from '../lib/supabase';
 
 type Notification = Database['public']['Tables']['notifications']['Row'];
 
@@ -31,29 +32,81 @@ export const useNotifications = () => {
     }
   }, [user]);
 
-  const handleMarkAsRead = async (notificationId: string) => {
+  const handleMarkAsRead = useCallback(async (notificationId: string) => {
     await markAsRead(notificationId);
-    loadNotifications();
-    loadUnreadCount();
-  };
+    await loadNotifications();
+    await loadUnreadCount();
+  }, [loadNotifications, loadUnreadCount]);
 
-  const handleMarkAllAsRead = async () => {
+  const handleMarkAllAsRead = useCallback(async () => {
     if (!user) return;
     await markAllAsRead(user.id);
-    loadNotifications();
-    loadUnreadCount();
-  };
+    await loadNotifications();
+    await loadUnreadCount();
+  }, [user, loadNotifications, loadUnreadCount]);
 
   useEffect(() => {
     if (user) {
-      loadNotifications();
-      loadUnreadCount();
+      let cancelled = false;
 
-      const interval = setInterval(() => {
-        loadUnreadCount();
-      }, 30000);
+      const run = async () => {
+        setLoading(true);
+        const [notificationsResult, unreadResult] = await Promise.all([
+          getNotifications(user.id),
+          getUnreadCount(user.id),
+        ]);
 
-      return () => clearInterval(interval);
+        if (cancelled) return;
+
+        if (notificationsResult.success && notificationsResult.notifications) {
+          setNotifications(notificationsResult.notifications);
+        }
+        if (unreadResult.success && unreadResult.count !== undefined) {
+          setUnreadCount(unreadResult.count);
+        }
+        setLoading(false);
+      };
+
+      void run();
+
+      const channel = supabase
+        .channel(`notifications:${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => {
+            void loadUnreadCount();
+            void loadNotifications();
+          }
+        )
+        .subscribe();
+
+      const maybeRefresh = () => {
+        if (cancelled) return;
+        void loadUnreadCount();
+      };
+
+      const handleFocus = () => maybeRefresh();
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible') {
+          maybeRefresh();
+        }
+      };
+
+      window.addEventListener('focus', handleFocus);
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      return () => {
+        cancelled = true;
+        window.removeEventListener('focus', handleFocus);
+        document.removeEventListener('visibilitychange', handleVisibility);
+        supabase.removeChannel(channel);
+      };
     }
   }, [user, loadNotifications, loadUnreadCount]);
 

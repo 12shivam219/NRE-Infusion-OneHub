@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Download, Loader, AlertCircle } from 'lucide-react';
 import '@harbour-enterprises/superdoc/style.css';
 import { SuperDoc } from '@harbour-enterprises/superdoc';
@@ -186,6 +187,10 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastAutoSaveRef = useRef<Map<string, number>>(new Map()); // Track last save time per doc
   const cleanupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pdfUrlsRef = useRef<Record<string, string>>({});
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editedCount, setEditedCount] = useState(0);
@@ -195,6 +200,24 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
   const [fileSizeError, setFileSizeError] = useState<string | null>(null);
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
   const [memoryWarning, setMemoryWarning] = useState<string | null>(null);
+
+  // Focus management for accessibility and to avoid aria-hidden warnings when other portal-based dialogs appear.
+  useEffect(() => {
+    previousActiveElementRef.current = document.activeElement as HTMLElement | null;
+
+    // Ensure focus is moved inside the editor immediately on mount.
+    // Use a microtask to allow the portal to mount first.
+    queueMicrotask(() => {
+      closeButtonRef.current?.focus?.();
+      if (document.activeElement !== closeButtonRef.current) {
+        dialogRef.current?.focus?.();
+      }
+    });
+
+    return () => {
+      previousActiveElementRef.current?.focus?.();
+    };
+  }, []);
 
   // Determine grid layout
   const getGridClass = () => {
@@ -297,7 +320,6 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                 blob = await response.blob();
 
                 // Verify blob size
-                // Verify blob size
                 if (blob.size > MAX_FILE_SIZE) {
                   const errorMsg = `Downloaded file too large: ${(blob.size / 1024 / 1024).toFixed(2)}MB`;
                   console.warn(errorMsg);
@@ -390,11 +412,11 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
       });
       return newUrls;
     });
-
-    return () => {
-      Object.values(newUrls).forEach((url) => URL.revokeObjectURL(url));
-    };
   }, [documentsToDisplay, documentBlobs]);
+
+  useEffect(() => {
+    pdfUrlsRef.current = pdfUrls;
+  }, [pdfUrls]);
 
   // Auto-save effect: Save document state periodically
   useEffect(() => {
@@ -458,18 +480,20 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
     };
   }, [loading, editedCount, documentsToDisplay, showToast]);
 
-  // AGGRESSIVE MEMORY CLEANUP: Clear blobs and resources when component unmounts or docs change
+  // AGGRESSIVE MEMORY CLEANUP: clear resources on unmount (avoid setState in cleanup)
   useEffect(() => {
-    // Capture refs in the effect body to avoid stale warnings
-    const editedDocsMap = editedDocsRef.current;
-    const lastSavesMap = lastAutoSaveRef.current;
-    const superdocRefs = superdocInstances.current;
-    
     return () => {
       console.log('🧹 DocumentEditor unmounting - aggressive cleanup starting...');
 
-      // 1. Immediately clear all SuperDoc instances
-      superdocRefs.forEach((instance: SuperDoc | undefined, i: number) => {
+      Object.values(pdfUrlsRef.current).forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          console.error('Error revoking object URL:', error);
+        }
+      });
+
+      superdocInstances.current.forEach((instance: SuperDoc | undefined, i: number) => {
         try {
           instance?.destroy?.();
           console.log(`Destroyed SuperDoc instance ${i}`);
@@ -478,42 +502,29 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
         }
       });
       superdocInstances.current = [];
-      
-      // Clear Maps
-      editedDocsMap?.clear();
-      lastSavesMap?.clear();
 
-      // 2. Clear all state holding blobs (force garbage collection)
-      setDocumentBlobs([]);
-      setEditedCount(0);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const editedDocs = editedDocsRef.current;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      const lastAutoSave = lastAutoSaveRef.current;
+      const autoSaveTimer = autoSaveTimerRef.current;
+      const cleanupTimeout = cleanupTimeoutRef.current;
 
-      // 3. Revoke all PDF object URLs immediately
-      Object.values(pdfUrls).forEach((url) => {
-        try {
-          URL.revokeObjectURL(url);
-          console.log(`Revoked object URL: ${url}`);
-        } catch (error) {
-          console.error('Error revoking object URL:', error);
-        }
-      });
-      setPdfUrls({});
+      editedDocs?.clear();
+      lastAutoSave?.clear();
 
-      // 4. Clear auto-save timer
-      if (autoSaveTimerRef.current) {
-        clearInterval(autoSaveTimerRef.current);
+      if (autoSaveTimer) {
+        clearInterval(autoSaveTimer);
         autoSaveTimerRef.current = null;
       }
 
-      // 5. Clear cleanup timeout if pending
-      if (cleanupTimeoutRef.current) {
-        clearTimeout(cleanupTimeoutRef.current);
+      if (cleanupTimeout) {
+        clearTimeout(cleanupTimeout);
         cleanupTimeoutRef.current = null;
       }
 
-      // 6. Async cleanup of IndexedDB cache (non-blocking)
       cleanupTimeoutRef.current = setTimeout(async () => {
         try {
-          // Prune old cache entries (>24 hours)
           await pruneOldCache(24 * 60 * 60 * 1000);
           console.log('✓ Cache pruned successfully');
         } catch (error) {
@@ -523,7 +534,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
 
       console.log('✓ Memory cleanup complete');
     };
-  }, [pdfUrls]);
+  }, []);
 
   // Phase 3: Initialize SuperDoc editors AFTER DOM is rendered - OPTIMIZED for speed
   useEffect(() => {
@@ -832,10 +843,18 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
     }
   };
 
-  return (
+  const content = (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg w-full h-full max-h-screen max-w-7xl flex flex-col">
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" role="presentation">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Document Editor"
+          tabIndex={-1}
+          className="card-base w-full h-full max-h-screen max-w-7xl flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Document Editor</h2>
@@ -844,11 +863,13 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
               </p>
             </div>
             <button
+              ref={closeButtonRef}
               onClick={handleCloseWithConfirm}
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
               title="Close editor"
+              aria-label="Close editor"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 
@@ -889,7 +910,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <Loader className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
+                  <Loader className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-3" />
                   <p className="text-gray-700 font-medium mb-2">Opening documents...</p>
                   <p className="text-sm text-gray-500">
                     {loadProgress > 0 ? `Loading ${Math.round(loadProgress)}%` : 'Preparing editors'}
@@ -898,7 +919,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                   {loadProgress > 0 && (
                     <div className="w-48 h-1 bg-gray-200 rounded-full mx-auto mt-3 overflow-hidden">
                       <div
-                        className="h-full bg-blue-600 transition-all duration-300"
+                        className="h-full bg-primary-600 transition-all duration-300"
                         style={{ width: `${loadProgress}%` }}
                       />
                     </div>
@@ -913,14 +934,14 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                   return (
                     <div
                       key={doc.id}
-                      className="flex flex-col bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden"
+                      className="card-base flex flex-col overflow-hidden"
                     >
                       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
                         <div className="min-w-0">
                           <h3 className="text-sm font-semibold text-gray-900 truncate">{doc.original_filename}</h3>
                           <p className="text-xs text-gray-500">Version {doc.version}</p>
                           {isPdf && (
-                            <p className="mt-1 text-xs font-medium text-blue-600">PDF preview – editing disabled</p>
+                            <p className="mt-1 text-xs font-medium text-primary-600">PDF preview – editing disabled</p>
                           )}
                         </div>
                         <button
@@ -935,7 +956,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                       {!isPdf && (
                         <div
                           id={`superdoc-toolbar-${index}`}
-                          className="bg-white border-b border-gray-200 overflow-x-auto flex-shrink-0"
+                          className="surface-bg border-b border-gray-200 overflow-x-auto flex-shrink-0"
                         />
                       )}
 
@@ -955,8 +976,8 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                       ) : (
                         <div
                           id={`superdoc-container-${index}`}
-                            className="flex-1 overflow-auto min-h-[400px] bg-white shadow-lg rounded-lg"
-                            style={{ minHeight: '400px', maxWidth: '850px' }}
+                          className="flex-1 overflow-auto min-h-[400px] card-base"
+                          style={{ minHeight: '400px', maxWidth: '850px' }}
                         />
                       )}
                     </div>
@@ -988,7 +1009,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
               <button
                 onClick={handleSaveAll}
                 disabled={saving || editedCount === 0}
-                className="flex-1 sm:flex-none px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 sm:flex-none px-4 py-2 bg-primary-800 text-white rounded-lg font-medium hover:bg-primary-900 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {saving && <Loader className="w-4 h-4 animate-spin" />}
                 {saving ? 'Saving...' : `Save & Download (${editedCount})`}
@@ -1000,7 +1021,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
 
       {showConfirmClose && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="card-base max-w-md w-full p-6">
             <h3 className="text-lg font-bold text-gray-900 mb-2">Unsaved Changes</h3>
             <p className="text-gray-600 mb-6">
               You have <span className="font-semibold">{editedCount}</span> document
@@ -1029,4 +1050,8 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
       )}
     </>
   );
+
+  // Render via portal to avoid keeping focus inside #root while portal-based dialogs apply aria-hidden.
+  if (typeof document === 'undefined') return null;
+  return createPortal(content, document.body);
 };

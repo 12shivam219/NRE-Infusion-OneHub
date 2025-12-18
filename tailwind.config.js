@@ -1,34 +1,52 @@
 /** @type {import('tailwindcss').Config} */
+
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial'],
+      },
       colors: {
-        // Primary accent - reduced brightness
+        // Enterprise Color Palette - Charcoal Primary + Gold Accent
+        // Primary - Charcoal
         primary: {
-          50: '#f0f7ff',
-          100: '#e0eeff',
-          200: '#bbd7ff',
-          300: '#84baff',
-          400: '#4a96ff',
-          500: '#2563eb', // main primary
-          600: '#1d4ed8',
-          700: '#1e40af',
-          800: '#1e3a8a',
-          900: '#172554',
+          50: '#f9fafb',
+          100: '#f3f4f6',
+          200: '#e5e7eb',
+          300: '#d1d5db',
+          400: '#9ca3af',
+          500: '#6b7280', // Base charcoal
+          600: '#4b5563',
+          700: '#374151', // Dark charcoal
+          800: '#1f2937',
+          900: '#111827', // Deep charcoal
         },
-        // Neutral palette - grays and whites
+        // Accent - Gold
+        accent: {
+          50: '#fffdf5',
+          100: '#fff9e6',
+          200: '#fff2cc',
+          300: '#ffe7a3',
+          400: '#ffd866',
+          500: '#d4af37', // Primary gold
+          600: '#b88a00',
+          700: '#9c6c00',
+          800: '#7a5500',
+          900: '#4a3400',
+        },
+        // Neutral grayscale
         neutral: {
-          50: '#fafafa',
-          100: '#f5f5f5',
-          200: '#e5e5e5',
-          300: '#d4d4d4',
-          400: '#a3a3a3',
-          500: '#737373',
-          600: '#525252',
-          700: '#404040',
-          800: '#262626',
-          900: '#171717',
+          50: '#f9fafb',
+          100: '#f3f4f6',
+          200: '#e5e7eb',
+          300: '#d1d5db',
+          400: '#9ca3af',
+          500: '#6b7280',
+          600: '#4b5563',
+          700: '#374151',
+          800: '#1f2937',
+          900: '#111827',
         },
       },
       boxShadow: {

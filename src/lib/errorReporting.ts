@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { captureException, captureMessage } from './sentry';
 
 // Simple client-side rate limiting so a single bug cannot spam the error_reports table.
 const ERROR_RATE_LIMIT = 10; // max errors per window per tab
@@ -23,6 +24,13 @@ export const reportError = async (
       return;
     }
 
+    // Report to Sentry for production error tracking
+    captureException(error, {
+      userId,
+      location: window.location.href,
+    });
+
+    // Also report to local database for historical tracking
     await supabase.from('error_reports').insert({
       user_id: userId || null,
       error_message: error.message,
@@ -51,4 +59,46 @@ export const setupGlobalErrorHandler = (userId?: string): void => {
       userId
     );
   });
+
+  // Capture unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    captureMessage(
+      `Unhandled Promise Rejection: ${event.reason?.message || JSON.stringify(event.reason)}`,
+      'error'
+    );
+  });
 };
+
+/**
+ * Manual error logging utility for use in try-catch blocks
+ * Reports to both Sentry and local database
+ */
+export const logError = async (
+  error: Error | string,
+  context?: Record<string, unknown>
+): Promise<void> => {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  try {
+    // Report to Sentry
+    if (error instanceof Error) {
+      captureException(error, context);
+    } else {
+      captureMessage(errorMessage, 'error');
+    }
+
+    // Log to local database
+    await supabase.from('error_reports').insert({
+      error_message: errorMessage,
+      error_stack: errorStack || null,
+      error_type: error instanceof Error ? error.name : 'String',
+      url: window.location.href,
+      user_agent: navigator.userAgent,
+      status: 'new',
+    });
+  } catch (reportingError) {
+    if (import.meta.env.DEV) console.error('Failed to log error:', reportingError);
+  }
+};
+

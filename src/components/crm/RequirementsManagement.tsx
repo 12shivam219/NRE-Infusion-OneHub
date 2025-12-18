@@ -1,34 +1,53 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { Search, Plus, Trash2, Download, Eye, Sparkles, Cog, Calendar, CheckCircle, XCircle, Lock, ArrowUpDown, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Plus, Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { useToast } from '../../contexts/ToastContext';
 import { useSearchFilters } from '../../hooks/useSearchFilters';
+import { useRequirementsPage } from '../../hooks/useRequirementsPage';
 import { debounce } from '../../lib/utils';
-import { getRequirementsPage, deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
+import { deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsReport } from './RequirementsReport';
 import { RequirementDetailModal } from './RequirementDetailModal';
+import { RequirementsTable } from './RequirementsTable';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import { useSyncQueue } from '../../hooks/useSyncStatus';
+import { processSyncQueue } from '../../lib/offlineDB';
+import SearchIcon from '@mui/icons-material/Search';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import InputBase from '@mui/material/InputBase';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Chip from '@mui/material/Chip';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
+import Divider from '@mui/material/Divider';
+import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Popover from '@mui/material/Popover';
+import Portal from '@mui/material/Portal';
+import { alpha, styled } from '@mui/material/styles';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 
-// Icon components for status
-const getStatusIcon = (status: RequirementStatus) => {
-  const iconProps = 'w-4 h-4';
-  switch (status) {
-    case 'NEW': return <Sparkles className={iconProps} />;
-    case 'IN_PROGRESS': return <Cog className={iconProps} />;
-    case 'INTERVIEW': return <Calendar className={iconProps} />;
-    case 'OFFER': return <CheckCircle className={iconProps} />;
-    case 'REJECTED': return <XCircle className={iconProps} />;
-    case 'CLOSED': return <Lock className={iconProps} />;
-  }
-};
-
 const statusColors: Record<RequirementStatus, { badge: string; label: string }> = {
-  NEW: { badge: 'bg-blue-100 text-blue-800', label: 'New' },
+  NEW: { badge: 'bg-primary-50 text-primary-800', label: 'New' },
   IN_PROGRESS: { badge: 'bg-yellow-100 text-yellow-800', label: 'In Progress' },
   SUBMITTED: { badge: 'bg-cyan-100 text-cyan-800', label: 'Submitted' },
   INTERVIEW: { badge: 'bg-purple-100 text-purple-800', label: 'Interview' },
@@ -40,400 +59,112 @@ const statusColors: Record<RequirementStatus, { badge: string; label: string }> 
 interface RequirementsManagementProps {
   onQuickAdd?: () => void;
   onCreateInterview?: (requirementId: string) => void;
+  toolbarPortalTargetId?: string;
 }
 
-// HighlightedText component
-const HighlightedText = ({ text, searchTerm }: { text: string; searchTerm: string }) => {
-  if (!searchTerm.trim()) return <>{text}</>;
-  
-  const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
-  return (
-    <>
-      {parts.map((part, index) =>
-        part.toLowerCase() === searchTerm.toLowerCase() ? (
-          <mark key={index} className="bg-yellow-200 font-semibold">
-            {part}
-          </mark>
-        ) : (
-          <span key={index}>{part}</span>
-        )
-      )}
-    </>
-  );
-};
+const Search = styled('div')(({ theme }) => ({
+  position: 'relative',
+  borderRadius: 10,
+  backgroundColor:
+    theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.white, 0.12)
+      : alpha(theme.palette.common.black, 0.06),
+  '&:hover': {
+    backgroundColor:
+      theme.palette.mode === 'dark'
+        ? alpha(theme.palette.common.white, 0.16)
+        : alpha(theme.palette.common.black, 0.09),
+  },
+  width: '100%',
+  height: 40,
+  display: 'flex',
+  alignItems: 'center',
+}));
 
-// RequirementCard component
-const RequirementCardComponent = ({
-  req,
-  onViewDetails,
-  onCreateInterview,
-  onSetSelectedJD,
-  onDelete,
-  debouncedValue,
-  statusBgMap,
-  statusColors,
-  getStatusIcon,
-  isAdmin,
-  measureElement,
-}: {
-  req: RequirementWithLogs;
-  onViewDetails: (req: Requirement) => void;
-  onCreateInterview?: (id: string) => void;
-  onSetSelectedJD: (req: Requirement) => void;
-  onDelete: () => void;
-  debouncedValue: string;
-  statusBgMap: Record<RequirementStatus, string>;
-  statusColors: Record<RequirementStatus, { badge: string; label: string }>;
-  getStatusIcon: (status: RequirementStatus) => JSX.Element | undefined;
-  isAdmin: boolean;
-  measureElement?: (el: HTMLElement | null) => void;
-}) => {
-  const reqNumber = req.requirement_number || 1;
-  const cardRef = useRef<HTMLDivElement | null>(null);
+const CollapsedSearchButton = styled(IconButton)(({ theme }) => ({
+  width: 40,
+  height: 40,
+  borderRadius: 10,
+  backgroundColor:
+    theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.white, 0.12)
+      : alpha(theme.palette.common.black, 0.06),
+  color: theme.palette.text.secondary,
+  '&:hover': {
+    backgroundColor:
+      theme.palette.mode === 'dark'
+        ? alpha(theme.palette.common.white, 0.16)
+        : alpha(theme.palette.common.black, 0.09),
+  },
+  '&.Mui-focusVisible': {
+    boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`,
+  },
+}));
 
-  useEffect(() => {
-    if (!measureElement) return;
-    // initial measure
-    measureElement(cardRef.current);
-    const ro = new ResizeObserver(() => {
-      measureElement(cardRef.current);
-    });
-    if (cardRef.current) ro.observe(cardRef.current);
-    return () => ro.disconnect();
-  }, [measureElement, req.id]);
+const SearchIconWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 1),
+  height: '100%',
+  position: 'absolute',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: theme.palette.text.secondary,
+}));
 
-  return (
-    <div
-      ref={cardRef}
-      className={`card-base overflow-hidden flex flex-col h-full animate-fade-in ${statusBgMap[req.status]}`}
-    >
-      {/* HEADER: Job Title & Status */}
-      <div className="card-p-md pb-3 sm:pb-4 border-b border-gray-200">
-        {/* Title with Requirement Number */}
-        <div className="flex items-start gap-3 mb-3">
-          <div className="flex-shrink-0 text-gray-400 mt-0.5">
-            {getStatusIcon(req.status)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs sm:text-sm text-gray-500 font-semibold mb-1">
-              Req No: <span className="font-bold text-blue-600">{reqNumber}</span>
-            </p>
-            <h3 className="card-title">
-              <HighlightedText text={req.title} searchTerm={debouncedValue} />
-            </h3>
-          </div>
-        </div>
+const SearchClearWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 0.25),
+  height: '100%',
+  position: 'absolute',
+  right: theme.spacing(0.5),
+  top: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
 
-        {/* Status Badge - Refined */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          <span className="badge-primary">
-            {statusColors[req.status].label}
-          </span>
-        </div>
+const StyledInputBase = styled(InputBase)(({ theme }) => ({
+  color: 'inherit',
+  width: '100%',
+  '& .MuiInputBase-input': {
+    padding: theme.spacing(1, 1, 1, 0),
+    paddingLeft: `calc(1em + ${theme.spacing(3)})`,
+    paddingRight: `calc(1em + ${theme.spacing(4)})`,
+    fontSize: theme.typography.pxToRem(14),
+  },
+}));
 
-        {/* Company - Secondary Info */}
-        <p className="text-xs sm:text-sm text-gray-600">
-          <span className="text-gray-500">Company:</span> <span className="font-semibold text-gray-800"><HighlightedText text={req.company || 'N/A'} searchTerm={debouncedValue} /></span>
-        </p>
-      </div>
 
-      {/* KEY INFORMATION SECTION */}
-      <div className="card-p-md py-3 sm:py-4 bg-white bg-opacity-50 border-b border-gray-100">
-        <div className="grid grid-cols-2 gap-3">
-          {/* Vendor Name */}
-          {req.vendor_company && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Vendor</span>
-              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_company} searchTerm={debouncedValue} /></span>
-            </div>
-          )}
-
-          {/* Vendor Email */}
-          {req.vendor_email && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Email</span>
-              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_email} searchTerm={debouncedValue} /></span>
-            </div>
-          )}
-
-          {/* Vendor Phone */}
-          {req.vendor_phone && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Phone</span>
-              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.vendor_phone} searchTerm={debouncedValue} /></span>
-            </div>
-          )}
-
-          {/* Tech Stack */}
-          {req.primary_tech_stack && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs text-gray-500 font-semibold mb-1 uppercase tracking-tight">Tech</span>
-              <span className="text-xs sm:text-sm font-semibold text-gray-900 truncate"><HighlightedText text={req.primary_tech_stack.split(',')[0].trim()} searchTerm={debouncedValue} /></span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* METADATA SECTION */}
-      <div className="card-p-md py-3 sm:py-4 border-b border-gray-100 flex-1">
-        <div className="space-y-2 text-xs sm:text-sm">
-          {req.duration && (
-            <div className="flex items-center gap-2 text-gray-700">
-              <span className="text-gray-400 text-sm">⏳</span>
-              <span className="font-medium">{req.duration}</span>
-            </div>
-          )}
-          {req.remote && (
-            <div className="flex items-center gap-2 text-gray-700">
-              <span className="text-gray-400 text-sm">🏠</span>
-              <span className="font-medium">{req.remote}</span>
-            </div>
-          )}
-          {req.rate && (
-            <div className="flex items-center gap-2 text-gray-700">
-              <span className="text-gray-400 text-sm">💰</span>
-              <span className="font-medium">{req.rate}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ACTION BUTTONS - Equal Size, Aligned Horizontally */}
-      <div className="card-p-md pt-3 sm:pt-4 bg-white bg-opacity-50">
-        <div className="flex flex-col sm:flex-row gap-2 w-full">
-          <button
-            onClick={() => onViewDetails(req)}
-            className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
-            title="View full details"
-          >
-            <Eye className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline truncate">View</span>
-          </button>
-
-          <button
-            onClick={() => onCreateInterview?.(req.id)}
-            className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-all duration-200 shadow-sm hover:shadow-md text-xs font-semibold min-w-0"
-            title="Create interview for this requirement"
-          >
-            <Calendar className="w-4 h-4 flex-shrink-0" />
-            <span className="hidden sm:inline truncate">Interview</span>
-          </button>
-
-          {req.description && (
-            <button
-              onClick={() => onSetSelectedJD(req)}
-              className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 text-xs font-semibold min-w-0"
-              title="View job description"
-            >
-              <span className="text-sm flex-shrink-0">📄</span>
-              <span className="hidden sm:inline truncate">JD</span>
-            </button>
-          )}
-
-          {isAdmin && (
-            <button
-              onClick={onDelete}
-              className="flex-1 h-9 sm:h-10 flex items-center justify-center gap-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 text-xs font-semibold min-w-0"
-              title="Delete requirement"
-            >
-              <Trash2 className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline truncate">Delete</span>
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const RequirementCard = memo(RequirementCardComponent);
-
-// ⚡ Virtualized Requirements List using TanStack React Virtual
-// Row-based multi-column virtualization: each virtual item is a "row" containing N cards
-const VirtualizedRequirementsList = ({
-  requirements,
-  onViewDetails,
-  onCreateInterview,
-  onSetSelectedJD,
-  onDelete,
-  debouncedValue,
-  statusBgMap,
-  statusColors,
-  getStatusIcon,
-  isAdmin,
-  loadMore,
-  hasMore,
-  isLoading,
-}: {
-  requirements: RequirementWithLogs[];
-  onViewDetails: (req: Requirement) => void;
-  onCreateInterview?: (id: string) => void;
-  onSetSelectedJD: (req: Requirement) => void;
-  onDelete: () => void;
-  debouncedValue: string;
-  statusBgMap: Record<RequirementStatus, string>;
-  statusColors: Record<RequirementStatus, { badge: string; label: string }>;
-  getStatusIcon: (status: RequirementStatus) => JSX.Element | undefined;
-  isAdmin: boolean;
-  loadMore: () => void;
-  hasMore: boolean;
-  isLoading: boolean;
-}) => {
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  // Responsive column detection to match the grid used in non-virtualized mode
-  const [columns, setColumns] = useState<number>(1);
-  useEffect(() => {
-    const calcColumns = () => {
-      const w = typeof window !== 'undefined' ? window.innerWidth : 1024;
-      if (w >= 1280) setColumns(4);
-      else if (w >= 1024) setColumns(3);
-      else if (w >= 640) setColumns(2);
-      else setColumns(1);
-    };
-    calcColumns();
-    window.addEventListener('resize', calcColumns);
-    return () => window.removeEventListener('resize', calcColumns);
-  }, []);
-
-  const itemsPerRow = Math.max(1, columns);
-  const rowCount = Math.max(0, Math.ceil(requirements.length / itemsPerRow));
-  const estimatedRowHeight = 560;
-
-  const virtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => estimatedRowHeight,
-    measureElement: (el: Element | null) => {
-      if (!el) return estimatedRowHeight;
-      return (el as HTMLElement).getBoundingClientRect().height || estimatedRowHeight;
-    },
-    overscan: 6,
-  });
-
-  const virtualItems = virtualizer.getVirtualItems();
-
-  // Keep a map of ResizeObservers for each virtual row so we can re-measure when size changes
-  const rowObserversRef = useRef<Map<number, ResizeObserver>>(new Map());
-
-  // Cleanup observers on unmount
-  useEffect(() => {
-    const observers = rowObserversRef.current;
-    return () => {
-      observers.forEach((ro) => ro.disconnect());
-      observers.clear();
-    };
-  }, []);
-
-  // Infinite load: when the last visible row approaches the end, trigger loadMore
-  useEffect(() => {
-    if (!hasMore || isLoading) return;
-    if (!virtualItems.length) return;
-    const lastVisible = virtualItems[virtualItems.length - 1];
-    if (lastVisible && lastVisible.index >= rowCount - 1 - 2) {
-      loadMore();
-    }
-  }, [virtualItems, rowCount, hasMore, isLoading, loadMore]);
-
-  return (
-    <div ref={parentRef} className="w-full max-h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden">
-      <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-        {virtualItems.map((virtualRow) => {
-          const rowIndex = virtualRow.index;
-          const startIdx = rowIndex * itemsPerRow;
-
-          return (
-            <div
-              key={virtualRow.key}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-              className="px-4 py-4"
-              ref={(el) => {
-                // Attach a ResizeObserver to each virtual row so we re-measure when its height changes
-                const existing = rowObserversRef.current.get(rowIndex);
-                if (!el) {
-                  if (existing) {
-                    existing.disconnect();
-                    rowObserversRef.current.delete(rowIndex);
-                  }
-                  return;
-                }
-
-                // Measure immediately
-                virtualizer.measureElement(el as HTMLElement | null);
-
-                // Disconnect previous observer for this row (if any)
-                if (existing) existing.disconnect();
-
-                // Create new ResizeObserver and observe
-                const ro = new ResizeObserver(() => {
-                  virtualizer.measureElement(el as HTMLElement | null);
-                });
-                ro.observe(el);
-                rowObserversRef.current.set(rowIndex, ro);
-              }}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${itemsPerRow}, minmax(0, 1fr))`, gap: '1rem' }}>
-                {Array.from({ length: itemsPerRow }).map((_, colIndex) => {
-                  const idx = startIdx + colIndex;
-                  const req = requirements[idx];
-                  if (!req) {
-                    return <div key={`empty-${rowIndex}-${colIndex}`} />;
-                  }
-
-                  return (
-                    <div key={req.id} className="w-full h-full">
-                      <RequirementCard
-                        req={req}
-                        onViewDetails={onViewDetails}
-                        onCreateInterview={onCreateInterview}
-                        onSetSelectedJD={onSetSelectedJD}
-                        onDelete={onDelete}
-                        debouncedValue={debouncedValue}
-                        statusBgMap={statusBgMap}
-                        statusColors={statusColors}
-                        getStatusIcon={getStatusIcon}
-                        isAdmin={isAdmin}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: RequirementsManagementProps) => {
+export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
+  const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
   const { filters: savedFilters, updateFilters, clearFilters, isLoaded } = useSearchFilters();
-  
-  const [requirements, setRequirements] = useState<RequirementWithLogs[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{ title: string; message: string } | null>(null);
+
   const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm || '');
   const [debouncedValue, setDebouncedValue] = useState('');
   const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'ALL'>((savedFilters?.filterStatus as RequirementStatus | 'ALL') || 'ALL');
   const [sortBy, setSortBy] = useState<'date' | 'company' | 'daysOpen'>((savedFilters?.sortBy as 'date' | 'company' | 'daysOpen') || 'date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((savedFilters?.sortOrder as 'asc' | 'desc') || 'desc');
   const [page, setPage] = useState(0);
-  const [totalResults, setTotalResults] = useState<number | null>(null);
-  const [useSyntheticData, setUseSyntheticData] = useState(false);
-  const [syntheticCount] = useState(10000);
+  const [isErrorDismissed, setIsErrorDismissed] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
   const [selectedJDRequirement, setSelectedJDRequirement] = useState<Requirement | null>(null);
   const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [requirementToDelete, setRequirementToDelete] = useState<Requirement | null>(null);
+  // Sync queue UI state
+  const { pendingItems, updateItemStatus, clearSynced, pendingCount } = useSyncQueue();
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
+
+  useEffect(() => {
+    const openHandler = () => setShowSyncPanel(true);
+    window.addEventListener('open-sync-queue', openHandler);
+    return () => window.removeEventListener('open-sync-queue', openHandler);
+  }, []);
   // Advanced filtering state
   const [minRate, setMinRate] = useState(savedFilters?.minRate || '');
   const [maxRate, setMaxRate] = useState(savedFilters?.maxRate || '');
@@ -443,41 +174,177 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     to: savedFilters?.dateRangeTo || '' 
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const pageSize = 50;
+  const [rowsPerPage, setRowsPerPage] = useState<number>(100);
+  const pageSize = rowsPerPage;
 
-  // Dev helper: generate synthetic requirements for stress testing
-  const generateSyntheticRequirements = useCallback((count: number) => {
-    const statuses: RequirementStatus[] = ['NEW','IN_PROGRESS','SUBMITTED','INTERVIEW','OFFER','REJECTED','CLOSED'];
-    return Array.from({ length: count }).map((_, i) => {
-      const id = `synthetic-${i}`;
-      const status = statuses[i % statuses.length];
-      const title = `Synthetic Requirement ${i + 1}`;
-      const company = `Company ${Math.floor(i % 500) + 1}`;
-      const createdAt = new Date(Date.now() - (i * 1000 * 60)).toISOString();
-      return ({
-        id,
-        user_id: 'synthetic',
-        requirement_number: i + 1,
-        title,
-        company,
-        description: `This is a synthetic description for ${title}`,
-        location: 'Remote',
-        status: status as RequirementStatus,
-        vendor_company: `Vendor ${i % 50}`,
-        vendor_email: `vendor${i}@example.com`,
-        vendor_phone: `+1-555-${String(1000 + (i % 9000)).padStart(4,'0')}`,
-        primary_tech_stack: ['React','TypeScript','Node.js','AWS'][i % 4],
-        duration: '3 months',
-        remote: 'Yes',
-        rate: `$${50 + (i % 150)}`,
-        created_at: createdAt,
-        updated_at: createdAt,
-        created_by: 'synthetic',
-        updated_by: 'synthetic',
-        logs: [],
-      } as unknown) as RequirementWithLogs;
-    });
-  }, []);
+  const dateFromIso = useMemo(() => {
+    return dateRange.from ? new Date(`${dateRange.from}T00:00:00`).toISOString() : undefined;
+  }, [dateRange.from]);
+
+  const dateToIso = useMemo(() => {
+    return dateRange.to ? new Date(`${dateRange.to}T23:59:59.999`).toISOString() : undefined;
+  }, [dateRange.to]);
+
+  const requirementsSWR = useRequirementsPage({
+    userId: user?.id,
+    page,
+    pageSize,
+    search: debouncedValue,
+    status: filterStatus,
+    dateFrom: dateFromIso,
+    dateTo: dateToIso,
+    sortBy,
+    sortOrder,
+    minRate,
+    maxRate,
+    remoteFilter,
+  });
+
+  const mutateRequirements = requirementsSWR.mutate;
+
+  const requirements = useMemo(
+    () => (requirementsSWR.data?.requirements || []) as RequirementWithLogs[],
+    [requirementsSWR.data?.requirements]
+  );
+  const hasNextPage = requirementsSWR.data?.hasNextPage || false;
+  const isFetchingPage = requirementsSWR.isValidating;
+  const loading = requirementsSWR.isLoading;
+  const error = !isErrorDismissed && requirementsSWR.error
+    ? {
+        title: 'Failed to load requirements',
+        message: requirementsSWR.error instanceof Error ? requirementsSWR.error.message : String(requirementsSWR.error),
+      }
+    : null;
+
+  useEffect(() => {
+    if (requirementsSWR.error) {
+      setIsErrorDismissed(false);
+    }
+  }, [requirementsSWR.error]);
+
+  const [toolsAnchorEl, setToolsAnchorEl] = useState<HTMLElement | null>(null);
+  const toolsOpen = Boolean(toolsAnchorEl);
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(() => Boolean(savedFilters?.searchTerm));
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLElement | null>(() => {
+    if (!toolbarPortalTargetId || typeof document === 'undefined') return null;
+    return document.getElementById(toolbarPortalTargetId) as HTMLElement | null;
+  });
+
+  useEffect(() => {
+    if (!toolbarPortalTargetId) {
+      setToolbarTarget(null);
+      return;
+    }
+    setToolbarTarget(document.getElementById(toolbarPortalTargetId) as HTMLElement | null);
+  }, [toolbarPortalTargetId]);
+
+  const isToolbarPortaled = Boolean(toolbarTarget);
+
+  const toolbar = (
+    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ width: { xs: '100%', sm: 'auto' } }}>
+      <Box
+        sx={{
+          flex: { xs: 1, sm: isSearchOpen ? 1 : 'unset' },
+          minWidth: { xs: '100%', sm: isSearchOpen ? 280 : 'unset' },
+        }}
+      >
+        <ClickAwayListener
+          onClickAway={() => {
+            if (!searchTerm) {
+              setIsSearchOpen(false);
+            }
+          }}
+        >
+          <Box>
+            {!isSearchOpen ? (
+              <CollapsedSearchButton
+                onClick={() => setIsSearchOpen(true)}
+                aria-label="Open search"
+                title="Search"
+              >
+                <SearchIcon fontSize="small" />
+              </CollapsedSearchButton>
+            ) : (
+              <Search sx={{ maxWidth: { xs: '100%', sm: 560 } }}>
+                <SearchIconWrapper>
+                  <SearchIcon fontSize="small" />
+                </SearchIconWrapper>
+                <StyledInputBase
+                  inputRef={searchInputRef}
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    handleDebouncedSearch(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }
+                    if (e.key === 'Escape' && !searchTerm) {
+                      setIsSearchOpen(false);
+                    }
+                  }}
+                  placeholder="Search..."
+                  inputProps={{
+                    'aria-label': 'Search requirements',
+                  }}
+                />
+
+                <SearchClearWrapper>
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      if (searchTerm) {
+                        setSearchTerm('');
+                        setDebouncedValue('');
+                      }
+                      setIsSearchOpen(false);
+                    }}
+                    aria-label={searchTerm ? 'Clear search' : 'Close search'}
+                    title={searchTerm ? 'Clear search' : 'Close search'}
+                  >
+                    <X className="w-5 h-5" />
+                  </IconButton>
+                </SearchClearWrapper>
+              </Search>
+            )}
+          </Box>
+        </ClickAwayListener>
+      </Box>
+      <Button
+        variant="outlined"
+        color="inherit"
+        startIcon={<SlidersHorizontal className="w-4 h-4" />}
+        onClick={(e) => setToolsAnchorEl(e.currentTarget)}
+        sx={{ flex: { xs: 1, sm: 'unset' } }}
+      >
+        Tools
+      </Button>
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<Plus className="w-4 h-4" />}
+        onClick={onQuickAdd}
+        sx={{ flex: { xs: 1, sm: 'unset' } }}
+      >
+        Create Requirement
+      </Button>
+    </Stack>
+  );
+
+  useEffect(() => {
+    if (searchTerm || debouncedValue) {
+      setIsSearchOpen(true);
+    }
+  }, [searchTerm, debouncedValue]);
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
 
   // Initialize debounced search with saved value
   useEffect(() => {
@@ -485,13 +352,6 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       setDebouncedValue(savedFilters.searchTerm);
     }
   }, [isLoaded, savedFilters]);
-
-  // If synthetic mode is enabled, ensure loadRequirements doesn't overwrite synthetic data
-  useEffect(() => {
-    if (!useSyntheticData) return;
-    // keep totalResults in sync if requirements length changes
-    setTotalResults(requirements.length);
-  }, [useSyntheticData, requirements.length]);
 
   // Save filters only on debounced search changes - cleanup timeout properly
   useEffect(() => {
@@ -566,95 +426,55 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     return remoteFilter === 'REMOTE' ? isRemote : !isRemote;
   }, [remoteFilter]);
 
-  const lastQueryKeyRef = useRef<string>('');
-
-  const loadRequirements = useCallback(async (opts?: { newPage?: number; force?: boolean; isLoadMore?: boolean }) => {
-    if (!user) return;
-    const requestedPage = opts?.newPage ?? page;
-    const isLoadMore = opts?.isLoadMore ?? false;
-    const queryKey = JSON.stringify({
-      page: requestedPage,
-      search: debouncedValue,
-      status: filterStatus,
-      dateFrom: dateRange.from,
-      dateTo: dateRange.to,
-      sortBy,
-      sortOrder,
-      userId: user.id,
-      // include client-side advanced filters in the query key so changes force a reload
-      minRate,
-      maxRate,
-      remoteFilter,
-    });
-
-    if (!opts?.force && lastQueryKeyRef.current === queryKey) {
-      return; // Skip duplicate fetch when nothing changed
-    }
-
-    try {
-      if (requestedPage === 0) {
-        setLoading(true);
-      }
-
-      setError(null);
-      lastQueryKeyRef.current = queryKey;
-
-      const orderByColumn = sortBy === 'date' ? 'created_at' : sortBy === 'company' ? 'company' : 'created_at';
-
-      const result = await getRequirementsPage({
-        userId: user.id,
-        limit: pageSize,
-        offset: requestedPage * pageSize,
-        search: debouncedValue,
-        status: filterStatus,
-        dateFrom: dateRange.from || undefined,
-        dateTo: dateRange.to || undefined,
-        orderBy: orderByColumn,
-        orderDir: sortOrder,
-      });
-
-      if (result.success && result.requirements) {
-        // If this is a "Load More" action, append results; otherwise replace
-        if (isLoadMore) {
-          setRequirements(prev => [...prev, ...(result.requirements || [])]);
-        } else {
-          setRequirements(result.requirements || []);
-        }
-        setTotalResults(result.total ?? null);
-      } else {
-        setError({ title: 'Failed to load requirements', message: result.error || 'An unexpected error occurred' });
-      }
-    } catch (err) {
-      setError({ title: 'Error', message: err instanceof Error ? err.message : 'Failed to load requirements' });
-    } finally {
-      setLoading(false);
-    }
-  }, [user, pageSize, debouncedValue, filterStatus, dateRange.from, dateRange.to, sortBy, sortOrder, page, minRate, maxRate, remoteFilter]);
-
   // Effect to handle filter changes - resets to page 0
   useEffect(() => {
     setPage(0);
-  }, [debouncedValue, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to]);
-
-  // Effect to handle page changes (for Load More functionality)
-  useEffect(() => {
-    if (useSyntheticData) return; // skip server loads when using synthetic data
-    loadRequirements({ newPage: page, isLoadMore: page > 0 });
-  }, [page, loadRequirements, useSyntheticData]);
+  }, [debouncedValue, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to, rowsPerPage]);
 
   useEffect(() => {
     // Subscribe to real-time changes
     let unsubscribe: (() => void) | undefined;
     if (user) {
+      const dateFrom = dateRange.from ? new Date(`${dateRange.from}T00:00:00`).getTime() : null;
+      const dateTo = dateRange.to ? new Date(`${dateRange.to}T23:59:59.999`).getTime() : null;
+      const searchLower = debouncedValue.trim().toLowerCase();
+      const matchesServerSideFilters = (record: Requirement) => {
+        const matchesStatus = filterStatus === 'ALL' || record.status === filterStatus;
+
+        const matchesSearch =
+          !searchLower ||
+          (record.title || '').toLowerCase().includes(searchLower) ||
+          (record.company || '').toLowerCase().includes(searchLower) ||
+          (record.primary_tech_stack || '').toLowerCase().includes(searchLower) ||
+          (record.vendor_company || '').toLowerCase().includes(searchLower);
+
+        let matchesDate = true;
+        if (dateFrom || dateTo) {
+          const createdMs = new Date(record.created_at).getTime();
+          if (!Number.isNaN(createdMs)) {
+            if (dateFrom && createdMs < dateFrom) matchesDate = false;
+            if (dateTo && createdMs > dateTo) matchesDate = false;
+          }
+        }
+
+        return matchesStatus && matchesSearch && matchesDate;
+      };
+
       unsubscribe = subscribeToRequirements(user.id, (update: RealtimeUpdate<Requirement>) => {
         if (update.type === 'INSERT') {
+          if (page !== 0) {
+            return;
+          }
           // insert at front if it matches current search/status filters roughly
           // Server-side filtering is authoritative; here we add to current page if it appears relevant
-          const matchesSearch = !debouncedValue || (update.record.title || '').toLowerCase().includes(debouncedValue.toLowerCase());
-          const matchesStatus = filterStatus === 'ALL' || update.record.status === filterStatus;
-          if (matchesSearch && matchesStatus) {
-            setRequirements(prev => [update.record, ...prev]);
-            setTotalResults(prev => (prev !== null ? prev + 1 : null));
+          if (matchesServerSideFilters(update.record)) {
+            void mutateRequirements((curr) => {
+              if (!curr) return curr;
+              return {
+                ...curr,
+                requirements: [update.record as unknown as RequirementWithLogs, ...curr.requirements].slice(0, pageSize),
+              };
+            }, { revalidate: false });
           }
           showToast({
             type: 'info',
@@ -662,7 +482,30 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
             message: `"${update.record.title}" has been added`,
           });
         } else if (update.type === 'UPDATE') {
-          setRequirements(prev => prev.map(r => (r.id === update.record.id ? update.record : r)));
+          void mutateRequirements((curr) => {
+            if (!curr) return curr;
+            const exists = curr.requirements.some(r => r.id === update.record.id);
+            const shouldInclude = matchesServerSideFilters(update.record);
+
+            if (exists) {
+              if (!shouldInclude) {
+                return { ...curr, requirements: curr.requirements.filter(r => r.id !== update.record.id) };
+              }
+              return {
+                ...curr,
+                requirements: curr.requirements.map(r => (r.id === update.record.id ? (update.record as unknown as RequirementWithLogs) : r)),
+              };
+            }
+
+            if (page === 0 && shouldInclude) {
+              return {
+                ...curr,
+                requirements: [update.record as unknown as RequirementWithLogs, ...curr.requirements].slice(0, pageSize),
+              };
+            }
+
+            return curr;
+          }, { revalidate: false });
           // Show notification if not the current user editing
           if (selectedRequirement?.id !== update.record.id) {
             showToast({
@@ -672,8 +515,10 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
             });
           }
         } else if (update.type === 'DELETE') {
-          setRequirements(prev => prev.filter(r => r.id !== update.record.id));
-          setTotalResults(prev => (prev !== null ? Math.max(0, prev - 1) : null));
+          void mutateRequirements((curr) => {
+            if (!curr) return curr;
+            return { ...curr, requirements: curr.requirements.filter(r => r.id !== update.record.id) };
+          }, { revalidate: false });
           if (selectedRequirement?.id === update.record.id) {
             setSelectedRequirement(null);
           }
@@ -689,12 +534,22 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     return () => {
       unsubscribe?.();
     };
-  }, [user, selectedRequirement?.id, showToast, debouncedValue, filterStatus]);
+  }, [user, selectedRequirement?.id, showToast, debouncedValue, filterStatus, dateRange.from, dateRange.to, page, pageSize, mutateRequirements]);
 
-  const handleDelete = useCallback(async () => {
-    const requirement = selectedRequirement;
-    if (!requirement) return;
+  // Listen for requirement creation event to immediately reload
+  useEffect(() => {
+    const handleRequirementCreated = () => {
+      // Reload requirements from current page to show the newly created one
+      void mutateRequirements();
+    };
 
+    window.addEventListener('requirement-created', handleRequirementCreated as EventListener);
+    return () => {
+      window.removeEventListener('requirement-created', handleRequirementCreated as EventListener);
+    };
+  }, [mutateRequirements]);
+
+  const handleDeleteClick = useCallback((requirementOrId: Requirement | string) => {
     if (!isAdmin) {
       showToast({
         type: 'error',
@@ -703,24 +558,63 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
       });
       return;
     }
-
-    if (confirm('Are you sure you want to delete this requirement? This action cannot be undone.')) {
-      try {
-        const result = await deleteRequirement(requirement.id, user?.id);
-        if (result.success) {
-            setSelectedRequirement(null);
-            showToast({ type: 'success', title: 'Requirement deleted', message: 'The requirement has been removed.' });
-            // reload first page
-            setPage(0);
-            await loadRequirements({ newPage: 0 });
-        } else {
-          showToast({ type: 'error', title: 'Failed to delete', message: result.error || 'Unknown error' });
-        }
-      } catch {
-        showToast({ type: 'error', title: 'Error', message: 'Failed to delete requirement' });
-      }
+    // Handle both Requirement object and string ID
+    const requirement = typeof requirementOrId === 'string' 
+      ? requirements.find(r => r.id === requirementOrId)
+      : requirementOrId;
+    if (requirement) {
+      setRequirementToDelete(requirement);
+      setShowDeleteConfirm(true);
     }
-  }, [selectedRequirement, isAdmin, showToast, loadRequirements, user?.id]);
+  }, [isAdmin, showToast, requirements]);
+
+  const handleDelete = useCallback(async () => {
+    const requirement = requirementToDelete;
+    if (!requirement || !user) return;
+
+    try {
+      // Check if offline - queue operation
+      if (!isOnline) {
+        await queueOfflineOperation('DELETE', 'requirement', requirement.id, {});
+        await mutateRequirements((curr) => {
+          if (!curr) return curr;
+          return { ...curr, requirements: curr.requirements.filter(r => r.id !== requirement.id) };
+        }, { revalidate: false });
+        setSelectedRequirement(null);
+        setShowDeleteConfirm(false);
+        setRequirementToDelete(null);
+        showToast({ 
+          type: 'info', 
+          title: 'Queued for Sync', 
+          message: 'Requirement will be deleted when you come back online' 
+        });
+        // Reload to show updated list
+        setPage(0);
+        await mutateRequirements();
+        return;
+      }
+
+      // Online - delete normally
+      const result = await deleteRequirement(requirement.id, user.id);
+      if (result.success) {
+        await mutateRequirements((curr) => {
+          if (!curr) return curr;
+          return { ...curr, requirements: curr.requirements.filter(r => r.id !== requirement.id) };
+        }, { revalidate: false });
+        setSelectedRequirement(null);
+        setShowDeleteConfirm(false);
+        setRequirementToDelete(null);
+        showToast({ type: 'success', title: 'Requirement deleted', message: 'The requirement has been removed.' });
+        // reload first page
+        setPage(0);
+        await mutateRequirements();
+      } else {
+        showToast({ type: 'error', title: 'Failed to delete', message: result.error || 'Unknown error' });
+      }
+    } catch {
+      showToast({ type: 'error', title: 'Error', message: 'Failed to delete requirement' });
+    }
+  }, [requirementToDelete, showToast, user, isOnline, queueOfflineOperation, mutateRequirements]);
 
   const handleViewDetails = (req: Requirement) => {
     setSelectedRequirement(req);
@@ -743,20 +637,35 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
     return filtered;
   }, [requirements, isRateInRange, isDateInRange, matchesRemoteFilter]);
 
-  const hasMoreRequirements = totalResults !== null ? requirements.length < totalResults : false;
 
-  const handleLoadMore = () => {
-    // Load next page using server-side pagination
-    // The effect above will listen to page changes and call loadRequirements
-    setPage(prevPage => prevPage + 1);
-  };
+  // Handle sort changes for server-side sorting
+  const handleSortChange = useCallback((field: 'title' | 'company' | 'status' | 'created_at' | 'rate', order: 'asc' | 'desc') => {
+    // Map client sort fields to server sort fields
+    const serverField = field === 'created_at' ? 'created_at' : field === 'company' ? 'company' : 'created_at';
+    setSortBy(serverField === 'created_at' ? 'date' : serverField === 'company' ? 'company' : 'date');
+    setSortOrder(order);
+    // Reset to first page when sorting changes
+    setPage(0);
+  }, []);
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Requirements Management</h2>
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-500">Loading requirements...</p>
+        <div className="sticky top-0 z-40 bg-white pb-6 -mx-6 px-6 pt-6 border-b border-gray-200 shadow-sm">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-6 animate-pulse" />
+          <div className="h-10 bg-gray-200 rounded w-full max-w-md animate-pulse" />
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+          <div className="px-4 py-3 bg-gradient-to-r from-white to-primary-50 border-b border-gray-100">
+            <div className="h-6 bg-gray-200 rounded w-32 mb-2 animate-pulse" />
+          </div>
+          <div className="p-4">
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -765,217 +674,209 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
   if (error) {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Requirements Management</h2>
         <ErrorAlert
           title={error.title}
           message={error.message}
-          onRetry={() => loadRequirements()}
-          onDismiss={() => setError(null)}
+          onRetry={() => void mutateRequirements()}
+          onDismiss={() => setIsErrorDismissed(true)}
           retryLabel="Try Again"
+          technical={error.message}
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Sticky Header Section */}
-      <div className="sticky top-0 z-40 bg-white pb-6 -mx-6 px-6 pt-6 border-b border-gray-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Requirements Management</h2>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={() => setShowReport(true)}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm"
-            >
-              <Download className="w-4 h-4" />
-              Report
-            </button>
-            <button
-              onClick={onQuickAdd}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2 text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Create Requirement
-            </button>
-            {/* Dev-only synthetic data toggle */}
-            <button
-              onClick={() => {
-                if (!useSyntheticData) {
-                  const items = generateSyntheticRequirements(syntheticCount);
-                  setRequirements(items);
-                  setTotalResults(items.length);
-                  setUseSyntheticData(true);
-                  setPage(0);
-                } else {
-                  setUseSyntheticData(false);
-                  setPage(0);
-                  // reload from server
-                  loadRequirements({ newPage: 0, force: true });
-                }
-              }}
-              title="Toggle synthetic 10K test data"
-              className={`px-3 py-2 sm:py-2.5 border rounded-lg text-sm font-medium ${useSyntheticData ? 'bg-yellow-100 border-yellow-300 text-yellow-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
-            >
-              Dev: Synthetic
-            </button>
-          </div>
-        </div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {isToolbarPortaled ? <Portal container={toolbarTarget}>{toolbar}</Portal> : null}
 
-        {/* Search and Filter */}
-        <div className="flex flex-col gap-4">
-          {/* Main Search Bar with Status Indicator */}
-          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
-            <div className="flex-1 min-w-[250px] relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by title, company, tech stack, vendor, phone..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  handleDebouncedSearch(e.target.value);
-                }}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm"
-                title="Search across title, company, tech stack, vendor name, phone number, email, and job description"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setDebouncedValue('');
-                  }}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                  title="Clear search"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-              {debouncedValue && (
-                <div className="absolute -bottom-7 left-0 text-xs text-gray-500">
-                  Searching for: <span className="font-semibold text-gray-700">"{debouncedValue}"</span>
-                </div>
-              )}
-            </div>
-            <select
+      <Popover
+        open={toolsOpen}
+        anchorEl={toolsAnchorEl}
+        onClose={() => setToolsAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: {
+              p: 2,
+              width: { xs: 'calc(100vw - 32px)', sm: 460 },
+              maxWidth: 'calc(100vw - 32px)',
+            },
+          },
+        }}
+      >
+        <Stack spacing={2}>
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+            <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
+              Tools
+            </Typography>
+            <IconButton size="small" onClick={() => setToolsAnchorEl(null)} aria-label="Close tools">
+              <X className="w-4 h-4" />
+            </IconButton>
+          </Stack>
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<Download className="w-4 h-4" />}
+            onClick={() => {
+              setShowReport(true);
+              setToolsAnchorEl(null);
+            }}
+          >
+            Report
+          </Button>
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="req-status-label">Status</InputLabel>
+            <Select
+              labelId="req-status-label"
               value={filterStatus}
+              label="Status"
               onChange={(e) => {
                 setFilterStatus(e.target.value as RequirementStatus | 'ALL');
               }}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
               title="Filter requirements by status"
             >
-              <option value="ALL">All Statuses</option>
-              <option value="NEW">New</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="INTERVIEW">Interview</option>
-              <option value="OFFER">Offer</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CLOSED">Closed</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-              title="Sort requirements by selected criteria"
+              <MenuItem value="ALL">All Statuses</MenuItem>
+              <MenuItem value="NEW">New</MenuItem>
+              <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+              <MenuItem value="SUBMITTED">Submitted</MenuItem>
+              <MenuItem value="INTERVIEW">Interview</MenuItem>
+              <MenuItem value="OFFER">Offer</MenuItem>
+              <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="CLOSED">Closed</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" fullWidth>
+            <InputLabel id="req-rowsperpage-label">Rows</InputLabel>
+            <Select
+              labelId="req-rowsperpage-label"
+              value={String(rowsPerPage)}
+              label="Rows"
+              onChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
+              title="Rows per page"
             >
-              <option value="date">Sort by Date</option>
-              <option value="company">Sort by Company</option>
-              <option value="daysOpen">Sort by Days Open</option>
-            </select>
-            <button
+              <MenuItem value="100">100</MenuItem>
+              <MenuItem value="200">200</MenuItem>
+              <MenuItem value="500">500</MenuItem>
+              <MenuItem value="1000">1000</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            <FormControl size="small" sx={{ flex: 1, minWidth: 200 }}>
+              <InputLabel id="req-sortby-label">Sort By</InputLabel>
+              <Select
+                labelId="req-sortby-label"
+                value={sortBy}
+                label="Sort By"
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                title="Sort requirements by selected criteria"
+              >
+                <MenuItem value="date">Sort by Date</MenuItem>
+                <MenuItem value="company">Sort by Company</MenuItem>
+                <MenuItem value="daysOpen">Sort by Days Open</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Button
+              variant="outlined"
+              color="inherit"
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-1"
+              startIcon={<ArrowUpDown className="w-4 h-4" />}
               title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+              sx={{ whiteSpace: 'nowrap' }}
             >
-              <ArrowUpDown className="w-4 h-4" />
               {sortOrder === 'asc' ? 'Asc' : 'Desc'}
-            </button>
-            <button
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all ${
-                showAdvancedFilters
-                  ? 'bg-blue-50 border-blue-300 text-blue-700'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-              title="Toggle advanced filters"
+            </Button>
+          </Stack>
+
+          <Button
+            variant={showAdvancedFilters ? 'contained' : 'outlined'}
+            color={showAdvancedFilters ? 'primary' : 'inherit'}
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            title="Toggle advanced filters"
+          >
+            Advanced Filters {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to) ? '✓' : ''}
+          </Button>
+
+          {showAdvancedFilters ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                bgcolor: 'rgba(212,175,55,0.10)',
+                borderColor: 'rgba(212,175,55,0.35)',
+              }}
             >
-              ⚙️ Filters {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to) && '✓'}
-            </button>
-          </div>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                  gap: 2,
+                }}
+              >
+                <TextField
+                  size="small"
+                  label="Min Rate"
+                  placeholder="e.g., 50"
+                  value={minRate}
+                  onChange={(e) => setMinRate(e.target.value)}
+                  title="Minimum hourly/daily rate"
+                />
+                <TextField
+                  size="small"
+                  label="Max Rate"
+                  placeholder="e.g., 150"
+                  value={maxRate}
+                  onChange={(e) => setMaxRate(e.target.value)}
+                  title="Maximum hourly/daily rate"
+                />
 
-          {/* Advanced Filters Panel */}
-          {showAdvancedFilters && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Rate Range */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">Min Rate</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., 50"
-                    value={minRate}
-                    onChange={(e) => setMinRate(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    title="Minimum hourly/daily rate"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">Max Rate</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., 150"
-                    value={maxRate}
-                    onChange={(e) => setMaxRate(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    title="Maximum hourly/daily rate"
-                  />
-                </div>
-
-                {/* Remote Filter */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">Work Type</label>
-                  <select
+                <FormControl size="small">
+                  <InputLabel id="req-worktype-label">Work Type</InputLabel>
+                  <Select
+                    labelId="req-worktype-label"
                     value={remoteFilter}
+                    label="Work Type"
                     onChange={(e) => setRemoteFilter(e.target.value as typeof remoteFilter)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     title="Filter by remote/onsite preference"
                   >
-                    <option value="ALL">All Types</option>
-                    <option value="REMOTE">Remote</option>
-                    <option value="ONSITE">On-site</option>
-                  </select>
-                </div>
+                    <MenuItem value="ALL">All Types</MenuItem>
+                    <MenuItem value="REMOTE">Remote</MenuItem>
+                    <MenuItem value="ONSITE">On-site</MenuItem>
+                  </Select>
+                </FormControl>
 
-                {/* Date Range - From */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">From Date</label>
-                  <input
-                    type="date"
-                    value={dateRange.from}
-                    onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    title="Filter requirements created from this date"
-                  />
-                </div>
+                <TextField
+                  size="small"
+                  label="From Date"
+                  type="date"
+                  value={dateRange.from}
+                  onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+                  title="Filter requirements created from this date"
+                  InputLabelProps={{ shrink: true }}
+                />
 
-                {/* Date Range - To */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-tight">To Date</label>
-                  <input
-                    type="date"
-                    value={dateRange.to}
-                    onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    title="Filter requirements created until this date"
-                  />
-                </div>
-              </div>
+                <TextField
+                  size="small"
+                  label="To Date"
+                  type="date"
+                  value={dateRange.to}
+                  onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+                  title="Filter requirements created until this date"
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Box>
 
-              {/* Clear Filters Button */}
-              {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || debouncedValue || filterStatus !== 'ALL') && (
-                <button
+              {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || debouncedValue || filterStatus !== 'ALL') ? (
+                <Button
+                  variant="text"
+                  color="primary"
+                  size="small"
                   onClick={() => {
                     setSearchTerm('');
                     setDebouncedValue('');
@@ -986,223 +887,261 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
                     setDateRange({ from: '', to: '' });
                     clearFilters();
                   }}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline"
+                  sx={{ mt: 1, px: 0 }}
                   title="Reset all advanced filters"
                 >
                   Clear all filters
-                </button>
-              )}
-            </div>
-          )}
+                </Button>
+              ) : null}
+            </Paper>
+          ) : null}
+        </Stack>
+      </Popover>
 
+      {!isToolbarPortaled ? (
+        <Paper
+          elevation={0}
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 40,
+            p: { xs: 2, sm: 3 },
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        >
+          {toolbar}
+        </Paper>
+      ) : null}
+
+        {/* Search and Filter */}
+        <Stack spacing={2}>
           {/* Active Filters Summary */}
-          {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) && (
-            <div className="text-xs text-gray-600 bg-gray-50 p-3 rounded flex items-center gap-2 flex-wrap">
-              <span className="text-gray-500 font-medium">Active filters:</span>
-              {debouncedValue && (
-                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded font-medium">
-                  Search: "{debouncedValue}"
-                </span>
-              )}
-              {filterStatus !== 'ALL' && (
-                <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded font-medium">
-                  Status: {filterStatus}
-                </span>
-              )}
-              {minRate && (
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
-                  Min: ${minRate}
-                </span>
-              )}
-              {maxRate && (
-                <span className="bg-green-100 text-green-800 px-2 py-1 rounded font-medium">
-                  Max: ${maxRate}
-                </span>
-              )}
-              {remoteFilter !== 'ALL' && (
-                <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded font-medium">
-                  {remoteFilter}
-                </span>
-              )}
-              {dateRange.from && (
-                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
-                  From: {dateRange.from}
-                </span>
-              )}
-              {dateRange.to && (
-                <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded font-medium">
-                  To: {dateRange.to}
-                </span>
-              )}
-              {filteredRequirements.length > 0 && (
-                <span className="ml-auto font-semibold text-gray-700">
-                  {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
-                </span>
-              )}
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setDebouncedValue('');
-                  setFilterStatus('ALL');
-                  setMinRate('');
-                  setMaxRate('');
-                  setRemoteFilter('ALL');
-                  setDateRange({ from: '', to: '' });
-                  clearFilters();
-                  setShowAdvancedFilters(false);
+          {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
+            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                  Active filters:
+                </Typography>
+                {debouncedValue ? <Chip size="small" label={`Search: "${debouncedValue}"`} /> : null}
+                {filterStatus !== 'ALL' ? <Chip size="small" label={`Status: ${filterStatus}`} /> : null}
+                {minRate ? <Chip size="small" label={`Min: $${minRate}`} /> : null}
+                {maxRate ? <Chip size="small" label={`Max: $${maxRate}`} /> : null}
+                {remoteFilter !== 'ALL' ? <Chip size="small" label={remoteFilter} /> : null}
+                {dateRange.from ? <Chip size="small" label={`From: ${dateRange.from}`} /> : null}
+                {dateRange.to ? <Chip size="small" label={`To: ${dateRange.to}`} /> : null}
+                <Box sx={{ flexGrow: 1 }} />
+                {filteredRequirements.length > 0 ? (
+                  <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                    {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
+                  </Typography>
+                ) : null}
+                <Button
+                  variant="text"
+                  color="error"
+                  size="small"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setDebouncedValue('');
+                    setFilterStatus('ALL');
+                    setMinRate('');
+                    setMaxRate('');
+                    setRemoteFilter('ALL');
+                    setDateRange({ from: '', to: '' });
+                    clearFilters();
+                    setShowAdvancedFilters(false);
+                  }}
+                  title="Clear all filters and reset search"
+                >
+                  ✕ Clear All
+                </Button>
+              </Stack>
+            </Paper>
+          ) : null}
+        </Stack>
+
+      {/* Sync Queue Panel (collapsible) */}
+      {showSyncPanel ? (
+        <Paper variant="outlined" sx={{ p: 1.5 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={1.5}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              Offline Sync Queue
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+              <Chip size="small" label={`Pending: ${pendingCount}`} />
+              <Button
+                variant="contained"
+                color="primary"
+                size="small"
+                onClick={async () => {
+                  setIsProcessingQueue(true);
+                  try {
+                    await processSyncQueue(20);
+                    window.dispatchEvent(new CustomEvent('sync-complete'));
+                  } finally {
+                    setIsProcessingQueue(false);
+                  }
                 }}
-                className="ml-auto text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition"
-                title="Clear all filters and reset search"
+                disabled={isProcessingQueue || pendingItems.length === 0}
+                startIcon={isProcessingQueue ? <CircularProgress size={16} color="inherit" /> : undefined}
               >
-                ✕ Clear All
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Requirements Grid - Virtualized when there are many items */}
-      <div className="w-full">
-        {filteredRequirements.length === 0 ? (
-          <div className="text-center py-16 bg-gradient-to-b from-gray-50 to-white rounded-lg border border-gray-100 shadow-card">
-            <Sparkles className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-700 font-semibold mb-2 text-lg">No requirements found</p>
-            <p className="text-sm text-gray-500 mb-6">Create your first requirement to get started tracking job opportunities.</p>
-            <button
-              onClick={onQuickAdd}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Create First Requirement
-            </button>
-          </div>
-        ) : requirements.length > 100 ? (
-          // Use virtualized list for large datasets
-          <VirtualizedRequirementsList
-            requirements={requirements}
-            onViewDetails={handleViewDetails}
-            onCreateInterview={onCreateInterview}
-            onSetSelectedJD={setSelectedJDRequirement}
-            onDelete={handleDelete}
-            debouncedValue={debouncedValue}
-            statusBgMap={{
-              'NEW': 'status-new',
-              'IN_PROGRESS': 'status-in-progress',
-              'SUBMITTED': 'status-submitted',
-              'INTERVIEW': 'status-interview',
-              'OFFER': 'status-offer',
-              'REJECTED': 'status-rejected',
-              'CLOSED': 'status-closed',
-            }}
-            statusColors={statusColors}
-            getStatusIcon={getStatusIcon}
-            isAdmin={isAdmin}
-            loadMore={handleLoadMore}
-            hasMore={hasMoreRequirements}
-            isLoading={loading}
-          />
-        ) : (
-          // Standard grid for smaller datasets
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-responsive">
-            {requirements.map((req: RequirementWithLogs) => (
-              <RequirementCard
-                key={req.id}
-                req={req}
-                onViewDetails={handleViewDetails}
-                onCreateInterview={onCreateInterview}
-                onSetSelectedJD={setSelectedJDRequirement}
-                onDelete={handleDelete}
-                debouncedValue={debouncedValue}
-                statusBgMap={{
-                  'NEW': 'status-new',
-                  'IN_PROGRESS': 'status-in-progress',
-                  'SUBMITTED': 'status-submitted',
-                  'INTERVIEW': 'status-interview',
-                  'OFFER': 'status-offer',
-                  'REJECTED': 'status-rejected',
-                  'CLOSED': 'status-closed',
+                {isProcessingQueue ? 'Processing...' : 'Process Queue'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                size="small"
+                onClick={async () => {
+                  await clearSynced();
+                  window.dispatchEvent(new CustomEvent('sync-complete'));
                 }}
-                statusColors={statusColors}
-                getStatusIcon={getStatusIcon}
-                isAdmin={isAdmin}
-              />
-            ))}
-          </div>
-        )}
+              >
+                Clear Synced
+              </Button>
+              <Button
+                variant="text"
+                color="inherit"
+                size="small"
+                onClick={() => setShowSyncPanel(false)}
+              >
+                Close
+              </Button>
+            </Stack>
+          </Stack>
+
+          {pendingItems.length === 0 ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              No items in queue
+            </Typography>
+          ) : (
+            <Box sx={{ mt: 1 }}>
+              <List dense disablePadding>
+                {pendingItems.slice(0, 10).map((item, idx) => (
+                  <Box key={item.id}>
+                    <ListItem
+                      disableGutters
+                      secondaryAction={
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                            onClick={async () => {
+                              setIsProcessingQueue(true);
+                              try {
+                                await processSyncQueue(1);
+                                window.dispatchEvent(new CustomEvent('sync-complete'));
+                              } finally {
+                                setIsProcessingQueue(false);
+                              }
+                            }}
+                          >
+                            Retry
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            onClick={async () => {
+                              await updateItemStatus(item.id, 'failed', 'Marked failed via UI');
+                              window.dispatchEvent(new CustomEvent('sync-complete'));
+                            }}
+                          >
+                            Mark Failed
+                          </Button>
+                        </Stack>
+                      }
+                    >
+                      <ListItemText
+                        primary={`${item.entityType} · ${item.operation}`}
+                        secondary={`Entity ID: ${item.entityId} • Retries: ${item.retries}${item.lastError ? ` • Error: ${item.lastError}` : ''}`}
+                        primaryTypographyProps={{ variant: 'body2', sx: { fontWeight: 700 } }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                    {idx < Math.min(10, pendingItems.length) - 1 ? <Divider /> : null}
+                  </Box>
+                ))}
+              </List>
+              {pendingItems.length > 10 ? (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Showing 10 of {pendingItems.length} pending items
+                </Typography>
+              ) : null}
+            </Box>
+          )}
+        </Paper>
+      ) : null}
+
+      {/* Requirements Display - Table View Only */}
+      <div className="w-full">
+        <RequirementsTable
+          requirements={filteredRequirements}
+          onViewDetails={handleViewDetails}
+          onCreateInterview={onCreateInterview}
+          onDelete={handleDeleteClick}
+          statusColors={statusColors}
+          isAdmin={isAdmin}
+          serverSortField={sortBy === 'date' ? 'created_at' : sortBy}
+          serverSortOrder={sortOrder}
+          onSortChange={handleSortChange}
+          page={page}
+          hasNextPage={hasNextPage}
+          isFetchingPage={isFetchingPage}
+          onPageChange={setPage} badge={''} label={''}        />
       </div>
 
 
-      {/* Load More Section */}
-      {hasMoreRequirements && (
-        <div className="flex flex-col items-center gap-4 py-8">
-          <p className="text-sm text-gray-600">
-            Showing <span className="font-semibold">{requirements.length}</span> of <span className="font-semibold">{totalResults ?? 0}</span> requirements
-          </p>
-          <button
-            onClick={handleLoadMore}
-            disabled={loading}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Loading...
-              </>
-            ) : (
-              <>
-                Load More
-              </>
-            )}
-          </button>
-        </div>
-      )}
 
       {/* JD Modal */}
       {selectedJDRequirement && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4 lg:p-6">
-          <div className="bg-white rounded-lg sm:rounded-2xl shadow-2xl max-w-2xl sm:max-w-3xl lg:max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 sm:p-6 lg:p-8 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <div className="flex-1 pr-3 sm:pr-4 min-w-0">
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-1 truncate">{selectedJDRequirement.title}</h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold ${statusColors[selectedJDRequirement.status].badge}`}>
-                    {statusColors[selectedJDRequirement.status].label}
-                  </span>
-                  {selectedJDRequirement.company && (
-                    <span className="text-xs sm:text-sm text-gray-600 truncate">{selectedJDRequirement.company}</span>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedJDRequirement(null)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition flex-shrink-0 ml-2"
-                title="Close modal"
-              >
-                <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
-            </div>
+        <Dialog
+          open={Boolean(selectedJDRequirement)}
+          onClose={() => setSelectedJDRequirement(null)}
+          fullWidth
+          maxWidth="lg"
+          scroll="paper"
+        >
+          <DialogTitle sx={{ pr: 7 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800 }} noWrap>
+              {selectedJDRequirement.title}
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+              <Chip
+                size="small"
+                label={statusColors[selectedJDRequirement.status].label}
+                variant="outlined"
+              />
+              {selectedJDRequirement.company ? (
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {selectedJDRequirement.company}
+                </Typography>
+              ) : null}
+            </Stack>
+            <IconButton
+              onClick={() => setSelectedJDRequirement(null)}
+              title="Close modal"
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+            >
+              <XCircle className="w-5 h-5" />
+            </IconButton>
+          </DialogTitle>
 
-            {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-              <div className="prose prose-sm max-w-none">
-                <div className="text-gray-700 whitespace-pre-wrap leading-relaxed text-xs sm:text-sm lg:text-base">
-                  {selectedJDRequirement.description}
-                </div>
-              </div>
-            </div>
+          <DialogContent dividers>
+            <Typography
+              variant="body2"
+              sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: 'text.primary' }}
+            >
+              {selectedJDRequirement.description}
+            </Typography>
+          </DialogContent>
 
-            {/* Modal Footer */}
-            <div className="p-3 sm:p-4 lg:p-6 border-t border-gray-200 bg-gray-50 flex justify-end">
-              <button
-                onClick={() => setSelectedJDRequirement(null)}
-                className="px-4 sm:px-6 py-2 sm:py-2.5 bg-gray-300 text-gray-800 rounded-lg font-medium hover:bg-gray-400 transition text-xs sm:text-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+          <DialogActions>
+            <Button variant="outlined" color="inherit" onClick={() => setSelectedJDRequirement(null)}>
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
 
       {/* Detail Modal */}
@@ -1210,13 +1149,28 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview }: Requir
         isOpen={selectedRequirement !== null}
         requirement={selectedRequirement}
         onClose={() => setSelectedRequirement(null)}
-        onUpdate={loadRequirements}
+        onUpdate={() => void mutateRequirements()}
         createdBy={selectedCreatedBy}
         updatedBy={selectedUpdatedBy}
       />
 
       {/* Report Modal */}
       {showReport && <RequirementsReport onClose={() => setShowReport(false)} />}
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setRequirementToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        title="Delete Requirement"
+        message={`Are you sure you want to delete "${requirementToDelete?.title || 'this requirement'}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
+    </Box>
   );
 };

@@ -4,8 +4,20 @@ import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant } from '../../lib/api/consultants';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import { subscribeToConsultantById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
@@ -31,13 +43,26 @@ export const ConsultantDetailModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Consultant> | null>(null);
   const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    if (consultant) {
+    if (!consultant) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
       setFormData(consultant);
       setIsEditing(false);
       setRemoteUpdateNotified(false);
-    }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [consultant, isOpen]);
 
   // Subscribe to real-time updates for this specific consultant
@@ -106,7 +131,7 @@ export const ConsultantDetailModal = ({
     setIsLoading(false);
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!isAdmin) {
       showToast({
         type: 'error',
@@ -115,11 +140,11 @@ export const ConsultantDetailModal = ({
       });
       return;
     }
+    setShowDeleteConfirm(true);
+  };
 
-    if (!confirm('Are you sure you want to delete this consultant? This action cannot be undone.')) {
-      return;
-    }
-
+  const handleDelete = async () => {
+    if (!consultant) return;
     setIsDeleting(true);
     const result = await deleteConsultant(consultant.id, user?.id);
 
@@ -139,196 +164,257 @@ export const ConsultantDetailModal = ({
       });
     }
     setIsDeleting(false);
+    setShowDeleteConfirm(false);
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
-            {isEditing ? 'Edit Consultant' : 'Consultant Details'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+    <Dialog
+      open={isOpen}
+      onClose={() => {
+        setIsEditing(false);
+        onClose();
+      }}
+      fullWidth
+      maxWidth="md"
+      scroll="paper"
+    >
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          {isEditing ? 'Edit Consultant' : 'Consultant Details'}
+        </Typography>
+        <IconButton
+          onClick={() => {
+            setIsEditing(false);
+            onClose();
+          }}
+          aria-label="Close"
+          sx={{ position: 'absolute', right: 8, top: 8 }}
+        >
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent dividers>
+        <Stack spacing={3} sx={{ p: 3 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              gap: 2,
+            }}
           >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+            {isEditing ? (
+              <TextField
+                label="Name"
+                value={formData.name || ''}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Name
+                </Typography>
+                <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                  {formData.name || '-'}
+                </Typography>
+              </Box>
+            )}
 
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Name
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.name || ''}
-                  onChange={(e) => handleFieldChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-900 font-medium">{formData.name}</p>
-              )}
-            </div>
+            {isEditing ? (
+              <TextField
+                select
+                label="Status"
+                value={String(formData.status || 'Active')}
+                onChange={(e) => handleFieldChange('status', e.target.value)}
+                size="small"
+                fullWidth
+              >
+                <MenuItem value="Active">Active</MenuItem>
+                <MenuItem value="Not Active">Not Active</MenuItem>
+                <MenuItem value="Recently Placed">Recently Placed</MenuItem>
+              </TextField>
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Status
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {String(formData.status || '-')}
+                </Typography>
+              </Box>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              {isEditing ? (
-                <select
-                  value={formData.status || 'Active'}
-                  onChange={(e) => handleFieldChange('status', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Not Active">Not Active</option>
-                  <option value="Recently Placed">Recently Placed</option>
-                </select>
-              ) : (
-                <p className="text-gray-600">{formData.status || '-'}</p>
-              )}
-            </div>
+            {isEditing ? (
+              <TextField
+                label="Email"
+                type="email"
+                value={formData.email || ''}
+                onChange={(e) => handleFieldChange('email', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Email
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {String(formData.email || '-')}
+                </Typography>
+              </Box>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              {isEditing ? (
-                <input
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => handleFieldChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.email || '-'}</p>
-              )}
-            </div>
+            {isEditing ? (
+              <TextField
+                label="Phone"
+                type="tel"
+                value={formData.phone || ''}
+                onChange={(e) => handleFieldChange('phone', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Phone
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {String(formData.phone || '-')}
+                </Typography>
+              </Box>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone
-              </label>
-              {isEditing ? (
-                <input
-                  type="tel"
-                  value={formData.phone || ''}
-                  onChange={(e) => handleFieldChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.phone || '-'}</p>
-              )}
-            </div>
+            {isEditing ? (
+              <TextField
+                label="Location"
+                value={formData.location || ''}
+                onChange={(e) => handleFieldChange('location', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Location
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {String(formData.location || '-')}
+                </Typography>
+              </Box>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.location || ''}
-                  onChange={(e) => handleFieldChange('location', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.location || '-'}</p>
-              )}
-            </div>
+            {isEditing ? (
+              <TextField
+                label="Total Experience"
+                value={formData.total_experience || ''}
+                onChange={(e) => handleFieldChange('total_experience', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Total Experience
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {String(formData.total_experience || '-')}
+                </Typography>
+              </Box>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Total Experience
-              </label>
+            <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
               {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.total_experience || ''}
-                  onChange={(e) => handleFieldChange('total_experience', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.total_experience || '-'}</p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Primary Skills
-              </label>
-              {isEditing ? (
-                <textarea
+                <TextField
+                  label="Primary Skills"
                   value={formData.primary_skills || ''}
                   onChange={(e) => handleFieldChange('primary_skills', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  size="small"
+                  fullWidth
+                  multiline
                   rows={2}
                 />
               ) : (
-                <p className="text-gray-600">{formData.primary_skills || '-'}</p>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                    Primary Skills
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {String(formData.primary_skills || '-')}
+                  </Typography>
+                </Box>
               )}
-            </div>
+            </Box>
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Secondary Skills
-              </label>
+            <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
               {isEditing ? (
-                <textarea
+                <TextField
+                  label="Secondary Skills"
                   value={formData.secondary_skills || ''}
                   onChange={(e) => handleFieldChange('secondary_skills', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  size="small"
+                  fullWidth
+                  multiline
                   rows={2}
                 />
               ) : (
-                <p className="text-gray-600">{formData.secondary_skills || '-'}</p>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                    Secondary Skills
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {String(formData.secondary_skills || '-')}
+                  </Typography>
+                </Box>
               )}
-            </div>
+            </Box>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                LinkedIn Profile
-              </label>
-              {isEditing ? (
-                <input
-                  type="url"
-                  value={formData.linkedin_profile || ''}
-                  onChange={(e) => handleFieldChange('linkedin_profile', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">
+            {isEditing ? (
+              <TextField
+                label="LinkedIn Profile"
+                type="url"
+                value={formData.linkedin_profile || ''}
+                onChange={(e) => handleFieldChange('linkedin_profile', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  LinkedIn Profile
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
                   {formData.linkedin_profile ? (
-                    <a href={formData.linkedin_profile} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    <a href={formData.linkedin_profile} target="_blank" rel="noopener noreferrer">
                       View Profile
                     </a>
                   ) : (
                     '-'
                   )}
-                </p>
-              )}
-            </div>
+                </Typography>
+              </Box>
+            )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Expected Rate
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={formData.expected_rate || ''}
-                  onChange={(e) => handleFieldChange('expected_rate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <p className="text-gray-600">{formData.expected_rate || '-'}</p>
-              )}
-            </div>
-          </div>
+            {isEditing ? (
+              <TextField
+                label="Expected Rate"
+                value={formData.expected_rate || ''}
+                onChange={(e) => handleFieldChange('expected_rate', e.target.value)}
+                size="small"
+                fullWidth
+              />
+            ) : (
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Expected Rate
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {String(formData.expected_rate || '-')}
+                </Typography>
+              </Box>
+            )}
+          </Box>
 
           {/* Audit Log - Admin Only */}
           {isAdmin && (
@@ -338,62 +424,79 @@ export const ConsultantDetailModal = ({
               title="Recent admin + CRM actions"
             />
           )}
+        </Stack>
+      </DialogContent>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  disabled={isLoading}
-                  className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Save Changes'}
-                </button>
-                <button
-                  onClick={() => {
-                    setFormData(consultant);
-                    setIsEditing(false);
-                  }}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  Edit
-                </button>
-                {isAdmin && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isDeleting ? (
-                      <Loader className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                    Delete
-                  </button>
-                )}
-                <button
-                  onClick={onClose}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+      <DialogActions>
+        {isEditing ? (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSave}
+              disabled={isLoading}
+              startIcon={isLoading ? <Loader className="w-4 h-4" /> : undefined}
+            >
+              Save Changes
+            </Button>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                setFormData(consultant);
+                setIsEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => setIsEditing(true)}
+              startIcon={<Edit2 className="w-4 h-4" />}
+            >
+              Edit
+            </Button>
+            {isAdmin ? (
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                startIcon={isDeleting ? <Loader className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+              >
+                Delete
+              </Button>
+            ) : null}
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                setIsEditing(false);
+                onClose();
+              }}
+            >
+              Close
+            </Button>
+          </>
+        )}
+      </DialogActions>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Consultant"
+        message={`Are you sure you want to delete ${consultant?.name || 'this consultant'}? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
+    </Dialog>
   );
 };

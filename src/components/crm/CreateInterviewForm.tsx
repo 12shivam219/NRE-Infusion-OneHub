@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X, AlertCircle, ChevronDown } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { createInterview } from '../../lib/api/interviews';
@@ -8,6 +8,20 @@ import { getConsultants } from '../../lib/api/consultants';
 import { validateInterviewForm, getAllInterviewStatuses } from '../../lib/interviewValidation';
 import { sanitizeText } from '../../lib/utils';
 import type { Database } from '../../lib/database.types';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type Consultant = Database['public']['Tables']['consultants']['Row'];
@@ -23,7 +37,7 @@ interface FormFieldProps {
   type?: string;
   placeholder?: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => void;
   required?: boolean;
   readOnly?: boolean;
   options?: FormFieldOption[];
@@ -45,58 +59,44 @@ const FormField = memo(function FormField({
 }: FormFieldProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
       {type === 'select' ? (
-        <select
+        <TextField
+          select
+          label={label}
           name={name}
           value={value}
           onChange={onChange}
           disabled={readOnly}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
+          required={required}
+          error={Boolean(error)}
+          helperText={error || ' '}
+          size="small"
+          fullWidth
         >
-          <option value="">Select {label.toLowerCase()}</option>
+          <MenuItem value="">Select {label.toLowerCase()}</MenuItem>
           {options?.map((opt: FormFieldOption) => (
-            <option key={opt.value} value={opt.value}>
+            <MenuItem key={opt.value} value={opt.value}>
               {opt.label}
-            </option>
+            </MenuItem>
           ))}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          readOnly={readOnly}
-          rows={3}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 resize-none ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
-        />
+        </TextField>
       ) : (
-        <input
-          type={type}
+        <TextField
+          label={label}
           name={name}
+          type={type === 'textarea' ? 'text' : type}
           value={value}
-          onChange={onChange}
+          onChange={onChange as unknown as (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void}
           placeholder={placeholder}
           required={required}
-          readOnly={readOnly}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
+          disabled={readOnly}
+          error={Boolean(error)}
+          helperText={error || ' '}
+          size="small"
+          fullWidth
+          multiline={type === 'textarea'}
+          rows={type === 'textarea' ? 3 : undefined}
         />
-      )}
-      {error && (
-        <div className="flex items-center gap-2 mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
       )}
     </div>
   );
@@ -109,23 +109,27 @@ interface CreateInterviewFormProps {
 }
 
 const AccordionSection = ({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [expanded, setExpanded] = useState(defaultOpen);
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 hover:bg-gray-100 flex items-center justify-between font-semibold text-gray-900 transition text-sm"
-      >
-        <span>{title}</span>
-        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      {isOpen && (
-        <div className="px-4 sm:px-6 py-3 sm:py-4 space-y-4 border-t border-gray-200">
+    <Accordion
+      expanded={expanded}
+      onChange={(_, next) => setExpanded(next)}
+      disableGutters
+      elevation={0}
+      variant="outlined"
+      sx={{ borderRadius: 2, overflow: 'hidden' }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+          {title}
+        </Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Stack spacing={2}>
           {children}
-        </div>
-      )}
-    </div>
+        </Stack>
+      </AccordionDetails>
+    </Accordion>
   );
 };
 
@@ -161,8 +165,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
     feedback_notes: '',
   });
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
+    const { name, value } = e.target as { name: string; value: string };
     // Trim string values to prevent leading/trailing whitespace issues
     const trimmedValue = typeof value === 'string' ? value.trim() : value;
     setFormData(prevState => ({ ...prevState, [name]: trimmedValue }));
@@ -183,22 +187,47 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
   }, [user]);
 
   useEffect(() => {
-    loadData();
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await loadData();
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadData]);
 
   // Auto-generate subject line when requirement or date changes
   useEffect(() => {
-    if (formData.requirement_id && formData.scheduled_date) {
+    if (!formData.requirement_id || !formData.scheduled_date) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+
       const requirement = requirements.find(r => r.id === formData.requirement_id);
       if (requirement) {
-        const dateStr = new Date(formData.scheduled_date).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric' 
+        const dateStr = new Date(formData.scheduled_date).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
         });
         const generatedSubject = `${requirement.title} - Interview on ${dateStr}`;
         setFormData(prev => ({ ...prev, subject_line: generatedSubject }));
       }
-    }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [formData.requirement_id, formData.scheduled_date, requirements]);
 
   const requirementOptions = useMemo(
@@ -281,19 +310,18 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl w-full max-w-2xl sm:max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto flex flex-col">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between gap-2">
-          <h2 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Schedule Interview</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-          >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Schedule Interview
+        </Typography>
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={handleSubmit} className="p-4 sm:p-8 space-y-4 overflow-y-auto flex-1">
+      <DialogContent dividers>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Required Information Accordion - Open by default */}
           <AccordionSection title="✓ Basic Information (Required)" defaultOpen={true}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -333,7 +361,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 onChange={handleChange}
               />
             </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-800">
               <AlertCircle className="w-4 h-4 inline mr-2" />
               These fields must be filled to create an interview.
             </div>
@@ -529,24 +557,29 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
           </AccordionSection>
 
           {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-6 border-t border-gray-200">
-            <button
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ pt: 3, borderTop: 1, borderColor: 'divider' }}
+          >
+            <Button
               type="submit"
+              variant="contained"
               disabled={loading}
-              className="px-4 sm:px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition"
             >
               {loading ? 'Scheduling...' : 'Schedule Interview'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outlined"
+              color="inherit"
               onClick={onClose}
-              className="px-4 sm:px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
             >
               Cancel
-            </button>
-          </div>
+            </Button>
+          </Stack>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

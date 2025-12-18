@@ -37,8 +37,34 @@ const requirementsFetcher = async (
   _key: string,
   options: RequirementsPageOptions
 ): Promise<{ requirements: Requirement[]; total: number }> => {
-  // Create cache key based on options
-  const result = await getRequirementsPage(options);
+  // Check if offline - use cache if available (even if expired)
+  if (!navigator.onLine && options.userId) {
+    const cached = await getCachedRequirements(options.userId, true); // Allow expired cache when offline
+    if (cached) {
+      console.log('[useCachedRequirements] Using cached data (offline)');
+      // Apply basic filtering to cached data
+      let filtered = cached;
+      if (options.search) {
+        const searchLower = options.search.toLowerCase();
+        filtered = filtered.filter(r => 
+          r.title?.toLowerCase().includes(searchLower) ||
+          r.company?.toLowerCase().includes(searchLower)
+        );
+      }
+      if (options.status && options.status !== 'ALL') {
+        filtered = filtered.filter(r => r.status === options.status);
+      }
+      return {
+        requirements: filtered as Requirement[],
+        total: filtered.length,
+      };
+    }
+    // If offline and no cache, throw error
+    throw new Error('Offline and no cached data available');
+  }
+
+  // Online - fetch from API
+  const result = await getRequirementsPage({ ...options, includeCount: (options.offset ?? 0) === 0 });
 
   if (result.success && result.requirements) {
     // Cache to IndexedDB for offline access

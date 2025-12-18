@@ -16,6 +16,11 @@
 
 import { lazy } from 'react';
 
+export const preloadDashboard = () => import('../components/dashboard/Dashboard');
+export const preloadDocumentsPage = () => import('../components/documents/DocumentsPage');
+export const preloadCRMPage = () => import('../components/crm/CRMPage');
+export const preloadAdminPage = () => import('../components/admin/AdminPage');
+
 // Pre-configured lazy components - simple dynamic imports
 // These will only load when needed, reducing initial bundle
 export const LazyDashboard = lazy(() =>

@@ -4,6 +4,17 @@ import { useAuth } from '../../hooks/useAuth';
 import { getRequirements, createRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import type { Database } from '../../lib/database.types';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 
@@ -35,6 +46,8 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
   const [selectedTemplate, setSelectedTemplate] = useState<RequirementTemplate | null>(null);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [templateToDelete, setTemplateToDelete] = useState<RequirementTemplate | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadRequirements = useCallback(async () => {
     if (!user) return;
@@ -46,17 +59,38 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
   }, [user]);
 
   useEffect(() => {
-    loadRequirements();
+    let cancelled = false;
+
+    const run = async () => {
+      if (!user) return;
+      const result = await getRequirements(user.id);
+      if (cancelled) return;
+      if (result.success && result.requirements) {
+        setRequirements(result.requirements);
+      }
+      setLoading(false);
+    };
+
+    void run();
+
     // Load templates from localStorage
     const savedTemplates = localStorage.getItem('requirementTemplates');
     if (savedTemplates) {
       try {
-        setTemplates(JSON.parse(savedTemplates));
+        void (async () => {
+          await Promise.resolve();
+          if (cancelled) return;
+          setTemplates(JSON.parse(savedTemplates));
+        })();
       } catch (error) {
         console.error('Failed to load templates:', error);
       }
     }
-  }, [loadRequirements]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const suggestedTemplates = useMemo(() => {
     // Suggest templates based on frequent patterns in existing requirements
@@ -116,6 +150,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
     });
     setNewTemplateName('');
     setShowTemplateForm(false);
+    setSelectedTemplate(null);
   };
 
   const handleDeleteTemplate = (templateId: string) => {
@@ -129,6 +164,21 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       title: 'Template deleted',
       message: 'Template has been removed',
     });
+  };
+
+  const handleRequestDeleteTemplate = (template: RequirementTemplate) => {
+    setTemplateToDelete(template);
+  };
+
+  const handleConfirmDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+    setIsDeleting(true);
+    try {
+      handleDeleteTemplate(templateToDelete.id);
+    } finally {
+      setIsDeleting(false);
+      setTemplateToDelete(null);
+    }
   };
 
   const handleApplyTemplate = async (template: RequirementTemplate) => {
@@ -168,28 +218,61 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
   };
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading templates...</div>;
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="h-6 bg-gray-200 rounded w-56 mb-4 animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="card-base card-p-sm animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
+                <div className="h-3 bg-gray-200 rounded w-5/6 mb-4" />
+                <div className="h-8 bg-gray-200 rounded w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        isOpen={Boolean(templateToDelete)}
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={handleConfirmDeleteTemplate}
+        title="Delete template"
+        message={
+          templateToDelete
+            ? `Are you sure you want to delete "${templateToDelete.name}"? This cannot be undone.`
+            : 'Are you sure you want to delete this template?'
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
+
       {/* Saved Templates */}
       {templates.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Saved Templates</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map(template => (
-              <div key={template.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+              <div key={template.id} className="card-base card-p-sm">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{template.name}</p>
                     <p className="text-sm text-gray-600">{template.title}</p>
                   </div>
                   <button
-                    onClick={() => handleDeleteTemplate(template.id)}
-                    className="text-red-600 hover:bg-red-50 p-2 rounded"
+                    type="button"
+                    onClick={() => handleRequestDeleteTemplate(template)}
+                    className="btn-icon-sm text-red-700 hover:bg-red-50 focus-ring"
+                    aria-label={`Delete template ${template.name}`}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
 
@@ -198,10 +281,12 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                 {template.rate && <p className="text-xs text-gray-500">Rate: {template.rate}</p>}
 
                 <button
+                  type="button"
                   onClick={() => handleApplyTemplate(template)}
-                  className="w-full mt-3 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100 text-sm flex items-center justify-center gap-2"
+                  className="btn-secondary w-full mt-3 inline-flex items-center justify-center gap-2 focus-ring"
+                  aria-label={`Apply template ${template.name}`}
                 >
-                  <Copy className="w-4 h-4" />
+                  <Copy className="w-4 h-4" aria-hidden="true" />
                   Apply Template
                 </button>
               </div>
@@ -216,7 +301,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Suggested Templates</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {suggestedTemplates.map(template => (
-              <div key={template.id} className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-4 hover:shadow-md transition">
+              <div key={template.id} className="card-base card-p-sm bg-gradient-to-br from-primary-50 to-primary-100">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{template.name}</p>
@@ -229,20 +314,24 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
 
                 <div className="flex gap-2 mt-3">
                   <button
+                    type="button"
                     onClick={() => handleApplyTemplate(template)}
-                    className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm flex items-center justify-center gap-2"
+                    className="btn-primary flex-1 inline-flex items-center justify-center gap-2 focus-ring"
+                    aria-label={`Apply suggested template ${template.name}`}
                   >
-                    <Copy className="w-4 h-4" />
+                    <Copy className="w-4 h-4" aria-hidden="true" />
                     Apply
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       setSelectedTemplate(template as RequirementTemplate);
                       setShowTemplateForm(true);
                     }}
-                    className="px-3 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 text-sm"
+                    className="btn-outline px-3 py-2 inline-flex items-center justify-center focus-ring"
+                    aria-label={`Save suggested template ${template.name}`}
                   >
-                    <Save className="w-4 h-4" />
+                    <Save className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -257,7 +346,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Template from Requirement</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {requirements.slice(0, 6).map(req => (
-              <div key={req.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+              <div key={req.id} className="card-base card-p-sm">
                 <p className="font-medium text-gray-900 mb-1">{req.title}</p>
                 <p className="text-sm text-gray-600 mb-3">{req.company || 'No company'}</p>
 
@@ -265,6 +354,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                 {req.rate && <p className="text-xs text-gray-500">Rate: {req.rate}</p>}
 
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedTemplate({
                       id: req.id,
@@ -280,9 +370,10 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
                     });
                     setShowTemplateForm(true);
                   }}
-                  className="w-full mt-3 px-3 py-2 bg-green-50 text-green-600 rounded-lg font-medium hover:bg-green-100 text-sm flex items-center justify-center gap-2"
+                  className="btn-secondary w-full mt-3 inline-flex items-center justify-center gap-2 focus-ring"
+                  aria-label={`Save requirement ${req.title} as template`}
                 >
-                  <Save className="w-4 h-4" />
+                  <Save className="w-4 h-4" aria-hidden="true" />
                   Save as Template
                 </button>
               </div>
@@ -291,79 +382,118 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
         </div>
       )}
 
+      {templates.length === 0 && suggestedTemplates.length === 0 && requirements.length === 0 && (
+        <div className="card-base card-p-md text-center">
+          <Save className="w-12 h-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No templates yet</h3>
+          <p className="text-gray-600 text-sm">Create your first requirement to start saving templates.</p>
+        </div>
+      )}
+
       {/* Template Form Modal */}
       {showTemplateForm && selectedTemplate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Save as Template</h2>
-              <button
-                onClick={() => {
-                  setShowTemplateForm(false);
-                  setSelectedTemplate(null);
-                  setNewTemplateName('');
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+        <Dialog
+          open
+          onClose={() => {
+            setShowTemplateForm(false);
+            setSelectedTemplate(null);
+            setNewTemplateName('');
+          }}
+          fullWidth
+          maxWidth="sm"
+          slotProps={{
+            backdrop: { sx: { backdropFilter: 'blur(4px)' } }
+          }}
+        >
+          <DialogTitle sx={{ pr: 7 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Save as Template
+            </Typography>
+            <IconButton
+              onClick={() => {
+                setShowTemplateForm(false);
+                setSelectedTemplate(null);
+                setNewTemplateName('');
+              }}
+              sx={{ position: 'absolute', right: 8, top: 8 }}
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
+            </IconButton>
+          </DialogTitle>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Template Name</label>
-                <input
-                  type="text"
-                  value={newTemplateName}
-                  onChange={(e) => setNewTemplateName(e.target.value)}
-                  placeholder={`${selectedTemplate.company} - ${selectedTemplate.primary_tech_stack}`}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  aria-label="Template Name"
-                />
-                {formError && <p className="text-xs text-red-600 mt-2">{formError}</p>}
-              </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                <p className="text-sm font-medium text-gray-700">Template Preview:</p>
-                {selectedTemplate.company && (
-                  <p className="text-xs text-gray-600">Company: {selectedTemplate.company}</p>
-                )}
-                {selectedTemplate.title && (
-                  <p className="text-xs text-gray-600">Title: {selectedTemplate.title}</p>
-                )}
-                {selectedTemplate.primary_tech_stack && (
-                  <p className="text-xs text-gray-600">Tech Stack: {selectedTemplate.primary_tech_stack}</p>
-                )}
-                {selectedTemplate.rate && (
-                  <p className="text-xs text-gray-600">Rate: {selectedTemplate.rate}</p>
-                )}
-                {selectedTemplate.duration && (
-                  <p className="text-xs text-gray-600">Duration: {selectedTemplate.duration}</p>
-                )}
-              </div>
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => handleCreateTemplate(selectedTemplate as unknown as Requirement)}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
-                  aria-label="Save Template"
-                >
-                  Save Template
-                </button>
-                <button
-                  onClick={() => {
-                    setShowTemplateForm(false);
-                    setSelectedTemplate(null);
-                    setNewTemplateName('');
-                    setFormError(null);
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                  aria-label="Cancel"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          <DialogContent dividers>
+            <Stack spacing={2}>
+              <TextField
+                label="Template Name"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder={`${selectedTemplate.company} - ${selectedTemplate.primary_tech_stack}`}
+                size="small"
+                fullWidth
+                error={Boolean(formError)}
+                helperText={formError || ' '}
+                inputProps={{ 'aria-label': 'Template Name' }}
+              />
+
+              <Box sx={{ maxHeight: 256, overflowY: 'auto' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                  Template Preview:
+                </Typography>
+                <Stack spacing={0.5}>
+                  {selectedTemplate.company && (
+                    <Typography variant="caption" color="text.secondary">
+                      Company: {selectedTemplate.company}
+                    </Typography>
+                  )}
+                  {selectedTemplate.title && (
+                    <Typography variant="caption" color="text.secondary">
+                      Title: {selectedTemplate.title}
+                    </Typography>
+                  )}
+                  {selectedTemplate.primary_tech_stack && (
+                    <Typography variant="caption" color="text.secondary">
+                      Tech Stack: {selectedTemplate.primary_tech_stack}
+                    </Typography>
+                  )}
+                  {selectedTemplate.rate && (
+                    <Typography variant="caption" color="text.secondary">
+                      Rate: {selectedTemplate.rate}
+                    </Typography>
+                  )}
+                  {selectedTemplate.duration && (
+                    <Typography variant="caption" color="text.secondary">
+                      Duration: {selectedTemplate.duration}
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            </Stack>
+          </DialogContent>
+
+          <DialogActions>
+            <Button
+              onClick={() => handleCreateTemplate(selectedTemplate as unknown as Requirement)}
+              variant="contained"
+              aria-label="Save Template"
+            >
+              Save Template
+            </Button>
+            <Button
+              onClick={() => {
+                setShowTemplateForm(false);
+                setSelectedTemplate(null);
+                setNewTemplateName('');
+                setFormError(null);
+              }}
+              variant="outlined"
+              color="inherit"
+              aria-label="Cancel"
+            >
+              Cancel
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </div>
   );

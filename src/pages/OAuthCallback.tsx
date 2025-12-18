@@ -20,11 +20,11 @@ export default function OAuthCallback() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
       <div className="text-center space-y-6">
         <div className="flex justify-center">
           <div className="p-4 bg-white rounded-full shadow-lg">
-            <Mail className="w-12 h-12 text-blue-600 animate-bounce" />
+            <Mail className="w-12 h-12 text-primary-600 animate-bounce" />
           </div>
         </div>
 
@@ -38,22 +38,22 @@ export default function OAuthCallback() {
         <div className="flex justify-center">
           <div className="space-y-3">
             <div className="flex items-center gap-3 text-gray-700">
-              <div className="w-3 h-3 rounded-full bg-blue-600 animate-pulse"></div>
+              <div className="w-3 h-3 rounded-full bg-primary-600 animate-pulse"></div>
               <span>Exchanging authorization code</span>
             </div>
             <div className="flex items-center gap-3 text-gray-700">
-              <div className="w-3 h-3 rounded-full bg-blue-600 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-3 h-3 rounded-full bg-primary-600 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
               <span>Saving secure tokens</span>
             </div>
             <div className="flex items-center gap-3 text-gray-700">
-              <div className="w-3 h-3 rounded-full bg-blue-600 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+              <div className="w-3 h-3 rounded-full bg-primary-600 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
               <span>Redirecting to admin panel</span>
             </div>
           </div>
         </div>
 
         <p className="text-sm text-gray-500">
-          If you're not redirected automatically, <a href="/admin" className="text-blue-600 hover:underline">click here</a>
+          If you're not redirected automatically, <a href="/admin" className="text-primary-600 hover:underline">click here</a>
         </p>
       </div>
     </div>

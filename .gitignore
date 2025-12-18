@@ -21,3 +21,11 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.local
+.env.*.local
+
+# Email server env (CRITICAL: Never commit credentials)
+email-server/.env
+
+# Generated test results
+axe-results.json

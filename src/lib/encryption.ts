@@ -9,7 +9,7 @@ import CryptoJS from 'crypto-js';
 const EMAIL_SERVER_URL = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
 const EMAIL_SERVER_API_KEY = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
 
-async function callEmailServer(path: string, body: any) {
+async function callEmailServer(path: string, body: Record<string, unknown>) {
   const url = `${EMAIL_SERVER_URL}${path}`;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (EMAIL_SERVER_API_KEY) {

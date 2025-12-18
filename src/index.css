@@ -1,21 +1,108 @@
+/* Custom: Table density, row backgrounds, and badge contrast improvements */
+.table-row-compact {
+  @apply py-1 sm:py-2 md:py-2;
+}
+.table-header-compact {
+  @apply py-2 sm:py-2 md:py-2 text-xs sm:text-sm font-semibold;
+}
+.table-row-alt {
+  @apply bg-gray-50;
+}
+.table-row-hover:hover {
+  @apply bg-primary-50;
+}
+.badge-status {
+  @apply px-2 py-0.5 rounded-full text-xs font-bold border shadow-sm;
+}
+.badge-status-submitted {
+  @apply bg-cyan-100 text-cyan-800 border-cyan-300;
+}
+.badge-status-inprogress {
+  @apply bg-yellow-100 text-yellow-800 border-yellow-300;
+}
+.badge-status-new {
+  @apply bg-primary-50 text-primary-800 border-primary-200;
+}
+.badge-status-closed {
+  @apply bg-gray-200 text-gray-800 border-gray-300;
+}
+.badge-status-rejected {
+  @apply bg-red-100 text-red-800 border-red-300;
+}
+.badge-status-offer {
+  @apply bg-green-100 text-green-800 border-green-300;
+}
+.badge-status-interview {
+  @apply bg-purple-100 text-purple-800 border-purple-300;
+}
+.btn-icon-sm {
+  @apply inline-flex items-center justify-center p-1.5 rounded text-base border border-transparent transition-colors duration-150;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ========== Base Improvements ========== */
 :root {
-  --color-primary: rgb(37, 99, 235);
-  --color-primary-dark: rgb(29, 78, 216);
+  --color-primary: #d4af37; /* NRETech gold */
+  --color-primary-dark: #b8960f;
   --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
   --shadow-card-hover: 0 10px 20px -5px rgb(0 0 0 / 0.1);
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+/* Semantic tokens for easy theme tuning */
+:root {
+  --bg: #f9fafb;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e6e7ea;
+}
+
+html[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #111827;
+  --text: #ffffff;
+  --muted: rgba(255, 255, 255, 0.78);
+  --border: rgba(255, 255, 255, 0.22);
+}
+
+/* Normalize base font-size to avoid unexpected large UI when browser or OS settings
+   change default scaling. Keep 16px as a predictable baseline for Tailwind rem units. */
+html {
+  font-size: 16px;
+}
+
+/* Apply semantic tokens to global elements */
+html, body, #root {
+  height: 100%;
+}
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-weight: 400;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+}
+
+/* Utility: apply semantic surface color without card padding/shadow */
+.surface-bg {
+  background-color: var(--surface);
 }
 
 /* ========== Card Component Styles ========== */
 @layer components {
   /* Base card styling with soft shadows */
   .card-base {
-    @apply bg-white rounded-lg sm:rounded-xl border border-gray-100 shadow-card;
+    background-color: var(--surface);
+    @apply rounded-lg sm:rounded-xl border shadow-card;
+    border-color: var(--border);
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
@@ -25,7 +112,7 @@
 
   /* Card padding variants */
   .card-p-md {
-    @apply p-4 sm:p-5 lg:p-6;
+    @apply p-3 sm:p-4 md:p-5 lg:p-6;
   }
 
   .card-p-sm {
@@ -34,7 +121,7 @@
 
   /* Card title styling */
   .card-title {
-    @apply text-lg sm:text-xl font-bold text-gray-900 line-clamp-2;
+    @apply text-lg sm:text-xl font-bold text-gray-900;
   }
 
   /* Card subtitle */
@@ -49,45 +136,75 @@
 
   /* Status colors with left border */
   .status-new {
-    @apply status-accent border-l-blue-500 bg-blue-50;
+    @apply status-accent border-l-primary-600 bg-primary-50;
   }
 
   .status-in-progress {
-    @apply status-accent border-l-yellow-500 bg-yellow-50;
+    @apply status-accent border-l-yellow-600 bg-yellow-50;
   }
 
   .status-submitted {
-    @apply status-accent border-l-orange-500 bg-orange-50;
+    @apply status-accent border-l-cyan-600 bg-cyan-50;
   }
 
   .status-interview {
-    @apply status-accent border-l-purple-500 bg-purple-50;
+    @apply status-accent border-l-purple-600 bg-purple-50;
   }
 
   .status-offer {
-    @apply status-accent border-l-green-500 bg-green-50;
+    @apply status-accent border-l-green-600 bg-green-50;
   }
 
   .status-rejected {
-    @apply status-accent border-l-red-500 bg-red-50;
+    @apply status-accent border-l-red-600 bg-red-50;
   }
 
   .status-closed {
-    @apply status-accent border-l-gray-500 bg-gray-50;
+    @apply status-accent border-l-gray-600 bg-gray-50;
   }
 
   /* Button variants */
   .btn-primary {
-    @apply px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm;
+    @apply px-4 py-2.5 bg-primary-800 text-white rounded-lg font-semibold text-sm;
     transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .btn-primary:hover {
-    @apply bg-blue-700 shadow-md;
+    @apply bg-primary-900 shadow-md;
   }
 
   .btn-primary:active {
-    @apply bg-blue-800;
+    @apply bg-primary-900;
+  }
+
+  .btn-primary:focus-visible {
+    @apply outline-none ring-2 ring-accent-600 ring-offset-2;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2.5 bg-red-600 text-white rounded-lg font-semibold text-sm;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-danger:hover {
+    @apply bg-red-700 shadow-md;
+  }
+
+  .btn-danger:focus-visible {
+    @apply outline-none ring-2 ring-red-600 ring-offset-2;
+  }
+
+  .btn-success {
+    @apply px-4 py-2.5 bg-green-600 text-white rounded-lg font-semibold text-sm;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-success:hover {
+    @apply bg-green-700 shadow-md;
+  }
+
+  .btn-success:focus-visible {
+    @apply outline-none ring-2 ring-green-600 ring-offset-2;
   }
 
   .btn-secondary {
@@ -100,12 +217,12 @@
   }
 
   .btn-outline {
-    @apply px-4 py-2.5 bg-white text-gray-700 rounded-lg font-semibold text-sm border border-gray-300;
-    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    @apply px-3 py-2 bg-white text-gray-700 rounded-lg font-medium text-sm border border-gray-200;
+    transition: all 180ms ease;
   }
 
   .btn-outline:hover {
-    @apply border-gray-400 shadow-sm bg-gray-50;
+    @apply border-gray-300 shadow-sm bg-gray-50;
   }
 
   /* Icon button - minimal, light feel */
@@ -120,13 +237,13 @@
 
   /* Small icon button for dense layouts */
   .btn-icon-sm {
-    @apply inline-flex items-center justify-center p-1.5 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100;
-    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    @apply inline-flex items-center justify-center p-2 rounded text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-transparent;
+    transition: all 160ms ease;
   }
 
   /* Badge/Tag styling - muted and refined */
   .badge-primary {
-    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold;
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50 text-primary-800 text-xs font-semibold;
   }
 
   .badge-success {
@@ -188,9 +305,30 @@
   animation: slideUp 300ms ease-out;
 }
 
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
+  .animate-pulse-subtle {
+    animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+    background: linear-gradient(
+      to right,
+      #f3f4f6 0%,
+      #e5e7eb 20%,
+      #f3f4f6 40%,
+      #f3f4f6 100%
+    );
+    background-size: 1000px 100%;
+  }
 
 /* ========== Utility Classes ========== */
 .text-clamp-1 {
@@ -229,22 +367,93 @@
 /* ========== Focus States for Accessibility ========== */
 @layer utilities {
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600 focus-visible:ring-offset-2;
   }
 
   .focus-ring-inset {
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600 focus-visible:ring-inset;
   }
+
+  /* Enhanced focus for better visibility */
+  .focus-ring-visible {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+}
+
+/* Ensure all interactive elements have visible focus */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #d4af37;
+  outline-offset: 2px;
+}
+
+html[data-theme="dark"] button:focus-visible,
+html[data-theme="dark"] a:focus-visible,
+html[data-theme="dark"] input:focus-visible,
+html[data-theme="dark"] select:focus-visible,
+html[data-theme="dark"] textarea:focus-visible,
+html[data-theme="dark"] [tabindex]:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+html[data-theme="dark"] .text-gray-900,
+html[data-theme="dark"] .text-gray-800,
+html[data-theme="dark"] .text-gray-700 {
+  color: var(--text) !important;
+}
+
+html[data-theme="dark"] .text-gray-600,
+html[data-theme="dark"] .text-gray-500,
+html[data-theme="dark"] .text-gray-400 {
+  color: var(--muted) !important;
+}
+
+html[data-theme="dark"] .text-gray-300,
+html[data-theme="dark"] .text-gray-200 {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+html[data-theme="dark"] .border-gray-50,
+html[data-theme="dark"] .border-gray-100,
+html[data-theme="dark"] .border-gray-200,
+html[data-theme="dark"] .border-gray-300 {
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .focus-ring,
+html[data-theme="dark"] .focus-ring-inset,
+html[data-theme="dark"] .focus-ring-visible {
+  --tw-ring-color: #ffffff !important;
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+html[data-theme="dark"] .bg-white {
+  background-color: var(--surface) !important;
+}
+
+html[data-theme="dark"] .bg-gray-50,
+html[data-theme="dark"] .bg-gray-100,
+html[data-theme="dark"] .bg-gray-200 {
+  background-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 /* ========== Selection Styles ========== */
 ::selection {
-  background-color: rgb(37, 99, 235);
+  background-color: var(--color-primary-dark);
   color: white;
 }
 
 ::-moz-selection {
-  background-color: rgb(37, 99, 235);
+  background-color: var(--color-primary);
   color: white;
 }
 
@@ -265,4 +474,29 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #a0aec0;
+}
+
+/* ========== Skip Links Styling ========== */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only:focus,
+.focus-within\:not-sr-only:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
 }

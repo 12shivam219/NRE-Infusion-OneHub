@@ -1,5 +1,18 @@
 import { useState, useCallback } from 'react';
 import { X, Plus } from 'lucide-react';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import CheckIcon from '@mui/icons-material/Check';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 interface QuickAddInterviewProps {
   onClose: () => void;
@@ -13,16 +26,23 @@ interface QuickAddInterviewProps {
 }
 
 const StepIndicator = ({ completed }: { completed: boolean }) => (
-  <span
+  <Box
     aria-hidden="true"
-    className={`flex items-center justify-center w-5 h-5 rounded border text-xs font-semibold transition-colors ${
-      completed
-        ? 'bg-blue-600 border-blue-600 text-white'
-        : 'border-gray-300 text-transparent'
-    }`}
+    sx={{
+      width: 20,
+      height: 20,
+      borderRadius: 1,
+      border: '1px solid',
+      borderColor: completed ? 'primary.main' : 'divider',
+      bgcolor: completed ? 'primary.main' : 'transparent',
+      display: 'grid',
+      placeItems: 'center',
+      color: completed ? 'common.white' : 'transparent',
+      flexShrink: 0,
+    }}
   >
-    ✓
-  </span>
+    <CheckIcon sx={{ fontSize: 16 }} />
+  </Box>
 );
 
 export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps) => {
@@ -34,8 +54,10 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
     interviewer: '',
   });
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback((
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>
+  ) => {
+    const { name, value } = e.target as { name: string; value: string };
     setFormData(prev => ({ ...prev, [name]: value }));
   }, []);
 
@@ -45,123 +67,110 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">Schedule Interview</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Schedule Interview
+        </Typography>
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+      <DialogContent dividers>
+        <form id="quick-add-interview-form" onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.requirementId)} />
-              <div>
-                <div className="font-medium text-gray-900">Which requirement?</div>
-                <input
-                  type="text"
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Which requirement?"
                   name="requirementId"
                   value={formData.requirementId}
                   onChange={handleChange}
                   placeholder="Senior Java Developer - TechCorp"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 />
-              </div>
-            </div>
-          </div>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.consultantName)} />
-              <div>
-                <div className="font-medium text-gray-900">Which consultant?</div>
-                <input
-                  type="text"
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Which consultant?"
                   name="consultantName"
                   value={formData.consultantName}
                   onChange={handleChange}
                   placeholder="Sarah Chen"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 />
-              </div>
-            </div>
-          </div>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.dateTime)} />
-              <div>
-                <div className="font-medium text-gray-900">When? (date & time)</div>
-                <input
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="When? (date & time)"
                   type="datetime-local"
                   name="dateTime"
                   value={formData.dateTime}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
                 />
-              </div>
-            </div>
-          </div>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.mode)} />
-              <div>
-                <div className="font-medium text-gray-900">How are we meeting?</div>
-                <select
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  select
+                  label="How are we meeting?"
                   name="mode"
                   value={formData.mode}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 >
-                  <option value="phone">Phone Call</option>
-                  <option value="video">Video Call</option>
-                  <option value="inperson">In-Person</option>
-                </select>
-              </div>
-            </div>
-          </div>
+                  <MenuItem value="phone">Phone Call</MenuItem>
+                  <MenuItem value="video">Video Call</MenuItem>
+                  <MenuItem value="inperson">In-Person</MenuItem>
+                </TextField>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.interviewer)} />
-              <div>
-                <div className="font-medium text-gray-900">Who's interviewing?</div>
-                <input
-                  type="text"
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Who's interviewing?"
                   name="interviewer"
                   value={formData.interviewer}
                   onChange={handleChange}
                   placeholder="John Smith"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Schedule
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
+              </Box>
+            </Stack>
+          </Stack>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+
+      <DialogActions>
+        <Button type="submit" form="quick-add-interview-form" variant="contained" startIcon={<Plus className="w-4 h-4" />}>
+          Schedule
+        </Button>
+        <Button type="button" variant="outlined" color="inherit" onClick={onClose}>
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };

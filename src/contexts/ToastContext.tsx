@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { generateId } from '../lib/utils';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -12,7 +12,6 @@ export interface Toast {
 }
 
 interface ToastContextValue {
-  toasts: Toast[];
   showToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
 }
@@ -40,11 +39,16 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     [removeToast]
   );
 
+  const contextValue = useMemo(
+    () => ({ showToast, removeToast }),
+    [showToast, removeToast]
+  );
+
   return (
-    <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {/* Toast stack */}
-      <div className="fixed top-4 right-4 z-[60] space-y-3 w-full max-w-sm">
+      <div className="fixed top-24 right-4 z-[1500] space-y-3 w-full max-w-sm">
         {toasts.map((toast) => (
           <div
             key={toast.id}
@@ -64,8 +68,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             </div>
             <button
               type="button"
-              className="text-xs opacity-80 hover:opacity-100 ml-2"
+              className="ml-2 inline-flex items-center justify-center w-8 h-8 rounded opacity-80 hover:opacity-100 focus-ring"
               onClick={() => removeToast(toast.id)}
+              aria-label="Dismiss notification"
+              title="Dismiss"
             >
               ✕
             </button>

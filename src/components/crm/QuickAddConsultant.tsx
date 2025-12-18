@@ -1,5 +1,18 @@
 import { useState, useCallback } from 'react';
 import { X, Plus } from 'lucide-react';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import CheckIcon from '@mui/icons-material/Check';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 interface QuickAddConsultantProps {
   onClose: () => void;
@@ -13,16 +26,23 @@ interface QuickAddConsultantProps {
 }
 
 const StepIndicator = ({ completed }: { completed: boolean }) => (
-  <span
+  <Box
     aria-hidden="true"
-    className={`flex items-center justify-center w-5 h-5 rounded border text-xs font-semibold transition-colors ${
-      completed
-        ? 'bg-blue-600 border-blue-600 text-white'
-        : 'border-gray-300 text-transparent'
-    }`}
+    sx={{
+      width: 20,
+      height: 20,
+      borderRadius: 1,
+      border: '1px solid',
+      borderColor: completed ? 'primary.main' : 'divider',
+      bgcolor: completed ? 'primary.main' : 'transparent',
+      display: 'grid',
+      placeItems: 'center',
+      color: completed ? 'common.white' : 'transparent',
+      flexShrink: 0,
+    }}
   >
-    ✓
-  </span>
+    <CheckIcon sx={{ fontSize: 16 }} />
+  </Box>
 );
 
 export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProps) => {
@@ -34,8 +54,10 @@ export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProp
     skills: '',
   });
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback((
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>
+  ) => {
+    const { name, value } = e.target as { name: string; value: string };
     setFormData(prev => ({ ...prev, [name]: value }));
   }, []);
 
@@ -45,115 +67,106 @@ export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProp
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">Add to Team</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Add to Team
+        </Typography>
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+      <DialogContent dividers>
+        <form id="quick-add-consultant-form" onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.name)} />
-              <div>
-                <div className="font-medium text-gray-900">What's their name?</div>
-                <input
-                  type="text"
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="What's their name?"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="Michael Johnson"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 />
-              </div>
-            </div>
-          </div>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.email)} />
-              <div>
-                <div className="font-medium text-gray-900">Email & phone?</div>
-                <input
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Email"
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="michael@email.com"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
+                  sx={{ mb: 2 }}
                 />
-                <input
+                <TextField
+                  label="Phone"
                   type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
                   placeholder="555-0123"
-                  className="mt-2 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 />
-              </div>
-            </div>
-          </div>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.status)} />
-              <div>
-                <div className="font-medium text-gray-900">Current status?</div>
-                <select
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  select
+                  label="Current status?"
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 >
-                  <option>Active</option>
-                  <option>Not Active</option>
-                  <option>Recently Placed</option>
-                </select>
-              </div>
-            </div>
-          </div>
+                  <MenuItem value="Active">Active</MenuItem>
+                  <MenuItem value="Not Active">Not Active</MenuItem>
+                  <MenuItem value="Recently Placed">Recently Placed</MenuItem>
+                </TextField>
+              </Box>
+            </Stack>
 
-          <div>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
               <StepIndicator completed={Boolean(formData.skills)} />
-              <div>
-                <div className="font-medium text-gray-900">Key skill area?</div>
-                <input
-                  type="text"
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  label="Key skill area?"
                   name="skills"
                   value={formData.skills}
                   onChange={handleChange}
                   placeholder="Full-Stack Developer"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  size="small"
+                  fullWidth
                 />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 inline mr-2" />
-              Add to Team
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
+              </Box>
+            </Stack>
+          </Stack>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+
+      <DialogActions>
+        <Button type="submit" form="quick-add-consultant-form" variant="contained" startIcon={<Plus className="w-4 h-4" />}>
+          Add to Team
+        </Button>
+        <Button type="button" variant="outlined" color="inherit" onClick={onClose}>
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };

@@ -2,13 +2,25 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { createRequirement, getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
 import { findSimilarRequirements } from '../../lib/requirementUtils';
 import { validateRequirementForm } from '../../lib/formValidation';
 import { sanitizeText } from '../../lib/utils';
 import { ErrorAlert } from '../common/ErrorAlert';
+import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
@@ -23,7 +35,7 @@ interface FormFieldProps {
   type?: string;
   placeholder?: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => void;
   required?: boolean;
   options?: FormFieldOption[];
   error?: string;
@@ -43,55 +55,42 @@ const FormField = memo(function FormField({
 }: FormFieldProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
       {type === 'select' ? (
-        <select
+        <TextField
+          select
+          label={label}
           name={name}
           value={value}
           onChange={onChange}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
+          required={required}
+          error={Boolean(error)}
+          helperText={error || ' '}
+          size="small"
+          fullWidth
         >
-          <option value="">Select {label.toLowerCase()}</option>
+          <MenuItem value="">Select {label.toLowerCase()}</MenuItem>
           {options?.map((opt: FormFieldOption) => (
-            <option key={opt.value} value={opt.value}>
+            <MenuItem key={opt.value} value={opt.value}>
               {opt.label}
-            </option>
+            </MenuItem>
           ))}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          rows={4}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
-        />
+        </TextField>
       ) : (
-        <input
-          type={type}
+        <TextField
+          label={label}
           name={name}
+          type={type === 'textarea' ? 'text' : type}
           value={value}
-          onChange={onChange}
+          onChange={onChange as unknown as (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void}
           placeholder={placeholder}
           required={required}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
+          error={Boolean(error)}
+          helperText={error || ' '}
+          size="small"
+          fullWidth
+          multiline={type === 'textarea'}
+          rows={type === 'textarea' ? 4 : undefined}
         />
-      )}
-      {error && (
-        <div className="flex items-center gap-2 mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
       )}
     </div>
   );
@@ -112,6 +111,7 @@ const FormSection = ({ title, children }: { title: string; children: React.React
 export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementFormProps) => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { isOnline, queueOfflineOperation } = useOfflineCache();
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [allRequirements, setAllRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [loading, setLoading] = useState(false);
@@ -142,12 +142,12 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
     location: '',
   });
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
+    const { name, value } = e.target as { name: string; value: string };
     setFormData(prevState => {
-      // Trim string values to prevent leading/trailing whitespace issues
-      const trimmedValue = typeof value === 'string' ? value.trim() : value;
-      const newFormData = { ...prevState, [name]: trimmedValue };
+      // Don't trim during input - preserve spaces as user types
+      // Trimming will happen during form submission
+      const newFormData = { ...prevState, [name]: value };
       
       // Check for similar requirements whenever company or tech stack changes
       if (name === 'company' || name === 'primary_tech_stack' || name === 'title') {
@@ -179,8 +179,20 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
   }, [user]);
 
   useEffect(() => {
-    loadConsultants();
-    loadRequirements();
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await loadConsultants();
+      await loadRequirements();
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadConsultants, loadRequirements]);
 
   const consultantOptions = useMemo(
@@ -218,7 +230,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
     setLoading(true);
 
     try {
-      const result = await createRequirement({
+      const requirementData = {
         user_id: user.id,
         title: sanitizeText(formData.title),
         company: sanitizeText(formData.company),
@@ -240,7 +252,36 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
         remote: formData.remote || null,
         duration: formData.duration || null,
         location: sanitizeText(formData.location),
-      }, user.id);
+      };
+
+      // Check if offline - queue operation
+      if (!isOnline) {
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        await queueOfflineOperation('CREATE', 'requirement', tempId, requirementData);
+        
+        // Optimistically add to local cache
+        const optimisticRequirement = {
+          id: tempId,
+          ...requirementData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          requirement_number: 0, // Will be assigned on sync
+        } as Database['public']['Tables']['requirements']['Row'];
+        
+        await cacheRequirements([optimisticRequirement as CachedRequirement], user.id);
+        
+        setLoading(false);
+        showToast({
+          type: 'info',
+          title: 'Queued for Sync',
+          message: 'Requirement will be created when you come back online',
+        });
+        onSuccess(); // Close form and refresh
+        return;
+      }
+
+      // Online - create normally
+      const result = await createRequirement(requirementData, user.id);
 
       setLoading(false);
       if (result.success) {
@@ -249,6 +290,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
           title: 'Requirement Created',
           message: 'New requirement has been successfully created',
         });
+        // Dispatch event to refresh requirements list
+        window.dispatchEvent(new CustomEvent('requirement-created', { detail: result.requirement }));
         onSuccess();
       } else {
         setSubmitError(result.error || 'Failed to create requirement');
@@ -271,21 +314,23 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Create New Requirement</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            aria-label="Close form"
-            title="Close form"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Create New Requirement
+        </Typography>
+        <IconButton
+          onClick={onClose}
+          sx={{ position: 'absolute', right: 8, top: 8 }}
+          aria-label="Close form"
+          title="Close form"
+        >
+          <X className="w-6 h-6" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+      <DialogContent dividers>
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Submit Error Alert */}
           {submitError && (
             <ErrorAlert
@@ -505,26 +550,33 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
           </FormSection>
 
           {/* Form Actions */}
-          <div className="flex gap-3 pt-6 border-t border-gray-200">
-            <button
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ pt: 3, borderTop: 1, borderColor: 'divider' }}
+          >
+            <Button
               type="submit"
+              variant="contained"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition"
               aria-busy={loading}
               aria-label="Create requirement"
+              sx={{ flex: 1 }}
             >
               {loading ? 'Creating...' : 'Create Requirement'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outlined"
+              color="inherit"
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+              sx={{ flex: 1 }}
             >
               Cancel
-            </button>
-          </div>
+            </Button>
+          </Stack>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

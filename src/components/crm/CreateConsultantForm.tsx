@@ -5,6 +5,20 @@ import { useToast } from '../../contexts/ToastContext';
 import { createConsultant } from '../../lib/api/consultants';
 import { validateConsultantForm } from '../../lib/formValidation';
 import { ErrorAlert } from '../common/ErrorAlert';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import type { SelectChangeEvent } from '@mui/material/Select';
 
 type Project = {
   id: string;
@@ -29,7 +43,7 @@ interface FormFieldProps {
   type?: string;
   placeholder?: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => void;
   required?: boolean;
   options?: FormFieldOption[];
   error?: string;
@@ -49,54 +63,42 @@ const FormField = memo(function FormField({
 }: FormFieldProps) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        {label}
-        {required && <span className="text-red-500">*</span>}
-      </label>
       {type === 'select' ? (
-        <select
+        <TextField
+          select
+          label={label}
           name={name}
           value={value}
           onChange={onChange}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
+          required={required}
+          error={Boolean(error)}
+          helperText={error || ' '}
+          size="small"
+          fullWidth
         >
-          <option value="">Select {label.toLowerCase()}</option>
+          <MenuItem value="">Select {label.toLowerCase()}</MenuItem>
           {options?.map((opt: FormFieldOption) => (
-            <option key={opt.value} value={opt.value}>
+            <MenuItem key={opt.value} value={opt.value}>
               {opt.label}
-            </option>
+            </MenuItem>
           ))}
-        </select>
-      ) : type === 'textarea' ? (
-        <textarea
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          rows={4}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
-        />
+        </TextField>
       ) : (
-        <input
-          type={type}
+        <TextField
+          label={label}
           name={name}
+          type={type === 'textarea' ? 'text' : type}
           value={value}
-          onChange={onChange}
+          onChange={onChange as unknown as (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void}
           placeholder={placeholder}
           required={required}
-          className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-            error ? 'border-red-500 ring-2 ring-red-200' : 'border-gray-300'
-          }`}
+          error={Boolean(error)}
+          helperText={error || ' '}
+          size="small"
+          fullWidth
+          multiline={type === 'textarea'}
+          rows={type === 'textarea' ? 4 : undefined}
         />
-      )}
-      {error && (
-        <div className="flex items-center gap-2 mt-2 text-red-600 text-sm bg-red-50 p-2 rounded">
-          <span>{error}</span>
-        </div>
       )}
     </div>
   );
@@ -165,8 +167,8 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
     description: '',
   });
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
+    const { name, value } = e.target as { name: string; value: string };
     setFormData(prevState => ({ ...prevState, [name]: value }));
   }, []);
 
@@ -300,19 +302,18 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Add New Consultant</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Add New Consultant
+        </Typography>
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+          <X className="w-6 h-6" />
+        </IconButton>
+      </DialogTitle>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+      <DialogContent dividers>
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Submit Error Alert */}
           {submitError && (
             <ErrorAlert
@@ -630,148 +631,188 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
               {projects.length > 0 && (
                 <div className="space-y-3">
                   {projects.map(project => (
-                    <div key={project.id} className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-start">
-                      <div>
-                        <p className="font-medium text-gray-900">{project.name}</p>
-                        <p className="text-sm text-gray-600">{project.domain} • {project.city}, {project.state}</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                    <Paper
+                      key={project.id}
+                      variant="outlined"
+                      sx={{ p: 2, display: 'flex', justifyContent: 'space-between', gap: 2, bgcolor: 'rgba(212,175,55,0.08)' }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                          {project.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {project.domain} • {project.city}, {project.state}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
                           {project.start_date} - {project.currently_working ? 'Present' : project.end_date}
-                        </p>
+                        </Typography>
                         {project.description && (
-                          <p className="text-sm text-gray-700 mt-2">{project.description}</p>
+                          <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>
+                            {project.description}
+                          </Typography>
                         )}
-                      </div>
-                      <button
+                      </Box>
+                      <IconButton
                         type="button"
                         onClick={() => handleRemoveProject(project.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        color="error"
+                        aria-label="Remove project"
                       >
                         <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                      </IconButton>
+                    </Paper>
                   ))}
                 </div>
               )}
 
               {!showProjectForm ? (
-                <button
+                <Button
                   type="button"
+                  variant="outlined"
                   onClick={() => setShowProjectForm(true)}
-                  className="w-full px-4 py-3 border-2 border-dashed border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition"
+                  sx={{ width: '100%', borderStyle: 'dashed', borderWidth: 2 }}
                 >
                   + Add Project
-                </button>
+                </Button>
               ) : (
-                <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <input
-                      type="text"
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                      gap: 2,
+                      mb: 2,
+                    }}
+                  >
+                    <TextField
+                      label="Project name"
                       name="name"
-                      placeholder="Project name"
                       value={projectForm.name}
                       onChange={handleProjectFormChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      size="small"
+                      fullWidth
                     />
-                    <input
-                      type="text"
+                    <TextField
+                      label="Project domain"
                       name="domain"
-                      placeholder="Project domain"
                       value={projectForm.domain}
                       onChange={handleProjectFormChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      size="small"
+                      fullWidth
                     />
-                    <input
-                      type="text"
+                    <TextField
+                      label="City"
                       name="city"
-                      placeholder="City"
                       value={projectForm.city}
                       onChange={handleProjectFormChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      size="small"
+                      fullWidth
                     />
-                    <input
-                      type="text"
+                    <TextField
+                      label="State"
                       name="state"
-                      placeholder="State"
                       value={projectForm.state}
                       onChange={handleProjectFormChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      size="small"
+                      fullWidth
                     />
-                    <input
+                    <TextField
+                      label="Start date"
                       type="date"
                       name="start_date"
                       value={projectForm.start_date}
                       onChange={handleProjectFormChange}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      size="small"
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
                     />
-                    <div className="flex items-center gap-3">
-                      <input
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 1 }}>
+                      <TextField
+                        label="End date"
                         type="date"
                         name="end_date"
                         disabled={projectForm.currently_working}
                         value={projectForm.end_date}
                         onChange={handleProjectFormChange}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        size="small"
+                        fullWidth
+                        InputLabelProps={{ shrink: true }}
                       />
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="currently_working"
-                          checked={projectForm.currently_working}
-                          onChange={handleProjectFormChange}
-                          className="rounded"
-                        />
-                        <span>Currently working</span>
-                      </label>
-                    </div>
-                  </div>
-                  <textarea
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            name="currently_working"
+                            checked={projectForm.currently_working}
+                            onChange={handleProjectFormChange}
+                          />
+                        }
+                        label="Currently working"
+                      />
+                    </Box>
+                  </Box>
+
+                  <TextField
+                    label="Project description"
                     name="description"
-                    placeholder="Project description"
                     value={projectForm.description}
                     onChange={handleProjectFormChange}
+                    size="small"
+                    fullWidth
+                    multiline
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    sx={{ mb: 2 }}
                   />
-                  <div className="flex gap-3">
-                    <button
+
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                    <Button
                       type="button"
+                      variant="contained"
                       onClick={handleAddProject}
-                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm"
+                      sx={{ flex: 1 }}
                     >
                       Save Project
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="outlined"
+                      color="inherit"
                       onClick={() => setShowProjectForm(false)}
-                      className="flex-1 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 text-sm"
+                      sx={{ flex: 1 }}
                     >
                       Cancel
-                    </button>
-                  </div>
-                </div>
+                    </Button>
+                  </Stack>
+                </Paper>
               )}
             </div>
           </FormSection>
 
           {/* Form Actions */}
-          <div className="flex gap-3 pt-6 border-t border-gray-200">
-            <button
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{ pt: 3, borderTop: 1, borderColor: 'divider' }}
+          >
+            <Button
               type="submit"
+              variant="contained"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 transition"
+              sx={{ flex: 1 }}
             >
               {loading ? 'Adding...' : 'Add Consultant'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outlined"
+              color="inherit"
               onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+              sx={{ flex: 1 }}
             >
               Cancel
-            </button>
-          </div>
+            </Button>
+          </Stack>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

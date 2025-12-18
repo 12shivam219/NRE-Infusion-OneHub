@@ -56,19 +56,20 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
   );
 
   useEffect(() => {
+    const missingIds = actorIds.filter(id => !userNames.has(id));
+    
+    if (missingIds.length === 0) return;
+    
     const fetchActors = async () => {
       const next = new Map(userNames);
-      for (const id of actorIds) {
-        if (next.has(id)) continue;
+      for (const id of missingIds) {
         const user = await getUserName(id);
         next.set(id, { name: user?.full_name || 'Unknown', email: user?.email || undefined });
       }
       setUserNames(next);
     };
-    if (actorIds.length > 0) {
-      fetchActors();
-    }
-  }, [actorIds]);
+    fetchActors();
+  }, [actorIds, userNames]);
 
   if (loading) {
     return (
@@ -97,7 +98,7 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
   return (
     <div className="border border-gray-200 rounded-lg bg-white">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
-        <Activity className="w-4 h-4 text-blue-600" />
+        <Activity className="w-4 h-4 text-primary-600" />
         <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
       </div>
       <ul className="divide-y divide-gray-100">

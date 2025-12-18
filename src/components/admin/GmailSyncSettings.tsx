@@ -309,7 +309,7 @@ const GmailSyncSettings: React.FC = () => {
             <button
               onClick={handleSettingsUpdate}
               disabled={loading}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="w-full px-4 py-2 bg-primary-800 text-white rounded-lg font-medium hover:bg-primary-900 transition-colors disabled:opacity-50"
             >
               {loading ? 'Updating...' : 'Update Settings'}
             </button>
@@ -337,7 +337,7 @@ const GmailSyncSettings: React.FC = () => {
           <button
             onClick={handleConnect}
             disabled={connecting}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors inline-flex items-center gap-2 disabled:opacity-50"
+            className="px-6 py-3 bg-primary-800 text-white rounded-lg font-medium hover:bg-primary-900 transition-colors inline-flex items-center gap-2 disabled:opacity-50"
           >
             <Mail className="w-4 h-4" />
             {connecting ? 'Connecting...' : 'Connect Gmail Account'}

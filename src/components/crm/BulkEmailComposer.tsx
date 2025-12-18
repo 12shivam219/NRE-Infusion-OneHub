@@ -1,11 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Send, Loader, Users, Mail as MailIcon } from 'lucide-react';
+import { Send, Loader, Mail as MailIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
-import {
-  createBulkEmailCampaign,
-  sendBulkEmailCampaign,
-} from '../../lib/api/bulkEmailCampaigns';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Stepper from '@mui/material/Stepper';
+import Step from '@mui/material/Step';
+import StepLabel from '@mui/material/StepLabel';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
+import LinearProgress from '@mui/material/LinearProgress';
+import { createBulkEmailCampaign, sendBulkEmailCampaign } from '../../lib/api/bulkEmailCampaigns';
 import { getEmailAccounts } from '../../lib/api/emailAccounts';
 
 interface BulkEmailCampaignRow {
@@ -181,273 +199,289 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
 
   if (!user) {
     return (
-      <div className="text-center p-6 text-gray-600">
-        Please sign in to send bulk emails
-      </div>
+      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          Please sign in to send bulk emails
+        </Typography>
+      </Paper>
     );
   }
 
+  const steps = ['recipients', 'compose', 'review', 'sending'] as const;
+  const activeStepIndex = steps.indexOf(step);
+
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col h-[700px]">
+    <Dialog
+      open
+      onClose={() => onClose?.()}
+      fullWidth
+      maxWidth="md"
+      scroll="paper"
+      slotProps={{
+        backdrop: { sx: { backdropFilter: 'blur(4px)' } }
+      }}
+      PaperProps={{
+        sx: {
+          boxShadow: 24,
+        }
+      }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-2">
-          <MailIcon className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Bulk Email Campaign</h2>
-        </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded transition"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+      <DialogTitle sx={{ pr: 7 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <MailIcon className="w-5 h-5" />
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            Bulk Email Campaign
+          </Typography>
+        </Stack>
+        {onClose ? (
+          <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+            <Box component="span">✕</Box>
+          </IconButton>
+        ) : null}
+      </DialogTitle>
 
       {/* Progress Indicator */}
-      <div className="flex gap-2 px-4 py-3 bg-gray-100 text-sm border-b border-gray-200">
-        {(['recipients', 'compose', 'review', 'sending'] as const).map((s, i) => (
-          <div key={s} className="flex items-center">
-            <div
-              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                step === s
-                  ? 'bg-blue-600 text-white'
-                  : step > s || ['sending'].includes(step)
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-300 text-gray-700'
-              }`}
-            >
-              {i + 1}
-            </div>
-            <span className="ml-2 font-medium text-gray-700">
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </span>
-            {i < 3 && <div className="w-4 h-px bg-gray-300 mx-2" />}
-          </div>
-        ))}
-      </div>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Stepper activeStep={Math.max(0, activeStepIndex)} alternativeLabel>
+            <Step>
+              <StepLabel>Recipients</StepLabel>
+            </Step>
+            <Step>
+              <StepLabel>Compose</StepLabel>
+            </Step>
+            <Step>
+              <StepLabel>Review</StepLabel>
+            </Step>
+            <Step>
+              <StepLabel>Sending</StepLabel>
+            </Step>
+          </Stepper>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
-        {/* Step 1: Recipients */}
-        {step === 'recipients' && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                <Users className="w-4 h-4 inline mr-2" />
-                Enter Recipients
-              </label>
-              <textarea
-                value={recipientsText}
-                onChange={(e) => setRecipientsText(e.target.value)}
-                placeholder="Email addresses (one per line or comma-separated):&#10;john@example.com,John Doe&#10;jane@example.com,Jane Smith"
-                rows={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
-              />
-              <p className="text-xs text-gray-600 mt-2">
-                Format: email@example.com or email@example.com,Name
-              </p>
-            </div>
-
-            <button
-              onClick={handleParseRecipients}
-              disabled={!recipientsText.trim()}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium"
-            >
-              Continue with {parseRecipients(recipientsText).length} Recipients
-            </button>
-          </div>
-        )}
-
-        {/* Step 2: Compose */}
-        {step === 'compose' && (
-          <div className="space-y-4">
-            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-900">
-                ✓ {recipients.length} recipients selected
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Subject
-              </label>
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Email subject"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                Body
-              </label>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Email message"
-                rows={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rotationEnabled}
-                  onChange={(e) => setRotationEnabled(e.target.checked)}
-                  className="w-4 h-4"
+          {/* Content */}
+          <Box>
+            {/* Step 1: Recipients */}
+            {step === 'recipients' && (
+              <Stack spacing={2}>
+                <TextField
+                  label="Enter Recipients"
+                  multiline
+                  minRows={8}
+                  value={recipientsText}
+                  onChange={(e) => setRecipientsText(e.target.value)}
+                  placeholder="Email addresses (one per line or comma-separated):\njohn@example.com,John Doe\njane@example.com,Jane Smith"
+                  fullWidth
                 />
-                <span className="text-sm font-medium text-gray-900">
-                  Enable Email Rotation
-                </span>
-              </label>
+                <Typography variant="caption" color="text.secondary">
+                  Format: email@example.com or email@example.com,Name
+                </Typography>
+              </Stack>
+            )}
 
-              {rotationEnabled && (
-                <div className="ml-7">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Emails per Account
-                  </label>
-                  <select
-                    value={emailsPerAccount}
-                    onChange={(e) => setEmailsPerAccount(parseInt(e.target.value))}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={5}>5 emails</option>
-                    <option value={10}>10 emails</option>
-                    <option value={15}>15 emails</option>
-                  </select>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {accounts.length > 0
-                      ? `Will use ${accounts.length} accounts: ${accounts.map((a) => a.email_address).join(', ')}`
-                      : 'No accounts configured'}
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Step 2: Compose */}
+            {step === 'compose' && (
+              <Stack spacing={2}>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(212,175,55,0.10)', borderColor: 'rgba(212,175,55,0.35)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    ✓ {recipients.length} recipients selected
+                  </Typography>
+                </Paper>
 
-            <button
-              onClick={handleCreateCampaign}
-              disabled={loading}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition font-medium flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Review Campaign'
-              )}
-            </button>
-          </div>
-        )}
+                <TextField
+                  label="Subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Email subject"
+                  fullWidth
+                />
 
-        {/* Step 3: Review */}
-        {step === 'review' && campaign && (
-          <div className="space-y-4">
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <p className="text-sm text-green-900 font-medium">✓ Campaign Ready to Send</p>
-            </div>
+                <TextField
+                  label="Body"
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Email message"
+                  multiline
+                  minRows={6}
+                  fullWidth
+                />
 
-            <div className="space-y-2">
-              <h4 className="font-semibold text-gray-900">Campaign Summary</h4>
-              <div className="text-sm text-gray-700 space-y-1">
-                <p><span className="font-medium">Recipients:</span> {campaign.total_recipients}</p>
-                <p><span className="font-medium">Subject:</span> {campaign.subject}</p>
-                <p><span className="font-medium">Rotation:</span> {campaign.rotation_enabled ? `Enabled (${campaign.emails_per_account} per account)` : 'Disabled'}</p>
-              </div>
-            </div>
+                <FormControlLabel
+                  control={<Checkbox checked={rotationEnabled} onChange={(e) => setRotationEnabled(e.target.checked)} />}
+                  label="Enable Email Rotation"
+                />
 
-            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-40 overflow-y-auto">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{campaign.body}</p>
-            </div>
+                {rotationEnabled && (
+                  <Stack spacing={1} sx={{ pl: 1 }}>
+                    <FormControl size="small" sx={{ maxWidth: 220 }}>
+                      <InputLabel id="emails-per-account-label">Emails per Account</InputLabel>
+                      <Select
+                        labelId="emails-per-account-label"
+                        value={String(emailsPerAccount)}
+                        label="Emails per Account"
+                        onChange={(e) => setEmailsPerAccount(parseInt(String(e.target.value), 10))}
+                      >
+                        <MenuItem value="5">5 emails</MenuItem>
+                        <MenuItem value="10">10 emails</MenuItem>
+                        <MenuItem value="15">15 emails</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <Typography variant="caption" color="text.secondary">
+                      {accounts.length > 0
+                        ? `Will use ${accounts.length} accounts: ${accounts.map((a) => a.email_address).join(', ')}`
+                        : 'No accounts configured'}
+                    </Typography>
+                  </Stack>
+                )}
+              </Stack>
+            )}
 
-            <button
-              onClick={handleSendCampaign}
-              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium flex items-center justify-center gap-2"
-            >
-              <Send className="w-4 h-4" />
-              Send Campaign Now
-            </button>
-          </div>
-        )}
+            {/* Step 3: Review */}
+            {step === 'review' && campaign && (
+              <Stack spacing={2}>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.30)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    ✓ Campaign Ready to Send
+                  </Typography>
+                </Paper>
 
-        {/* Step 4: Sending */}
-        {step === 'sending' && sendingProgress && (
-          <div className="space-y-4">
-            <div className="text-center">
-              <Loader className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Sending Campaign</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Please wait while we send your emails...
-              </p>
-            </div>
+                <Stack spacing={0.5}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Campaign Summary
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Recipients: {campaign.total_recipients}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Subject: {campaign.subject}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Rotation: {campaign.rotation_enabled ? `Enabled (${campaign.emails_per_account} per account)` : 'Disabled'}
+                  </Typography>
+                </Stack>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-700">Progress</span>
-                <span className="font-medium">
-                  {sendingProgress.sent + sendingProgress.failed}/{sendingProgress.total}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full transition-all"
-                  style={{
-                    width: `${((sendingProgress.sent + sendingProgress.failed) / sendingProgress.total) * 100}%`,
+                <Paper variant="outlined" sx={{ p: 2, maxHeight: 220, overflowY: 'auto', bgcolor: 'background.default' }}>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {campaign.body}
+                  </Typography>
+                </Paper>
+              </Stack>
+            )}
+
+            {/* Step 4: Sending */}
+            {step === 'sending' && sendingProgress && (
+              <Stack spacing={2}>
+                <Stack spacing={0.5} alignItems="center">
+                  <Loader className="w-10 h-10 animate-spin" />
+                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                    Sending Campaign
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Please wait while we send your emails...
+                  </Typography>
+                </Stack>
+
+                <Stack spacing={1}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="body2" color="text.secondary">Progress</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {sendingProgress.sent + sendingProgress.failed}/{sendingProgress.total}
+                    </Typography>
+                  </Stack>
+                  <LinearProgress
+                    variant="determinate"
+                    value={sendingProgress.total > 0 ? ((sendingProgress.sent + sendingProgress.failed) / sendingProgress.total) * 100 : 0}
+                  />
+                </Stack>
+
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 1,
                   }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="p-3 bg-green-50 rounded-lg text-center">
-                <p className="text-2xl font-bold text-green-600">{sendingProgress.sent}</p>
-                <p className="text-xs text-gray-600">Sent</p>
-              </div>
-              <div className="p-3 bg-red-50 rounded-lg text-center">
-                <p className="text-2xl font-bold text-red-600">{sendingProgress.failed}</p>
-                <p className="text-xs text-gray-600">Failed</p>
-              </div>
-              <div className="p-3 bg-gray-50 rounded-lg text-center">
-                <p className="text-2xl font-bold text-gray-600">{sendingProgress.total}</p>
-                <p className="text-xs text-gray-600">Total</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+                >
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'success.main' }}>{sendingProgress.sent}</Typography>
+                    <Typography variant="caption" color="text.secondary">Sent</Typography>
+                  </Paper>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>{sendingProgress.failed}</Typography>
+                    <Typography variant="caption" color="text.secondary">Failed</Typography>
+                  </Paper>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'text.secondary' }}>{sendingProgress.total}</Typography>
+                    <Typography variant="caption" color="text.secondary">Total</Typography>
+                  </Paper>
+                </Box>
+              </Stack>
+            )}
+          </Box>
+        </Stack>
+      </DialogContent>
 
       {/* Footer */}
-      {step !== 'sending' && (
-        <div className="border-t border-gray-200 bg-gray-50 p-4 flex gap-2">
-          {step !== 'recipients' && (
-            <button
-              onClick={() => {
-                if (step === 'compose') setStep('recipients');
-                if (step === 'review') setStep('compose');
-              }}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium"
-            >
-              Back
-            </button>
-          )}
-          {step === 'recipients' && (
-            <button
-              onClick={() => onClose?.()}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium"
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+      <DialogActions>
+        {step !== 'sending' ? (
+          <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
+            {step !== 'recipients' ? (
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => {
+                  if (step === 'compose') setStep('recipients');
+                  if (step === 'review') setStep('compose');
+                }}
+                sx={{ flex: 1 }}
+              >
+                Back
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => onClose?.()}
+                sx={{ flex: 1 }}
+              >
+                Cancel
+              </Button>
+            )}
+
+            {step === 'recipients' ? (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleParseRecipients}
+                disabled={!recipientsText.trim()}
+                sx={{ flex: 1 }}
+              >
+                Continue with {parseRecipients(recipientsText).length} Recipients
+              </Button>
+            ) : step === 'compose' ? (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleCreateCampaign}
+                disabled={loading}
+                startIcon={loading ? <Loader className="w-4 h-4 animate-spin" /> : undefined}
+                sx={{ flex: 1 }}
+              >
+                {loading ? 'Creating...' : 'Review Campaign'}
+              </Button>
+            ) : step === 'review' && campaign ? (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleSendCampaign}
+                startIcon={<Send className="w-4 h-4" />}
+                sx={{ flex: 1 }}
+              >
+                Send Campaign Now
+              </Button>
+            ) : null}
+          </Stack>
+        ) : null}
+      </DialogActions>
+    </Dialog>
   );
 };

@@ -16,6 +16,7 @@ import {
   Globe,
   MonitorSmartphone,
   AlertTriangle,
+  HardDrive,
 } from 'lucide-react';
 import {
   getAllUsers,
@@ -40,6 +41,9 @@ import type { Database, UserRole, UserStatus, ErrorStatus } from '../../lib/data
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { EmailAccountsSettings } from './EmailAccountsSettings';
+import { SyncDashboard } from './SyncDashboard';
+import { OfflineCacheSettings } from './OfflineCacheSettings';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -50,7 +54,7 @@ type Attachment = Database['public']['Tables']['attachments']['Row'];
 // `user_sessions` table type from DB schema
 type UserSession = Database['public']['Tables']['user_sessions']['Row'];
 
-type TabType = 'dashboard' | 'approvals' | 'security' | 'errors' | 'email-accounts';
+type TabType = 'dashboard' | 'approvals' | 'security' | 'errors' | 'email-accounts' | 'offline-sync' | 'cache-settings';
 
 type ApprovalStatistics = {
   pendingApproval: number;
@@ -92,7 +96,7 @@ const roleDirectory: { role: UserRole; label: string; description: string }[] = 
 
 const errorStatusStyles: Record<ErrorStatus, string> = {
   new: 'bg-red-100 text-red-700',
-  in_progress: 'bg-blue-100 text-blue-700',
+  in_progress: 'bg-primary-100 text-primary-800',
   resolved: 'bg-green-100 text-green-700',
   closed: 'bg-gray-200 text-gray-700',
 };
@@ -164,6 +168,9 @@ export const AdminPage = () => {
   const [userDetailLoading, setUserDetailLoading] = useState(false);
   const [forceLogoutLoading, setForceLogoutLoading] = useState(false);
   const [focusedLoginId, setFocusedLoginId] = useState<string | null>(null);
+  const [sessionToRevoke, setSessionToRevoke] = useState<{ id: string; userId?: string } | null>(null);
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
+  const [showForceLogoutConfirm, setShowForceLogoutConfirm] = useState(false);
   const loginHistoryContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [approvals, setApprovals] = useState<User[]>([]);
@@ -550,15 +557,19 @@ export const AdminPage = () => {
     await handleUserStatusChange(userId, 'rejected', reason || undefined);
   };
 
+  const [bulkActionProgress, setBulkActionProgress] = useState({ current: 0, total: 0, action: '' });
+
   const handleBulkApprove = async () => {
     if (selectedApprovals.length === 0) return;
     setBulkActionInProgress(true);
+    setBulkActionProgress({ current: 0, total: selectedApprovals.length, action: 'Approving' });
     try {
       const batchSize = 5;
       let failures: string[] = [];
       
       for (let i = 0; i < selectedApprovals.length; i += batchSize) {
         const batch = selectedApprovals.slice(i, i + batchSize);
+        setBulkActionProgress({ current: i, total: selectedApprovals.length, action: 'Approving' });
         const responses = await Promise.all(
           batch.map((userId) =>
             updateUserStatus(userId, 'approved', { adminId: adminId ?? undefined })
@@ -566,6 +577,7 @@ export const AdminPage = () => {
         );
         const batchFailures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
         failures = [...failures, ...batchFailures];
+        setBulkActionProgress({ current: Math.min(i + batchSize, selectedApprovals.length), total: selectedApprovals.length, action: 'Approving' });
         if (i + batchSize < selectedApprovals.length) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -587,6 +599,7 @@ export const AdminPage = () => {
     } finally {
       setSelectedApprovals([]);
       setBulkActionInProgress(false);
+      setBulkActionProgress({ current: 0, total: 0, action: '' });
       await loadUsers();
       await loadApprovals();
     }
@@ -596,12 +609,14 @@ export const AdminPage = () => {
     if (selectedApprovals.length === 0) return;
     const reason = window.prompt('Optional: provide a rejection reason for the selected users.');
     setBulkActionInProgress(true);
+    setBulkActionProgress({ current: 0, total: selectedApprovals.length, action: 'Rejecting' });
     try {
       const batchSize = 5;
       let failures: string[] = [];
       
       for (let i = 0; i < selectedApprovals.length; i += batchSize) {
         const batch = selectedApprovals.slice(i, i + batchSize);
+        setBulkActionProgress({ current: i, total: selectedApprovals.length, action: 'Rejecting' });
         const responses = await Promise.all(
           batch.map((userId) =>
             updateUserStatus(userId, 'rejected', {
@@ -612,6 +627,7 @@ export const AdminPage = () => {
         );
         const batchFailures = responses.filter((res) => !res.success && res.error).map((res) => res.error ?? 'Unknown error');
         failures = [...failures, ...batchFailures];
+        setBulkActionProgress({ current: Math.min(i + batchSize, selectedApprovals.length), total: selectedApprovals.length, action: 'Rejecting' });
         if (i + batchSize < selectedApprovals.length) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -633,6 +649,7 @@ export const AdminPage = () => {
     } finally {
       setSelectedApprovals([]);
       setBulkActionInProgress(false);
+      setBulkActionProgress({ current: 0, total: 0, action: '' });
       await loadUsers();
       await loadApprovals();
     }
@@ -651,27 +668,37 @@ export const AdminPage = () => {
     setFocusedLoginId(null);
   };
 
-  const handleRevokeSession = async (sessionId: string, userId?: string) => {
-    const confirmed = window.confirm('Revoke this session? The user will be signed out on that device.');
-    if (!confirmed) return;
-    const result = await revokeSession(sessionId, {
+  const handleRevokeSessionClick = (sessionId: string, userId?: string) => {
+    setSessionToRevoke({ id: sessionId, userId });
+    setShowRevokeConfirm(true);
+  };
+
+  const handleRevokeSession = async () => {
+    if (!sessionToRevoke) return;
+    const result = await revokeSession(sessionToRevoke.id, {
       adminId: adminId ?? undefined,
-      targetUserId: userId,
+      targetUserId: sessionToRevoke.userId,
     });
     if (!result.success && result.error) {
       showToast({ type: 'error', title: 'Failed to revoke session', message: result.error });
     } else {
       showToast({ type: 'success', title: 'Session revoked', message: 'The selected session was revoked.' });
     }
+    setShowRevokeConfirm(false);
+    setSessionToRevoke(null);
     if (selectedUser) {
       await loadUserContext(selectedUser);
     }
   };
 
+  // handleForceLogoutClick is used in JSX below
+  const handleForceLogoutClick = useCallback(() => {
+    if (!selectedUser) return;
+    setShowForceLogoutConfirm(true);
+  }, [selectedUser]);
+
   const handleForceLogout = async () => {
     if (!selectedUser) return;
-    const confirmed = window.confirm(`Force logout all active sessions for ${selectedUser.full_name}?`);
-    if (!confirmed) return;
     setForceLogoutLoading(true);
     const result = await forceLogoutUserSessions(selectedUser.id, { adminId: adminId ?? undefined });
     if (!result.success && result.error) {
@@ -679,6 +706,7 @@ export const AdminPage = () => {
     } else {
       showToast({ type: 'success', title: 'User logged out', message: 'All active sessions were revoked.' });
     }
+    setShowForceLogoutConfirm(false);
     await loadUserContext(selectedUser);
     setForceLogoutLoading(false);
   };
@@ -795,13 +823,15 @@ export const AdminPage = () => {
     { id: 'security' as TabType, label: 'Security Watch', icon: ShieldAlert },
     { id: 'errors' as TabType, label: 'Error Reports', icon: Bug },
     { id: 'email-accounts' as TabType, label: 'Email Accounts', icon: Mail },
+    { id: 'offline-sync' as TabType, label: 'Sync Dashboard', icon: RefreshCw },
+    { id: 'cache-settings' as TabType, label: 'Cache Management', icon: HardDrive },
   ];
 
   // --- MOVED: Conditional check is now AFTER all hooks ---
   if (!isAdmin) {
     return (
       <div className="p-8">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6 text-center">
+        <div className="max-w-2xl mx-auto card-base p-6 text-center">
           <h2 className="text-2xl font-semibold text-gray-900">Not authorized</h2>
           <p className="text-gray-600 mt-2">You do not have permission to view the Admin Panel.</p>
           <p className="text-gray-500 mt-4">Use the sidebar to access available sections for your role.</p>
@@ -830,7 +860,7 @@ export const AdminPage = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-6 py-4 font-medium transition whitespace-nowrap ${
                   isActive
-                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                    ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
@@ -845,13 +875,13 @@ export const AdminPage = () => {
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
+                <div className="bg-primary-50 border border-primary-100 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-blue-700">Total Users</p>
-                      <p className="text-2xl font-semibold text-blue-900">{users.length}</p>
+                      <p className="text-sm text-primary-800">Total Users</p>
+                      <p className="text-2xl font-semibold text-primary-900">{users.length}</p>
                     </div>
-                    <UsersIcon className="w-8 h-8 text-blue-400" />
+                    <UsersIcon className="w-8 h-8 text-primary-400" />
                   </div>
                 </div>
                 <div className="bg-green-50 border border-green-100 rounded-lg p-4">
@@ -907,7 +937,7 @@ export const AdminPage = () => {
                           value={userSearchTerm}
                           onChange={(event) => setUserSearchTerm(event.target.value)}
                           placeholder="Search by name or email"
-                          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
                         />
                       </div>
                       <div className="relative">
@@ -915,7 +945,7 @@ export const AdminPage = () => {
                         <select
                           value={userRoleFilter}
                           onChange={(event) => setUserRoleFilter(event.target.value as 'all' | UserRole)}
-                          className="pl-9 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="pl-9 pr-8 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
                         >
                           <option value="all">All roles</option>
                           <option value="admin">Admin</option>
@@ -951,7 +981,7 @@ export const AdminPage = () => {
                                 <tr key={user.id} className="hover:bg-gray-50">
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold flex-shrink-0">
+                                      <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-800 flex items-center justify-center font-semibold flex-shrink-0">
                                         {getInitials(user.full_name)}
                                       </div>
                                       <div className="min-w-0">
@@ -964,7 +994,7 @@ export const AdminPage = () => {
                                     <select
                                       value={user.role}
                                       onChange={(event) => handleUserRoleChange(user.id, event.target.value as UserRole)}
-                                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary-600"
                                     >
                                       <option value="user">User</option>
                                       <option value="marketing">Marketing</option>
@@ -988,7 +1018,7 @@ export const AdminPage = () => {
                                   <td className="px-6 py-4">
                                     <button
                                       onClick={() => handleOpenUser(user)}
-                                      className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                                      className="text-primary-700 hover:text-primary-800 font-medium text-sm"
                                     >
                                       View
                                     </button>
@@ -1006,7 +1036,7 @@ export const AdminPage = () => {
                 <aside className="space-y-4">
                   <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <ShieldAlert className="w-5 h-5 text-blue-500" />
+                      <ShieldAlert className="w-5 h-5 text-primary-500" />
                       Role Directory
                     </h3>
                     <div className="space-y-4">
@@ -1065,31 +1095,52 @@ export const AdminPage = () => {
                     Review new signups, approve qualified accounts, or provide guidance when rejecting.
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleBulkApprove}
-                    disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
-                      selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
-                        ? 'bg-green-100 text-green-400 cursor-not-allowed'
-                        : 'bg-green-600 text-white hover:bg-green-700'
-                    }`}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    {bulkActionInProgress ? 'Processing…' : 'Bulk approve'}
-                  </button>
-                  <button
-                    onClick={handleBulkReject}
-                    disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
-                      selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
-                        ? 'bg-red-100 text-red-400 cursor-not-allowed'
-                        : 'bg-red-600 text-white hover:bg-red-700'
-                    }`}
-                  >
-                    <XCircle className="w-4 h-4" />
-                    {bulkActionInProgress ? 'Processing…' : 'Bulk reject'}
-                  </button>
+                <div className="flex flex-col gap-3">
+                  {/* Bulk Action Progress */}
+                  {bulkActionInProgress && bulkActionProgress.total > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-blue-900">
+                          {bulkActionProgress.action} {bulkActionProgress.current} of {bulkActionProgress.total}
+                        </span>
+                        <span className="text-xs text-blue-700">
+                          {Math.round((bulkActionProgress.current / bulkActionProgress.total) * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-blue-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${(bulkActionProgress.current / bulkActionProgress.total) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleBulkApprove}
+                      disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                        selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
+                          ? 'bg-green-100 text-green-400 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {bulkActionInProgress ? 'Processing…' : 'Bulk approve'}
+                    </button>
+                    <button
+                      onClick={handleBulkReject}
+                      disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                        selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
+                          ? 'bg-red-100 text-red-400 cursor-not-allowed'
+                          : 'bg-red-600 text-white hover:bg-red-700'
+                      }`}
+                    >
+                      <XCircle className="w-4 h-4" />
+                      {bulkActionInProgress ? 'Processing…' : 'Bulk reject'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1463,6 +1514,14 @@ export const AdminPage = () => {
           {activeTab === 'email-accounts' && (
             <EmailAccountsSettings />
           )}
+
+          {activeTab === 'offline-sync' && (
+            <SyncDashboard />
+          )}
+
+          {activeTab === 'cache-settings' && (
+            <OfflineCacheSettings />
+          )}
         </div>
       </nav>
 
@@ -1521,7 +1580,7 @@ export const AdminPage = () => {
                   </div>
                 </div>
                 <button
-                  onClick={handleForceLogout}
+                  onClick={handleForceLogoutClick}
                   disabled={forceLogoutLoading}
                   className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
                     forceLogoutLoading
@@ -1560,7 +1619,7 @@ export const AdminPage = () => {
                             </div>
                           </div>
                           <button
-                            onClick={() => handleRevokeSession(session.id, session.user_id)}
+                            onClick={() => handleRevokeSessionClick(session.id, session.user_id ?? undefined)}
                             className="text-red-600 hover:text-red-700 text-sm font-medium"
                           >
                             Revoke
@@ -1759,8 +1818,8 @@ export const AdminPage = () => {
                     disabled={!errorNoteDraft.trim()}
                     className={`px-4 py-2 rounded-lg text-sm font-medium ${
                       errorNoteDraft.trim()
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-blue-100 text-blue-300 cursor-not-allowed'
+                        ? 'bg-primary-800 text-white hover:bg-primary-900'
+                        : 'bg-primary-100 text-primary-300 cursor-not-allowed'
                     }`}
                   >
                     Add note
@@ -1771,6 +1830,34 @@ export const AdminPage = () => {
           </div>
         </div>
       )}
+
+      {/* Revoke Session Confirmation */}
+      <ConfirmDialog
+        isOpen={showRevokeConfirm}
+        onClose={() => {
+          setShowRevokeConfirm(false);
+          setSessionToRevoke(null);
+        }}
+        onConfirm={handleRevokeSession}
+        title="Revoke Session"
+        message="Revoke this session? The user will be signed out on that device."
+        confirmLabel="Revoke"
+        cancelLabel="Cancel"
+        variant="warning"
+      />
+
+      {/* Force Logout Confirmation */}
+      <ConfirmDialog
+        isOpen={showForceLogoutConfirm}
+        onClose={() => setShowForceLogoutConfirm(false)}
+        onConfirm={handleForceLogout}
+        title="Force Logout"
+        message={selectedUser ? `Force logout all active sessions for ${selectedUser.full_name}?` : 'Force logout all active sessions?'}
+        confirmLabel="Force Logout"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={forceLogoutLoading}
+      />
     </div>
   );
 };

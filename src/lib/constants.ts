@@ -24,13 +24,6 @@ export const REQUIREMENT_STATUS_LABELS: Record<string, string> = {
   CLOSED: 'Closed',
 };
 
-// Consultant Status
-export const CONSULTANT_STATUS = {
-  ACTIVE: 'Active',
-  NOT_ACTIVE: 'Not Active',
-  RECENTLY_PLACED: 'Recently Placed',
-} as const;
-
 // Interview Status
 export const INTERVIEW_STATUS = {
   CONFIRMED: 'Confirmed',
@@ -45,7 +38,7 @@ export const INTERVIEW_STATUS = {
 export const INTERVIEW_STATUS_COLORS: Record<string, { badge: string; dot: string }> = {
   'Confirmed': { badge: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
   'Pending': { badge: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-500' },
-  'Scheduled': { badge: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
+  'Scheduled': { badge: 'bg-primary-50 text-primary-800 border-primary-200', dot: 'bg-primary-500' },
   'Completed': { badge: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
   'Cancelled': { badge: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
   'Re-Scheduled': { badge: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
@@ -77,20 +70,6 @@ export const VALIDATION_RULES = {
 export const CACHE_CONFIG = {
   USER_CACHE_TTL: 3600000, // 1 hour in ms
   REQUIREMENTS_CACHE_TTL: 600000, // 10 minutes in ms
-} as const;
-
-// Remote Work Types
-export const REMOTE_TYPES = {
-  REMOTE: 'Remote',
-  ONSITE: 'Onsite',
-  HYBRID: 'Hybrid',
-} as const;
-
-// SLA Thresholds (in days)
-export const SLA_THRESHOLDS = {
-  ON_TRACK: 3,
-  AT_RISK: 7,
-  DELAYED: 30,
 } as const;
 
 // Safe Protocols for URLs

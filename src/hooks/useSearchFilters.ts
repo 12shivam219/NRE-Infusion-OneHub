@@ -18,8 +18,22 @@ export const useSearchFilters = () => {
   const [filters, setFilters] = useState<SearchFiltersState | null>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
 
+  const getDefaultFilters = (): SearchFiltersState => ({
+    searchTerm: '',
+    sortBy: 'date',
+    sortOrder: 'desc',
+    filterStatus: 'ALL',
+    minRate: '',
+    maxRate: '',
+    remoteFilter: 'ALL',
+    dateRangeFrom: '',
+    dateRangeTo: '',
+  });
+
   // Load from localStorage and URL on mount
   useEffect(() => {
+    let cancelled = false;
+
     // Try to get from URL first
     const params = new URLSearchParams(window.location.search);
     const urlFilters = {
@@ -38,33 +52,41 @@ export const useSearchFilters = () => {
     const hasUrlParams = Array.from(params.keys()).length > 0;
 
     if (hasUrlParams) {
-      setFilters(urlFilters);
+      void (async () => {
+        await Promise.resolve();
+        if (cancelled) return;
+        setFilters(urlFilters);
+      })();
     } else {
       // Fall back to localStorage
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
-          setFilters(JSON.parse(stored));
+          void (async () => {
+            await Promise.resolve();
+            if (cancelled) return;
+            setFilters(JSON.parse(stored));
+          })();
         } catch {
-          setFilters(getDefaultFilters());
+          void (async () => {
+            await Promise.resolve();
+            if (cancelled) return;
+            setFilters(getDefaultFilters());
+          })();
         }
       } else {
-        setFilters(getDefaultFilters());
+        void (async () => {
+          await Promise.resolve();
+          if (cancelled) return;
+          setFilters(getDefaultFilters());
+        })();
       }
     }
-  }, []);
 
-  const getDefaultFilters = (): SearchFiltersState => ({
-    searchTerm: '',
-    sortBy: 'date',
-    sortOrder: 'desc',
-    filterStatus: 'ALL',
-    minRate: '',
-    maxRate: '',
-    remoteFilter: 'ALL',
-    dateRangeFrom: '',
-    dateRangeTo: '',
-  });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateFilters = useCallback((newFilters: Partial<SearchFiltersState>) => {
     setFilters(prev => {

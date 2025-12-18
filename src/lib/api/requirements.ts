@@ -90,7 +90,9 @@ export const getRequirementsPage = async (
   options: {
     userId?: string;
     limit?: number;
-    offset?: number;
+    offset?: number; // fallback pagination
+    cursor?: { created_at: string; direction?: 'after' | 'before' };
+    includeCount?: boolean; // avoid costly exact counts by default
     search?: string;
     status?: string | 'ALL';
     dateFrom?: string;
@@ -103,6 +105,8 @@ export const getRequirementsPage = async (
     userId,
     limit = 20,
     offset = 0,
+    cursor,
+    includeCount = false,
     search,
     status,
     dateFrom,
@@ -112,7 +116,8 @@ export const getRequirementsPage = async (
   } = options;
 
   try {
-    let query = supabase.from('requirements').select('*', { count: 'exact' });
+    const countMode = includeCount ? 'exact' : undefined;
+    let query = supabase.from('requirements').select('*', { count: countMode as 'exact' | undefined });
 
     if (userId) query = query.eq('user_id', userId);
     if (status && status !== 'ALL') query = query.eq('status', status);
@@ -121,6 +126,7 @@ export const getRequirementsPage = async (
       const term = `%${search.trim()}%`;
       // Uses pg_trgm extension for fast substring search on large datasets
       // For best performance with 10K+ records, enable GIN indexes on searched columns
+      // Prefer trigram search for single-term substring matches; full-text search (search_vector) can be used via migration.
       query = query.or(`title.ilike.${term},company.ilike.${term},primary_tech_stack.ilike.${term},vendor_company.ilike.${term}`);
     }
 
@@ -131,11 +137,35 @@ export const getRequirementsPage = async (
       query = query.lte('created_at', dateTo);
     }
 
+    // Keyset / cursor pagination: prefer cursor over offset when provided.
     query = query.order(orderBy, { ascending: orderDir === 'asc' });
-    // use range for pagination
-    const start = offset;
-    const end = offset + limit - 1;
-    query = query.range(start, end);
+
+    if (cursor && cursor.created_at) {
+      // Simple keyset using created_at as cursor. For most apps this is sufficient; a tiebreaker on id
+      // could be added if necessary.
+      if (orderDir === 'desc') {
+        // fetch older than cursor
+        if (cursor.direction === 'after') {
+          query = query.lt('created_at', cursor.created_at);
+        } else if (cursor.direction === 'before') {
+          query = query.gt('created_at', cursor.created_at);
+        }
+      } else {
+        if (cursor.direction === 'after') {
+          query = query.gt('created_at', cursor.created_at);
+        } else if (cursor.direction === 'before') {
+          query = query.lt('created_at', cursor.created_at);
+        }
+      }
+
+      // apply page size
+      query = query.limit(limit);
+    } else {
+      // fallback to offset/range pagination
+      const start = offset;
+      const end = offset + limit - 1;
+      query = query.range(start, end);
+    }
 
     const { data, count, error } = await query;
 

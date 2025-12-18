@@ -33,7 +33,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-xl mb-4">
             <LogIn className="w-8 h-8 text-white" aria-hidden="true" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
@@ -62,7 +62,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
               onChange={(e) => setEmail(e.target.value)}
               required
               aria-required="true"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
               placeholder="you@example.com"
             />
           </div>
@@ -78,7 +78,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
               onChange={(e) => setPassword(e.target.value)}
               required
               aria-required="true"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition"
               placeholder="••••••••"
             />
           </div>
@@ -86,7 +86,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary-800 text-white py-3 rounded-lg font-medium hover:bg-primary-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
             aria-busy={loading}
           >
             {loading ? 'Signing in...' : 'Sign In'}
@@ -98,7 +98,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
             Don't have an account?{' '}
             <button
               onClick={onSwitchToRegister}
-              className="text-blue-600 font-medium hover:text-blue-700 transition"
+              className="text-primary-800 font-medium hover:text-primary-900 transition"
               aria-label="Switch to registration form"
             >
               Create Account

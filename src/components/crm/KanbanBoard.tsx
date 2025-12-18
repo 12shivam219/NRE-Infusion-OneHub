@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GripVertical } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { getRequirements, updateRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import { calculateDaysOpen } from '../../lib/requirementUtils';
+import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -38,15 +40,15 @@ const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; on
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-gray-900 truncate">{requirement.title}</p>
-          <p className="text-xs text-gray-600 truncate mt-0.5">{requirement.company || 'No company'}</p>
+          <p title={requirement.title} className="font-semibold text-sm text-gray-900 line-clamp-1 md:line-clamp-none md:overflow-visible">{requirement.title}</p>
+          <p title={requirement.company || 'No company'} className="text-xs text-gray-600 line-clamp-1 md:line-clamp-none md:overflow-visible mt-0.5">{requirement.company || 'No company'}</p>
         </div>
         <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-gray-400 transition-colors" />
       </div>
 
       <div className="flex gap-1.5 mb-2.5 flex-wrap">
         {requirement.primary_tech_stack && (
-          <span className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-700 truncate">
+          <span title={requirement.primary_tech_stack?.split(',')[0]?.trim()} className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-700 overflow-hidden whitespace-nowrap text-ellipsis md:overflow-visible md:whitespace-normal">
             {requirement.primary_tech_stack.split(',')[0].trim()}
           </span>
         )}
@@ -55,7 +57,7 @@ const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; on
       <div className="text-xs text-gray-600 space-y-1.5 border-t border-gray-100 pt-2.5">
         {requirement.rate && <p className="font-medium">💰 {requirement.rate}</p>}
         <p className="text-gray-500">⏳ {daysOpen} days open</p>
-        {requirement.next_step && <p className="truncate text-gray-600 italic">→ {requirement.next_step}</p>}
+        {requirement.next_step && <p title={requirement.next_step} className="line-clamp-1 md:line-clamp-none md:overflow-visible md:whitespace-normal text-gray-600 italic">→ {requirement.next_step}</p>}
       </div>
     </div>
   );
@@ -115,6 +117,7 @@ interface KanbanBoardProps {
 
 export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
   const { user } = useAuth();
+  const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +135,19 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
   }, [user, showToast]);
 
   useEffect(() => {
-    loadRequirements();
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await loadRequirements();
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadRequirements]);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, requirement: Requirement) => {
@@ -148,12 +163,35 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
   const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>, newStatus: RequirementStatus) => {
     e.preventDefault();
     
-    if (!draggedRequirement || draggedRequirement.status === newStatus) {
+    if (!draggedRequirement || !user || draggedRequirement.status === newStatus) {
       setDraggedRequirement(null);
       return;
     }
 
-    const result = await updateRequirement(draggedRequirement.id, { status: newStatus }, user?.id);
+    // Check if offline - queue operation
+    if (!isOnline) {
+      await queueOfflineOperation('UPDATE', 'requirement', draggedRequirement.id, { status: newStatus });
+      
+      // Optimistically update local state
+      setRequirements(prev => prev.map(r => 
+        r.id === draggedRequirement.id ? { ...r, status: newStatus } : r
+      ));
+      
+      // Optimistically update cache
+      const updatedRequirement = { ...draggedRequirement, status: newStatus };
+      await cacheRequirements([updatedRequirement as CachedRequirement], user.id);
+      
+      showToast({ 
+        type: 'info', 
+        title: 'Queued for Sync', 
+        message: `Status change will be saved when you come back online` 
+      });
+      setDraggedRequirement(null);
+      return;
+    }
+
+    // Online - update normally
+    const result = await updateRequirement(draggedRequirement.id, { status: newStatus }, user.id);
     if (result.success) {
       showToast({ 
         type: 'success', 
@@ -169,7 +207,7 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
       });
     }
     setDraggedRequirement(null);
-  }, [draggedRequirement, loadRequirements, showToast, user?.id]);
+  }, [draggedRequirement, loadRequirements, showToast, user, isOnline, queueOfflineOperation]);
 
   const groupedByStatus = {
     NEW: requirements.filter(r => r.status === 'NEW'),
@@ -190,7 +228,7 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
         <div className="flex gap-3 flex-wrap items-start sm:items-center">
           <button
             onClick={() => onQuickAdd?.('requirement')}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 active:bg-blue-800 transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm whitespace-nowrap"
+            className="px-4 py-2.5 bg-primary-800 text-white rounded-lg font-semibold hover:bg-primary-900 active:bg-primary-950 transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm whitespace-nowrap"
           >
             + Add Requirement
           </button>

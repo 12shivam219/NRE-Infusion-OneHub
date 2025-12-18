@@ -320,7 +320,7 @@ export const sendBulkEmailCampaign = async (
 
     for (const batch of detailBatches) {
       await Promise.all(
-        batch.map((detail: any) => {
+        batch.map((detail: { status: string; messageId?: string; error?: string; email?: string }) => {
           const status = detail.status === 'sent' ? 'sent' : 'failed';
           return supabase
             .from('campaign_recipients')

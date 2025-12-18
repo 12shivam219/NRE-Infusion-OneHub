@@ -10,6 +10,75 @@ export interface InterviewWithLogs extends Interview {
   updated_by?: { id: string; full_name: string; email: string } | null;
 }
 
+export const getInterviewsPage = async (options: {
+  userId: string;
+  limit?: number;
+  offset?: number;
+  includeCount?: boolean;
+  status?: string;
+  excludeStatus?: string;
+  scheduledFrom?: string;
+  scheduledTo?: string;
+  orderBy?: 'scheduled_date' | 'updated_at' | 'created_at';
+  orderDir?: 'asc' | 'desc';
+}): Promise<{ success: boolean; interviews?: InterviewWithLogs[]; total?: number; error?: string }> => {
+  const {
+    userId,
+    limit = 20,
+    offset = 0,
+    includeCount = false,
+    status,
+    excludeStatus,
+    scheduledFrom,
+    scheduledTo,
+    orderBy = 'scheduled_date',
+    orderDir = 'asc',
+  } = options;
+
+  try {
+    const countMode = includeCount ? 'exact' : undefined;
+    let query = supabase
+      .from('interviews')
+      .select('*', { count: countMode as 'exact' | undefined })
+      .eq('user_id', userId)
+      .order(orderBy, { ascending: orderDir === 'asc' });
+
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+    if (excludeStatus) {
+      query = query.neq('status', excludeStatus);
+    }
+    if (scheduledFrom) {
+      query = query.gte('scheduled_date', scheduledFrom);
+    }
+    if (scheduledTo) {
+      query = query.lte('scheduled_date', scheduledTo);
+    }
+
+    const start = offset;
+    const end = offset + limit - 1;
+    query = query.range(start, end);
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching paged interviews:', error.message);
+      }
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, interviews: data || [], total: count ?? 0 };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching paged interviews:', errorMsg);
+    }
+    return { success: false, error: 'Failed to fetch interviews' };
+  }
+};
+
 export const getInterviews = async (
   userId?: string
 ): Promise<{ success: boolean; interviews?: InterviewWithLogs[]; error?: string }> => {

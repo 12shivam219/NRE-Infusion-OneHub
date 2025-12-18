@@ -1,8 +1,22 @@
 import { useState } from 'react';
-import { Bell, Menu } from 'lucide-react';
+import { Bell, Menu as MenuIcon, Mail as MailIcon, Moon, Sun } from 'lucide-react';
+import SyncControls from '../common/SyncControls';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useThemeMode } from '../../hooks/useThemeMode';
+import { Logo } from '../common/Logo';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Badge from '@mui/material/Badge';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -26,8 +40,9 @@ const getPageTitle = (pathname: string) => {
 export const Header = ({ onMenuClick }: HeaderProps) => {
   const { user } = useAuth();
   const { notifications, unreadCount, markAsRead } = useNotifications();
+  const { themeMode, toggleThemeMode } = useThemeMode();
   const { pathname } = useLocation();
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<HTMLElement | null>(null);
 
   const title = getPageTitle(pathname);
 
@@ -38,97 +53,158 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
+    <AppBar
+      position="sticky"
+      elevation={0}
+      sx={{
+        borderBottom: 1,
+        backgroundImage: 'none',
+        borderColor: 'divider',
+      }}
+    >
+      <Toolbar sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1, minHeight: { xs: 64, sm: 72 } }}>
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+            <Logo variant="icon" className="w-8 h-8" />
+          </Box>
+          <IconButton
             onClick={onMenuClick}
-            className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition"
             aria-label="Toggle menu"
+            sx={{ display: { xs: 'inline-flex', md: 'none' } }}
           >
-            <Menu className="w-6 h-6 text-gray-600" />
-          </button>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
+            <MenuIcon className="w-6 h-6" />
+          </IconButton>
+
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.1 }} noWrap>
+              {title}
+            </Typography>
             {user && (
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                Signed in as <span className="font-medium">{user.full_name}</span>
-              </p>
+              <Typography variant="caption" noWrap color="text.secondary">
+                Signed in as <Box component="strong" sx={{ color: 'text.primary' }}>{user.full_name}</Box>
+              </Typography>
             )}
-          </div>
-        </div>
+          </Box>
+        </Stack>
 
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <SyncControls />
+
+          <IconButton
+            onClick={toggleThemeMode}
+            aria-label={themeMode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}
+          >
+            {themeMode === 'dark' ? (
+              <Sun className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
+            ) : (
+              <Moon className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
+            )}
+          </IconButton>
+
+          <Divider orientation="vertical" flexItem />
+
+          <Button
+            onClick={() => window.dispatchEvent(new CustomEvent('open-bulk-email'))}
+            variant="text"
+            startIcon={<MailIcon className="w-5 h-5" />}
+            aria-label="Send bulk emails"
+            title="Send bulk emails to multiple recipients"
+            sx={{
+              minWidth: 0,
+              px: { xs: 1, sm: 1.5 },
+              '& .MuiButton-startIcon': { mr: { xs: 0, sm: 1 } },
+            }}
+          >
+            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+              Bulk Email
+            </Box>
+          </Button>
+
+          <Box>
+            <IconButton
+              onClick={(e) => {
+                if (notificationsAnchorEl) setNotificationsAnchorEl(null);
+                else setNotificationsAnchorEl(e.currentTarget);
+              }}
               aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-              aria-expanded={showDropdown}
               aria-haspopup="true"
+              aria-expanded={Boolean(notificationsAnchorEl)}
             >
-              <Bell className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
-              {unreadCount > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-semibold"
-                  aria-label={`${unreadCount} unread notifications`}
-                >
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+              <Badge badgeContent={unreadCount > 9 ? '9+' : unreadCount} color="primary" invisible={unreadCount === 0}>
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
+              </Badge>
+            </IconButton>
+
+            <Menu
+              anchorEl={notificationsAnchorEl}
+              open={Boolean(notificationsAnchorEl)}
+              onClose={() => {
+                setNotificationsAnchorEl(null);
+              }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    width: 360,
+                    maxWidth: 'calc(100vw - 2rem)',
+                  },
+                },
+              }}
+            >
+              <Box sx={{ px: 2, py: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Notifications
+                </Typography>
+              </Box>
+              <Divider />
+
+              {notifications.length === 0 ? (
+                <Box sx={{ px: 2, py: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No notifications
+                  </Typography>
+                </Box>
+              ) : (
+                notifications.slice(0, 5).map((notification) => (
+                  <MenuItem
+                    key={notification.id}
+                    onClick={() => {
+                      handleNotificationClick(notification.id, notification.read);
+                      setNotificationsAnchorEl(null);
+                    }}
+                    sx={{
+                      alignItems: 'flex-start',
+                      whiteSpace: 'normal',
+                      py: 1.5,
+                      bgcolor: !notification.read ? 'rgba(212,175,55,0.10)' : undefined,
+                    }}
+                    aria-label={`Notification: ${notification.title}`}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {notification.title}
+                        </Typography>
+                        {!notification.read && (
+                          <Box
+                            sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', mt: 0.75, flexShrink: 0 }}
+                          />
+                        )}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {notification.message}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.75 }}>
+                        {new Date(notification.created_at).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))
               )}
-            </button>
-
-            {showDropdown && (
-              <div
-                className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-lg shadow-xl border border-gray-200 z-50"
-                role="region"
-                aria-label="Notifications panel"
-              >
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="font-semibold text-gray-900">Notifications</h3>
-                </div>
-
-                <div className="max-h-96 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
-                      No notifications
-                    </div>
-                  ) : (
-                    notifications.slice(0, 5).map((notification) => (
-                      <button
-                        key={notification.id}
-                        onClick={() => handleNotificationClick(notification.id, notification.read)}
-                        className={`w-full text-left p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
-                          !notification.read ? 'bg-blue-50' : ''
-                        }`}
-                        aria-label={`Notification: ${notification.title}`}
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
-                            {notification.title}
-                          </h4>
-                          {!notification.read && (
-                            <span
-                              className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-2">
-                          {new Date(notification.created_at).toLocaleString()}
-                        </p>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </header>
+            </Menu>
+          </Box>
+        </Stack>
+      </Toolbar>
+    </AppBar>
   );
 };

@@ -1,17 +1,32 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Download, X, FileText, Table2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getRequirements } from '../../lib/api/requirements';
+import { getRequirementsPage } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
-import { calculateDaysOpen, exportToCSV, downloadFile } from '../../lib/requirementUtils';
+import { calculateDaysOpen } from '../../lib/requirementUtils';
 import type { Database } from '../../lib/database.types';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import RadioGroup from '@mui/material/RadioGroup';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Radio from '@mui/material/Radio';
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
+import Paper from '@mui/material/Paper';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 
 interface ExportOptionsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  requirements: Requirement[];
+  onExport: (opts: { columns: string[]; format: 'csv' | 'pdf' }) => void;
 }
 
 const CSV_COLUMNS = [
@@ -30,7 +45,7 @@ const CSV_COLUMNS = [
   'created_at',
 ];
 
-export const ExportOptionsModal = ({ isOpen, onClose, requirements }: ExportOptionsModalProps) => {
+export const ExportOptionsModal = ({ isOpen, onClose, onExport }: ExportOptionsModalProps) => {
   const { showToast } = useToast();
   const [selectedColumns, setSelectedColumns] = useState<string[]>(CSV_COLUMNS);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
@@ -61,220 +76,125 @@ export const ExportOptionsModal = ({ isOpen, onClose, requirements }: ExportOpti
       return;
     }
 
-    const csv = exportToCSV(requirements, selectedColumns);
-    downloadFile(csv, `requirements_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
-
-    showToast({
-      type: 'success',
-      title: 'Export successful',
-      message: `${requirements.length} requirements exported to CSV`,
-    });
+    onExport({ columns: selectedColumns, format: 'csv' });
     onClose();
   };
 
   const handleExportPDF = () => {
-    // Create a simple HTML table for PDF generation
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Requirements Report</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th { background-color: #3b82f6; color: white; padding: 10px; text-align: left; font-weight: bold; }
-          td { padding: 8px; border-bottom: 1px solid #d1d5db; }
-          tr:nth-child(even) { background-color: #f9fafb; }
-          .summary { background-color: #f3f4f6; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
-          .summary-item { display: inline-block; margin-right: 20px; }
-          .summary-label { font-weight: bold; color: #6b7280; }
-          .summary-value { color: #1f2937; font-size: 18px; }
-          .priority-high { color: #dc2626; font-weight: bold; }
-          .priority-medium { color: #f59e0b; font-weight: bold; }
-          .priority-low { color: #10b981; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <h1>Requirements Report</h1>
-        <div class="summary">
-          <div class="summary-item">
-            <span class="summary-label">Generated:</span>
-            <span class="summary-value">${new Date().toLocaleDateString()}</span>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">Total Requirements:</span>
-            <span class="summary-value">${requirements.length}</span>
-          </div>
-          <div class="summary-item">
-            <span class="summary-label">Active:</span>
-            <span class="summary-value">${requirements.filter(r => r.status !== 'CLOSED' && r.status !== 'REJECTED').length}</span>
-          </div>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              ${selectedColumns.map(col => `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${requirements.map(req => `
-              <tr>
-                ${selectedColumns.map(col => {
-                  const value = req[col as keyof Requirement];
-                  
-                  if (col === 'requirement_number') {
-                    const formattedNum = String(value).padStart(3, '0');
-                    return `<td><strong>#${formattedNum}</strong></td>`;
-                  }
-                  
-                  if (col === 'priority') {
-                    const priorityClass = `priority-${(value as string)?.toLowerCase() || 'medium'}`;
-                    return `<td class="${priorityClass}">${value || 'Medium'}</td>`;
-                  }
-                  
-                  if (col === 'created_at') {
-                    return `<td>${new Date(value as string).toLocaleDateString()}</td>`;
-                  }
-                  
-                  return `<td>${value || '-'}</td>`;
-                }).join('')}
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    // Open print dialog
-    const printWindow = window.open('', '', 'height=600,width=800');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
+    if (selectedColumns.length === 0) {
+      showToast({
+        type: 'error',
+        title: 'No columns selected',
+        message: 'Please select at least one column to export',
+      });
+      return;
     }
 
-    showToast({
-      type: 'success',
-      title: 'PDF Export',
-      message: 'Print dialog opened. Select "Save as PDF" to download.',
-    });
+    onExport({ columns: selectedColumns, format: 'pdf' });
     onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Export Requirements</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="md" scroll="paper">
+      <DialogTitle sx={{ pr: 7 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          Export Requirements
+        </Typography>
+        <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
 
-        <div className="p-6 space-y-6">
+      <DialogContent dividers>
+        <Stack spacing={3}>
           {/* Format Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">Export Format</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  value="csv"
-                  checked={exportFormat === 'csv'}
-                  onChange={(e) => setExportFormat(e.target.value as 'csv' | 'pdf')}
-                  className="w-4 h-4"
-                />
-                <span className="flex items-center gap-2 text-gray-700">
-                  <Table2 className="w-4 h-4" />
-                  CSV (Excel)
-                </span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="radio"
-                  value="pdf"
-                  checked={exportFormat === 'pdf'}
-                  onChange={(e) => setExportFormat(e.target.value as 'csv' | 'pdf')}
-                  className="w-4 h-4"
-                />
-                <span className="flex items-center gap-2 text-gray-700">
-                  <FileText className="w-4 h-4" />
-                  PDF (Print)
-                </span>
-              </label>
-            </div>
-          </div>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+              Export Format
+            </Typography>
+            <RadioGroup
+              row
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value as 'csv' | 'pdf')}
+            >
+              <FormControlLabel
+                value="csv"
+                control={<Radio />}
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Table2 className="w-4 h-4" />
+                    <span>CSV (Excel)</span>
+                  </Stack>
+                }
+              />
+              <FormControlLabel
+                value="pdf"
+                control={<Radio />}
+                label={
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <FileText className="w-4 h-4" />
+                    <span>PDF (Print)</span>
+                  </Stack>
+                }
+              />
+            </RadioGroup>
+          </Box>
 
           {/* Column Selection */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700">Columns to Export</label>
-              <button
-                onClick={handleSelectAll}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
+          <Box>
+            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                Columns to Export
+              </Typography>
+              <Button variant="text" size="small" onClick={handleSelectAll}>
                 {selectedColumns.length === CSV_COLUMNS.length ? 'Deselect All' : 'Select All'}
-              </button>
-            </div>
+              </Button>
+            </Stack>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
-              {CSV_COLUMNS.map(column => (
-                <label key={column} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedColumns.includes(column)}
-                    onChange={() => handleColumnToggle(column)}
-                    className="w-4 h-4"
+            <Paper variant="outlined" sx={{ p: 2, maxHeight: 360, overflowY: 'auto', bgcolor: 'grey.50' }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 1 }}>
+                {CSV_COLUMNS.map((column) => (
+                  <FormControlLabel
+                    key={column}
+                    control={
+                      <Checkbox
+                        checked={selectedColumns.includes(column)}
+                        onChange={() => handleColumnToggle(column)}
+                      />
+                    }
+                    label={<Typography variant="body2">{column.replace(/_/g, ' ')}</Typography>}
                   />
-                  <span className="text-sm text-gray-700">{column.replace(/_/g, ' ')}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+                ))}
+              </Box>
+            </Paper>
+          </Box>
 
           {/* Summary */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900">
-              You are about to export <strong>{requirements.length}</strong> requirements with{' '}
-              <strong>{selectedColumns.length}</strong> columns.
-            </p>
-          </div>
+          <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(212,175,55,0.08)' }}>
+            <Typography variant="body2">
+              You are about to export requirements with <strong>{selectedColumns.length}</strong> columns.
+            </Typography>
+          </Paper>
+        </Stack>
+      </DialogContent>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            {exportFormat === 'csv' ? (
-              <button
-                onClick={handleExportCSV}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export to CSV
-              </button>
-            ) : (
-              <button
-                onClick={handleExportPDF}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export to PDF
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+      <DialogActions>
+        {exportFormat === 'csv' ? (
+          <Button onClick={handleExportCSV} variant="contained" startIcon={<Download className="w-4 h-4" />}>
+            Export to CSV
+          </Button>
+        ) : (
+          <Button onClick={handleExportPDF} variant="contained" startIcon={<Download className="w-4 h-4" />}>
+            Export to PDF
+          </Button>
+        )}
+        <Button onClick={onClose} variant="outlined" color="inherit">
+          Cancel
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 
@@ -290,43 +210,215 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  const loadRequirements = useCallback(async () => {
+  const [page, setPage] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const pageSize = 50;
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportedRows, setExportedRows] = useState(0);
+  const exportCancelRef = useRef(false);
+
+  const dateFromIso = useMemo(() => (dateRange.start ? new Date(`${dateRange.start}T00:00:00`).toISOString() : undefined), [dateRange.start]);
+  const dateToIso = useMemo(() => (dateRange.end ? new Date(`${dateRange.end}T23:59:59.999`).toISOString() : undefined), [dateRange.end]);
+
+  const downloadBlob = useCallback((parts: BlobPart[], filename: string, mimeType: string) => {
+    const blob = new Blob(parts, { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const csvEscape = useCallback((value: unknown) => {
+    if (value === null || value === undefined) return '';
+    const s = String(value);
+    if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  }, []);
+
+  const loadRequirements = useCallback(async (opts?: { newPage?: number }) => {
     if (!user) return;
-    const result = await getRequirements(user.id);
+    const requestedPage = opts?.newPage ?? page;
+    setLoading(true);
+    const result = await getRequirementsPage({
+      userId: user.id,
+      limit: pageSize,
+      offset: requestedPage * pageSize,
+      dateFrom: dateFromIso,
+      dateTo: dateToIso,
+      orderBy: 'created_at',
+      orderDir: 'desc',
+      includeCount: false,
+    });
     if (result.success && result.requirements) {
       setRequirements(result.requirements);
+      setHasNextPage(result.requirements.length === pageSize);
     } else if (result.error) {
       showToast({ type: 'error', title: 'Failed to load requirements', message: result.error });
     }
     setLoading(false);
-  }, [user, showToast]);
+  }, [user, showToast, page, pageSize, dateFromIso, dateToIso]);
 
   useEffect(() => {
-    loadRequirements();
-  }, [loadRequirements]);
+    loadRequirements({ newPage: page });
+  }, [loadRequirements, page]);
 
-  const filteredRequirements = requirements.filter(req => {
-    if (!dateRange.start && !dateRange.end) return true;
-    
-    const created = new Date(req.created_at);
-    const start = dateRange.start ? new Date(dateRange.start) : null;
-    const end = dateRange.end ? new Date(dateRange.end) : null;
+  useEffect(() => {
+    setPage(0);
+  }, [dateRange.start, dateRange.end]);
 
-    if (start && created < start) return false;
-    if (end && created > end) return false;
-    return true;
-  });
+  const stats = useMemo(() => {
+    const current = requirements;
+    return {
+      total: current.length,
+      active: current.filter(r => r.status !== 'CLOSED' && r.status !== 'REJECTED').length,
+      closed: current.filter(r => r.status === 'CLOSED').length,
+      interview: current.filter(r => r.status === 'INTERVIEW').length,
+      avgDaysOpen: Math.round(
+        current.reduce((sum, r) => sum + calculateDaysOpen(r.created_at), 0) /
+          (current.length || 1)
+      ),
+    };
+  }, [requirements]);
 
-  const stats = {
-    total: filteredRequirements.length,
-    active: filteredRequirements.filter(r => r.status !== 'CLOSED' && r.status !== 'REJECTED').length,
-    closed: filteredRequirements.filter(r => r.status === 'CLOSED').length,
-    interview: filteredRequirements.filter(r => r.status === 'INTERVIEW').length,
-    avgDaysOpen: Math.round(
-      filteredRequirements.reduce((sum, r) => sum + calculateDaysOpen(r.created_at), 0) /
-      (filteredRequirements.length || 1)
-    ),
-  };
+  const handleExport = useCallback(async (opts: { columns: string[]; format: 'csv' | 'pdf' }) => {
+    if (!user) return;
+
+    if (opts.format === 'pdf') {
+      const selectedColumns = opts.columns;
+      const previewRequirements = requirements;
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Requirements Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background-color: #3b82f6; color: white; padding: 10px; text-align: left; font-weight: bold; }
+            td { padding: 8px; border-bottom: 1px solid #d1d5db; }
+            tr:nth-child(even) { background-color: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <h1>Requirements Report (Page ${page + 1})</h1>
+          <table>
+            <thead>
+              <tr>
+                ${selectedColumns.map(col => `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${previewRequirements
+                .map(req => `
+                <tr>
+                  ${selectedColumns
+                    .map(col => {
+                      const value = req[col as keyof Requirement];
+                      if (col === 'created_at') return `<td>${new Date(value as string).toLocaleDateString()}</td>`;
+                      return `<td>${value ?? '-'}</td>`;
+                    })
+                    .join('')}
+                </tr>
+              `)
+                .join('')}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const printWindow = window.open('', '', 'height=600,width=800');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      }
+
+      showToast({
+        type: 'info',
+        title: 'PDF Export',
+        message: 'PDF export is limited to the current page to avoid browser crashes. Use CSV to export all rows.',
+      });
+      return;
+    }
+
+    exportCancelRef.current = false;
+    setIsExporting(true);
+    setExportedRows(0);
+
+    try {
+      const limit = 1000;
+      let cursorCreatedAt: string | undefined;
+      let totalExported = 0;
+      const csvParts: BlobPart[] = [];
+
+      csvParts.push(`${opts.columns.join(',')}\n`);
+
+      while (true) {
+        if (exportCancelRef.current) {
+          showToast({ type: 'info', title: 'Export canceled', message: 'CSV export was canceled.' });
+          return;
+        }
+
+        const res = await getRequirementsPage({
+          userId: user.id,
+          limit,
+          cursor: cursorCreatedAt ? { created_at: cursorCreatedAt, direction: 'after' } : undefined,
+          dateFrom: dateFromIso,
+          dateTo: dateToIso,
+          orderBy: 'created_at',
+          orderDir: 'desc',
+          includeCount: false,
+        });
+
+        if (!res.success || !res.requirements) {
+          throw new Error(res.error || 'Failed to export requirements');
+        }
+
+        const batch = res.requirements;
+        if (batch.length === 0) break;
+
+        const lines = batch
+          .map(req => opts.columns.map(col => csvEscape(req[col as keyof Requirement])).join(','))
+          .join('\n');
+
+        csvParts.push(`${lines}\n`);
+        totalExported += batch.length;
+        setExportedRows(totalExported);
+        cursorCreatedAt = batch[batch.length - 1]?.created_at;
+
+        if (batch.length < limit) break;
+
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      }
+
+      downloadBlob(csvParts, `requirements_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+      showToast({
+        type: 'success',
+        title: 'Export successful',
+        message: `${totalExported} requirements exported to CSV`,
+      });
+    } catch (err) {
+      showToast({
+        type: 'error',
+        title: 'Export failed',
+        message: err instanceof Error ? err.message : 'Failed to export requirements',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }, [user, requirements, showToast, csvEscape, downloadBlob, page, dateFromIso, dateToIso]);
 
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Loading report...</div>;
@@ -334,43 +426,45 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Requirements Report</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+      <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
+        <DialogTitle sx={{ pr: 7 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            Requirements Report
+          </Typography>
+          <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
+            <X className="w-5 h-5" />
+          </IconButton>
+        </DialogTitle>
 
-          <div className="p-6 space-y-6">
+        <DialogContent dividers>
+          <Stack spacing={3}>
             {/* Date Range Filter */}
-            <div className="flex gap-4 flex-col sm:flex-row">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">From Date</label>
-                <input
-                  type="date"
-                  value={dateRange.start}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">To Date</label>
-                <input
-                  type="date"
-                  value={dateRange.end}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="From Date"
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                size="small"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="To Date"
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                size="small"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
                 <p className="text-gray-600 text-sm">Total</p>
-                <p className="text-3xl font-bold text-blue-600">{stats.total}</p>
+                <p className="text-3xl font-bold text-primary-600">{stats.total}</p>
               </div>
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-gray-600 text-sm">Active</p>
@@ -404,12 +498,12 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRequirements.map(req => (
+                    {requirements.map(req => (
                       <tr key={req.id} className="border-b border-gray-200 hover:bg-gray-50">
                         <td className="px-4 py-3 font-medium text-gray-900 truncate">{req.title}</td>
                         <td className="px-4 py-3 text-gray-600 truncate">{req.company || '-'}</td>
                         <td className="px-4 py-3">
-                          <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-primary-50 text-primary-800">
                             {req.status}
                           </span>
                         </td>
@@ -422,34 +516,72 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
               </div>
             </div>
 
-            {filteredRequirements.length > 10 && (
-              <p className="text-sm text-gray-600">Showing 10 of {filteredRequirements.length} requirements</p>
-            )}
+            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" useFlexGap flexWrap="wrap">
+              <Typography variant="body2" color="text.secondary">
+                Page <strong>{page + 1}</strong>
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0 || loading}
+                  variant="outlined"
+                  color="inherit"
+                  size="small"
+                >
+                  Prev
+                </Button>
+                <Button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={!hasNextPage || loading}
+                  variant="outlined"
+                  color="inherit"
+                  size="small"
+                >
+                  Next
+                </Button>
+              </Stack>
+            </Stack>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button
-                onClick={onClose}
-                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+            {isExporting && (
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" useFlexGap flexWrap="wrap">
+                  <Typography variant="body2">
+                    Exporting... <strong>{exportedRows}</strong> rows
+                  </Typography>
+                  <Button
+                    onClick={() => {
+                      exportCancelRef.current = true;
+                    }}
+                    variant="outlined"
+                    color="inherit"
+                    size="small"
+                  >
+                    Cancel
+                  </Button>
+                </Stack>
+              </Paper>
+            )}
+          </Stack>
+        </DialogContent>
+
+        <DialogActions>
+          <Button
+            onClick={() => setShowExportModal(true)}
+            variant="contained"
+            startIcon={<Download className="w-4 h-4" />}
+          >
+            Export
+          </Button>
+          <Button onClick={onClose} variant="outlined" color="inherit">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ExportOptionsModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
-        requirements={filteredRequirements}
+        onExport={handleExport}
       />
     </>
   );

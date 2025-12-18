@@ -125,6 +125,92 @@ export const getDocuments = async (
   }
 };
 
+export const getDocumentsPage = async (options: {
+  userId: string;
+  limit?: number;
+  offset?: number;
+  cursor?: { created_at: string; direction?: 'after' | 'before' };
+  includeCount?: boolean;
+  search?: string;
+  orderBy?: 'created_at' | 'updated_at';
+  orderDir?: 'asc' | 'desc';
+}): Promise<{ success: boolean; documents?: Document[]; total?: number; error?: string }> => {
+  const {
+    userId,
+    limit = 50,
+    offset = 0,
+    cursor,
+    includeCount = false,
+    search,
+    orderBy = 'created_at',
+    orderDir = 'desc',
+  } = options;
+
+  try {
+    const countMode = includeCount ? 'exact' : undefined;
+
+    const { data, count, error } = await retryAsync(
+      async () => {
+        let query = supabase
+          .from('documents')
+          .select('*', { count: countMode as 'exact' | undefined })
+          .eq('user_id', userId)
+          .order(orderBy, { ascending: orderDir === 'asc' });
+
+        if (search && search.trim()) {
+          const term = `%${search.trim()}%`;
+          query = query.or(`original_filename.ilike.${term},filename.ilike.${term}`);
+        }
+
+        if (cursor?.created_at) {
+          if (orderDir === 'desc') {
+            if (cursor.direction === 'before') {
+              query = query.gt(orderBy, cursor.created_at);
+            } else {
+              query = query.lt(orderBy, cursor.created_at);
+            }
+          } else {
+            if (cursor.direction === 'before') {
+              query = query.lt(orderBy, cursor.created_at);
+            } else {
+              query = query.gt(orderBy, cursor.created_at);
+            }
+          }
+          query = query.limit(limit);
+        } else {
+          const start = offset;
+          const end = offset + limit - 1;
+          query = query.range(start, end);
+        }
+
+        return query;
+      },
+      {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      }
+    );
+
+    if (error) {
+      const appError = handleApiError(error, {
+        component: 'getDocumentsPage',
+        action: 'fetch_page',
+        userId,
+      });
+      return { success: false, error: appError.message };
+    }
+
+    return { success: true, documents: data || [], total: count ?? 0 };
+  } catch (err) {
+    const appError = handleApiError(err, {
+      component: 'getDocumentsPage',
+      action: 'exception',
+      userId,
+    });
+    return { success: false, error: appError.message };
+  }
+};
+
 /**
  * Fetch a single document by ID
  */

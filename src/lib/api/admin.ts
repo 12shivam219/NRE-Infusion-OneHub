@@ -152,7 +152,6 @@ export const updateUserStatus = async (
   try {    
     const updatePayload: UserUpdate = {
       status,
-      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase
@@ -203,7 +202,6 @@ export const updateUserRole = async (
 
     const updatePayload: UserUpdate = {
       role,
-      updated_at: new Date().toISOString(),
     };
 
     const { data, error } = await supabase

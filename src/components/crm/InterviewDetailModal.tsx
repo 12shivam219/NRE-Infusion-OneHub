@@ -1,12 +1,31 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Loader, ExternalLink, Clock, MapPin, ChevronDown } from 'lucide-react';
+import { X, Edit2, Trash2, Loader, ExternalLink, MapPin } from 'lucide-react';
 import { isValidUrl, isMeetingLink, extractDomainFromUrl } from '../../lib/interviewValidation';
 import { useAuth } from '../../hooks/useAuth';
 import { updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import { subscribeToInterviewById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { alpha } from '@mui/material/styles';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
 
@@ -25,34 +44,42 @@ const EditableField = ({ label, value, isEditing, children }: {
   isEditing: boolean;
   children?: React.ReactNode;
 }) => (
-  <div>
-    <p className="text-xs font-semibold text-gray-600 uppercase mb-1">{label}</p>
+  <Stack spacing={0.5}>
+    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+      {label}
+    </Typography>
     {isEditing && children ? (
       children
     ) : (
-      <p className="text-sm text-gray-900 font-medium">{value || '-'}</p>
+      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+        {value || '-'}
+      </Typography>
     )}
-  </div>
+  </Stack>
 );
 
 const AccordionSection = ({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [expanded, setExpanded] = useState(defaultOpen);
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between font-semibold text-gray-900 transition text-sm"
-      >
-        <span>{title}</span>
-        <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-      {isOpen && (
-        <div className="px-4 py-4 space-y-4 border-t border-gray-200">
+    <Accordion
+      expanded={expanded}
+      onChange={(_, next) => setExpanded(next)}
+      disableGutters
+      elevation={0}
+      variant="outlined"
+      sx={{ borderRadius: 2, overflow: 'hidden' }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+          {title}
+        </Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <Stack spacing={2}>
           {children}
-        </div>
-      )}
-    </div>
+        </Stack>
+      </AccordionDetails>
+    </Accordion>
   );
 };
 
@@ -69,15 +96,26 @@ export const InterviewDetailModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Interview> | null>(null);
   const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    if (interview) {
-      // Update form data with fresh interview data when not editing
-      if (!isEditing) {
-        setFormData(interview);
-        setRemoteUpdateNotified(false);
-      }
-    }
+    if (!interview) return;
+    if (isEditing) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setFormData(interview);
+      setRemoteUpdateNotified(false);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [interview, isEditing]);
 
   // Subscribe to real-time updates for this specific interview
@@ -153,7 +191,7 @@ export const InterviewDetailModal = ({
     setIsLoading(false);
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!isAdmin) {
       showToast({
         type: 'error',
@@ -162,11 +200,11 @@ export const InterviewDetailModal = ({
       });
       return;
     }
+    setShowDeleteConfirm(true);
+  };
 
-    if (!confirm('Are you sure you want to delete this interview? This action cannot be undone.')) {
-      return;
-    }
-
+  const handleDelete = async () => {
+    if (!interview) return;
     setIsDeleting(true);
     const result = await deleteInterview(interview.id, user?.id);
 
@@ -211,96 +249,162 @@ export const InterviewDetailModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto flex flex-col">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-            <div className="inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-600 text-white font-bold text-xs sm:text-base flex-shrink-0">
-              {formData.interview_with?.charAt(0)?.toUpperCase() || 'A'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">{formData.interview_with || 'Interview'}</h2>
-              <p className="text-xs text-gray-500 flex items-center gap-1 truncate"><Clock className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{formData.scheduled_date || '-'} • {formData.scheduled_time || '-'}</span></p>
-            </div>
-          </div>
-
-          <button onClick={() => {
+    <Dialog
+      open={isOpen}
+      onClose={() => {
+        setIsEditing(false);
+        onClose();
+      }}
+      fullWidth
+      maxWidth="md"
+      scroll="paper"
+    >
+      <DialogTitle sx={{ pr: 7 }}>
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
+          <Chip
+            label={(formData.interview_with?.charAt(0)?.toUpperCase() || 'A')}
+            sx={{ bgcolor: 'primary.light', color: 'text.primary', fontWeight: 800, border: 1, borderColor: 'primary.main' }}
+          />
+          <Stack spacing={0.25} sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800 }} noWrap>
+              {formData.interview_with || 'Interview'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {formData.scheduled_date || '-'} • {formData.scheduled_time || '-'}
+            </Typography>
+          </Stack>
+        </Stack>
+        <IconButton
+          onClick={() => {
             setIsEditing(false);
             onClose();
-          }} className="text-gray-400 hover:text-gray-600 flex-shrink-0" aria-label="Close">
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
+          }}
+          aria-label="Close"
+          sx={{ position: 'absolute', right: 8, top: 8 }}
+        >
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
 
-        <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
+      <DialogContent dividers>
+        <Stack spacing={2}>
           {/* Schedule Information - Always Visible */}
           <AccordionSection title="Schedule & Status" defaultOpen={true}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Date</p>
-                <p className="text-sm text-gray-900 font-medium truncate">{formData.scheduled_date || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-gray-600 uppercase mb-1">Time</p>
-                <p className="text-sm text-gray-900 font-medium truncate">{formData.scheduled_time || '-'} {formData.timezone && `(${formData.timezone})`}</p>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs font-semibold text-gray-600 uppercase mb-2 block">Status</label>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 2,
+              }}
+            >
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Date
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                  {formData.scheduled_date || '-'}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  Time
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                  {formData.scheduled_time || '-'} {formData.timezone && `(${formData.timezone})`}
+                </Typography>
+              </Box>
+
+              <Box sx={{ gridColumn: { xs: 'auto', sm: '1 / -1' } }}>
                 {isEditing ? (
-                  <select
-                    value={formData.status || 'Scheduled'}
+                  <TextField
+                    select
+                    label="Status"
+                    value={String(formData.status || 'Scheduled')}
                     onChange={(e) => handleFieldChange('status', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                    size="small"
+                    fullWidth
                   >
-                    {getValidStatuses().map(status => (
-                      <option key={status} value={status}>{status}</option>
+                    {getValidStatuses().map((status) => (
+                      <MenuItem key={status} value={status}>
+                        {status}
+                      </MenuItem>
                     ))}
-                  </select>
+                  </TextField>
                 ) : (
-                  <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-900 font-medium">{formData.status || '-'}</p>
-                  </div>
+                  <Stack spacing={0.5}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                      Status
+                    </Typography>
+                    <Box>
+                      <Chip label={String(formData.status || '-')} color="primary" variant="outlined" />
+                    </Box>
+                  </Stack>
                 )}
-              </div>
-            </div>
+              </Box>
+            </Box>
           </AccordionSection>
 
           {/* Meeting Link */}
           {formData.location && (
-            <div className="flex items-start gap-2 sm:gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-blue-700 uppercase mb-1">Meeting Link</p>
-                {isMeetingUrl ? (
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-blue-900 truncate">{meetingProvider}</p>
-                    <button
-                      onClick={handleJoinCall}
-                      className="px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-700 flex items-center gap-2 flex-shrink-0"
-                    >
-                      <ExternalLink className="w-3 h-3" /> Join
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-sm text-blue-900 truncate">{formData.location}</p>
-                )}
-              </div>
-            </div>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                borderColor: (theme) => alpha(theme.palette.primary.main, 0.30),
+              }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                <MapPin className="w-5 h-5" />
+                <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                    Meeting Link
+                  </Typography>
+                  {isMeetingUrl ? (
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" useFlexGap flexWrap="wrap">
+                      <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                        {meetingProvider}
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        onClick={handleJoinCall}
+                        startIcon={<ExternalLink className="w-4 h-4" />}
+                      >
+                        Join
+                      </Button>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" noWrap>
+                      {String(formData.location)}
+                    </Typography>
+                  )}
+                </Stack>
+              </Stack>
+            </Paper>
           )}
 
           {/* Interview Details */}
           <AccordionSection title="Interview Details" defaultOpen={false}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 2,
+              }}
+            >
               <EditableField 
                 label="Candidate Name" 
                 value={formData.interview_with}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.interview_with || ''}
                   onChange={(e) => handleFieldChange('interview_with', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Candidate Name' }}
                 />
               </EditableField>
 
@@ -309,11 +413,12 @@ export const InterviewDetailModal = ({
                 value={formData.type}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.type || ''}
                   onChange={(e) => handleFieldChange('type', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Interview Type' }}
                 />
               </EditableField>
 
@@ -322,11 +427,12 @@ export const InterviewDetailModal = ({
                 value={formData.round}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.round || ''}
                   onChange={(e) => handleFieldChange('round', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Round' }}
                 />
               </EditableField>
 
@@ -335,11 +441,12 @@ export const InterviewDetailModal = ({
                 value={formData.result}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.result || ''}
                   onChange={(e) => handleFieldChange('result', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Result' }}
                 />
               </EditableField>
 
@@ -348,11 +455,13 @@ export const InterviewDetailModal = ({
                 value={formData.duration_minutes}
                 isEditing={isEditing}
               >
-                <input
+                <TextField
                   type="number"
-                  value={formData.duration_minutes || ''}
+                  value={String(formData.duration_minutes ?? '')}
                   onChange={(e) => handleFieldChange('duration_minutes', parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Duration (minutes)' }}
                 />
               </EditableField>
 
@@ -361,29 +470,37 @@ export const InterviewDetailModal = ({
                 value={formData.mode}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.mode || ''}
                   onChange={(e) => handleFieldChange('mode', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Mode' }}
                 />
               </EditableField>
-            </div>
+            </Box>
           </AccordionSection>
 
           {/* Participants */}
           <AccordionSection title="Participants" defaultOpen={false}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 2,
+              }}
+            >
               <EditableField 
                 label="Interviewer" 
                 value={formData.interviewer}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.interviewer || ''}
                   onChange={(e) => handleFieldChange('interviewer', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Interviewer' }}
                 />
               </EditableField>
 
@@ -392,29 +509,33 @@ export const InterviewDetailModal = ({
                 value={formData.vendor_company}
                 isEditing={isEditing}
               >
-                <input
-                  type="text"
+                <TextField
                   value={formData.vendor_company || ''}
                   onChange={(e) => handleFieldChange('vendor_company', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                  size="small"
+                  fullWidth
+                  inputProps={{ 'aria-label': 'Vendor Company' }}
                 />
               </EditableField>
-            </div>
+            </Box>
           </AccordionSection>
 
           {/* Notes & Feedback */}
           <AccordionSection title="Notes & Feedback" defaultOpen={false}>
-            <div className="space-y-4">
+            <Stack spacing={2}>
               <EditableField 
                 label="Interview Focus" 
                 value={formData.interview_focus}
                 isEditing={isEditing}
               >
-                <textarea
+                <TextField
                   value={formData.interview_focus || ''}
                   onChange={(e) => handleFieldChange('interview_focus', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  size="small"
+                  fullWidth
+                  multiline
                   rows={2}
+                  inputProps={{ 'aria-label': 'Interview Focus' }}
                 />
               </EditableField>
 
@@ -423,11 +544,14 @@ export const InterviewDetailModal = ({
                 value={formData.feedback_notes}
                 isEditing={isEditing}
               >
-                <textarea
+                <TextField
                   value={formData.feedback_notes || ''}
                   onChange={(e) => handleFieldChange('feedback_notes', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  size="small"
+                  fullWidth
+                  multiline
                   rows={2}
+                  inputProps={{ 'aria-label': 'Feedback Notes' }}
                 />
               </EditableField>
 
@@ -436,14 +560,17 @@ export const InterviewDetailModal = ({
                 value={formData.notes}
                 isEditing={isEditing}
               >
-                <textarea
+                <TextField
                   value={formData.notes || ''}
                   onChange={(e) => handleFieldChange('notes', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                  size="small"
+                  fullWidth
+                  multiline
                   rows={2}
+                  inputProps={{ 'aria-label': 'Special Notes' }}
                 />
               </EditableField>
-            </div>
+            </Stack>
           </AccordionSection>
 
           {/* Audit Log - Admin Only */}
@@ -456,66 +583,80 @@ export const InterviewDetailModal = ({
               />
             </AccordionSection>
           )}
+        </Stack>
+      </DialogContent>
 
-          {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200 sticky bottom-0 bg-white">
-            {isEditing ? (
-              <>
-                <button
-                  onClick={handleSave}
-                  disabled={isLoading}
-                  className="flex-1 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                >
-                  {isLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Save Changes'}
-                </button>
-                <button
-                  onClick={() => {
-                    setFormData(interview);
-                    setIsEditing(false);
-                  }}
-                  className="flex-1 px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 text-sm"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2 text-sm"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-                {isAdmin && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="flex-1 px-4 sm:px-6 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                  >
-                    {isDeleting ? (
-                      <Loader className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                    <span className="hidden sm:inline">Delete</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setIsEditing(false);
-                    onClose();
-                  }}
-                  className="flex-1 px-4 sm:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 text-sm"
-                >
-                  Close
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+      <DialogActions>
+        {isEditing ? (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSave}
+              disabled={isLoading}
+              startIcon={isLoading ? <Loader className="w-4 h-4" /> : undefined}
+            >
+              Save Changes
+            </Button>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                setFormData(interview);
+                setIsEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => setIsEditing(true)}
+              startIcon={<Edit2 className="w-4 h-4" />}
+            >
+              Edit
+            </Button>
+            {isAdmin ? (
+              <Button
+                variant="contained"
+                color="error"
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                startIcon={isDeleting ? <Loader className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+              >
+                Delete
+              </Button>
+            ) : null}
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                setIsEditing(false);
+                onClose();
+              }}
+            >
+              Close
+            </Button>
+          </>
+        )}
+      </DialogActions>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Interview"
+        message="Are you sure you want to delete this interview? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={isDeleting}
+      />
+    </Dialog>
   );
 };
 

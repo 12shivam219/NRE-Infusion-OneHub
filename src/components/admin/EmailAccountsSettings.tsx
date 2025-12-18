@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Mail, Plus, Trash2, Check, Loader, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import {
   getEmailAccounts,
   addEmailAccount,
@@ -43,6 +44,8 @@ export const EmailAccountsSettings = () => {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Load accounts callback
   const loadAccounts = async () => {
@@ -125,12 +128,14 @@ export const EmailAccountsSettings = () => {
     setTesting(null);
   };
 
-  const handleDeleteAccount = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this email account?')) {
-      return;
-    }
+  const handleDeleteAccountClick = (id: string) => {
+    setAccountToDelete(id);
+    setShowDeleteConfirm(true);
+  };
 
-    const result = await deleteEmailAccount(id);
+  const handleDeleteAccount = async () => {
+    if (!accountToDelete) return;
+    const result = await deleteEmailAccount(accountToDelete);
 
     if (result.success) {
       showToast({
@@ -164,7 +169,7 @@ export const EmailAccountsSettings = () => {
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-primary-900 transition"
         >
           <Plus className="w-4 h-4" />
           Add Account
@@ -252,7 +257,7 @@ export const EmailAccountsSettings = () => {
             <button
               onClick={handleAddAccount}
               disabled={submitting}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-primary-900 disabled:opacity-50 transition flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
@@ -329,7 +334,7 @@ export const EmailAccountsSettings = () => {
                   )}
                 </button>
                 <button
-                  onClick={() => handleDeleteAccount(account.id)}
+                  onClick={() => handleDeleteAccountClick(account.id)}
                   className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -351,6 +356,21 @@ export const EmailAccountsSettings = () => {
           </p>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setAccountToDelete(null);
+        }}
+        onConfirm={handleDeleteAccount}
+        title="Delete Email Account"
+        message="Are you sure you want to delete this email account? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

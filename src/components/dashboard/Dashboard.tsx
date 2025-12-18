@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, Briefcase, Users, TrendingUp, Upload, Plus, Calendar } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getDocuments } from '../../lib/api/documents';
@@ -10,26 +10,34 @@ export const Dashboard = () => {
   const [requirementCount, setRequirementCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const loadStats = useCallback(async () => {
-    if (!user) return;
-    const [docsResult, reqsResult] = await Promise.all([
-      getDocuments(user.id),
-      getRequirements(user.id),
-    ]);
+  useEffect(() => {
+    let cancelled = false;
 
-    if (docsResult.success && docsResult.documents)
-      setDocumentCount(docsResult.documents.length);
-    if (reqsResult.success && reqsResult.requirements)
-      setRequirementCount(reqsResult.requirements.length);
-    setLoading(false);
+    const run = async () => {
+      if (!user) return;
+      const [docsResult, reqsResult] = await Promise.all([
+        getDocuments(user.id),
+        getRequirements(user.id),
+      ]);
+
+      if (cancelled) return;
+
+      if (docsResult.success && docsResult.documents)
+        setDocumentCount(docsResult.documents.length);
+      if (reqsResult.success && reqsResult.requirements)
+        setRequirementCount(reqsResult.requirements.length);
+      setLoading(false);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
   const stats = [
-    { label: 'Total Documents', value: documentCount, icon: FileText, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Total Documents', value: documentCount, icon: FileText, color: 'text-primary-800 bg-primary-50' },
     { label: 'Active Requirements', value: requirementCount, icon: Briefcase, color: 'text-green-600 bg-green-50' },
     { label: 'Interviews', value: 0, icon: Users, color: 'text-orange-600 bg-orange-50' },
     { label: 'Success Rate', value: '0%', icon: TrendingUp, color: 'text-purple-600 bg-purple-50' },
@@ -49,12 +57,20 @@ export const Dashboard = () => {
 
       {/* Stats Section */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 animate-pulse">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {[...Array(4)].map((_, i) => (
             <div
               key={i}
-              className="h-28 bg-white rounded-xl shadow-sm border border-gray-200"
-            ></div>
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-24 mb-2 animate-pulse" />
+                  <div className="h-8 bg-gray-200 rounded w-16 animate-pulse" />
+                </div>
+                <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse" />
+              </div>
+            </div>
           ))}
         </div>
       ) : (
@@ -111,7 +127,7 @@ interface ActionButtonProps {
 
 const ActionButton = ({ color, icon, label }: ActionButtonProps) => {
   const colorClasses: Record<string, string> = {
-    blue: 'bg-blue-600 hover:bg-blue-700',
+    blue: 'bg-primary-800 hover:bg-primary-900',
     green: 'bg-green-600 hover:bg-green-700',
     orange: 'bg-orange-600 hover:bg-orange-700',
   };

@@ -238,13 +238,13 @@ export const GoogleDrivePicker = ({
 
       {/* Authentication Section */}
       {!authenticated && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
           <p className="text-gray-700 mb-4">
             Connect your Google Drive account to import documents
           </p>
           <button
             onClick={handleAuthenticate}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-800 text-white rounded-lg hover:bg-primary-900 transition"
           >
             <Cloud className="w-4 h-4" />
             Connect Google Drive
@@ -256,7 +256,7 @@ export const GoogleDrivePicker = ({
       {authenticated && files.length === 0 && !loading && (
         <button
           onClick={handleLoadFiles}
-          className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition mb-6"
+          className="flex items-center gap-2 px-4 py-3 bg-primary-800 text-white rounded-lg hover:bg-primary-900 transition mb-6"
         >
           <Plus className="w-4 h-4" />
           Load Files from Google Drive
@@ -265,7 +265,7 @@ export const GoogleDrivePicker = ({
 
       {loading && (
         <div className="flex justify-center items-center py-12">
-          <Loader className="w-6 h-6 text-blue-600 animate-spin" />
+          <Loader className="w-6 h-6 text-primary-700 animate-spin" />
         </div>
       )}
 

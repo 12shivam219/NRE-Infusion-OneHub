@@ -2,6 +2,20 @@ import { useState, useCallback, useEffect } from 'react';
 import { Mail, Send, Trash2, Reply, ChevronDown, ChevronUp, Loader } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { ConfirmDialog } from '../common/ConfirmDialog';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Divider from '@mui/material/Divider';
+import Collapse from '@mui/material/Collapse';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import CircularProgress from '@mui/material/CircularProgress';
 import {
   getEmailThreads,
   createEmailThread,
@@ -39,6 +53,8 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
     body: '',
   });
   const [composing, setComposing] = useState(false);
+  const [threadToDelete, setThreadToDelete] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Reply form state
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -73,9 +89,21 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
   }, [user, requirementId, showToast]);
 
   useEffect(() => {
-    if (user) {
-      loadThreads();
-    }
+    if (!user) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await loadThreads();
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadThreads, user]);
 
   const handleToggleThreadExpand = useCallback((threadId: string) => {
@@ -169,13 +197,15 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
     setReplying(false);
   }, [replyBody, selectedThreadId, threads, user, showToast, loadThreads]);
 
-  const handleDelete = useCallback(
-    async (threadId: string) => {
-      if (!window.confirm('Are you sure you want to delete this email thread?')) {
-        return;
-      }
+  const handleDeleteClick = useCallback((threadId: string) => {
+    setThreadToDelete(threadId);
+    setShowDeleteConfirm(true);
+  }, []);
 
-      const result = await deleteEmailThread(threadId);
+  const handleDelete = useCallback(
+    async () => {
+      if (!threadToDelete) return;
+      const result = await deleteEmailThread(threadToDelete);
 
       if (result.success) {
         showToast({
@@ -191,7 +221,7 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
         });
       }
     },
-    [showToast, loadThreads]
+    [threadToDelete, showToast, loadThreads]
   );
 
   const formatDate = (dateString: string): string => {
@@ -211,215 +241,243 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
 
   // --- MOVED EARLY RETURN HERE, AFTER ALL HOOKS ---
   if (!user) {
-    return <div className="text-center p-6 text-gray-600">Please sign in to view emails</div>;
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          Please sign in to view emails
+        </Typography>
+      </Box>
+    );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col h-[600px]">
+    <Paper variant="outlined" sx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 600 }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-2">
-          <Mail className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Email Threads</h2>
-        </div>
-        <div className="flex gap-2">
-          <button
+      <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ p: 2, bgcolor: 'grey.50' }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <Mail className="w-5 h-5" />
+          <Typography variant="h6" sx={{ fontWeight: 800 }} noWrap>
+            Email Threads
+          </Typography>
+        </Stack>
+
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
             onClick={() => setShowCompose(!showCompose)}
-            className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm"
+            startIcon={<Send className="w-4 h-4" />}
             aria-label="Compose new email"
           >
-            <Send className="w-4 h-4" />
             Compose
-          </button>
+          </Button>
           {onClose && (
-            <button
-              onClick={onClose}
-              className="px-3 py-2 text-gray-600 hover:bg-gray-100 rounded transition"
-              aria-label="Close email panel"
-            >
-              ✕
-            </button>
+            <IconButton onClick={onClose} aria-label="Close email panel" size="small">
+              <span aria-hidden>✕</span>
+            </IconButton>
           )}
-        </div>
-      </div>
+        </Stack>
+      </Stack>
+      <Divider />
 
       {/* Compose Form */}
       {showCompose && (
-        <div className="p-4 border-b border-gray-200 bg-blue-50 space-y-3">
-          <input
-            type="text"
-            placeholder="Subject"
-            value={composeData.subject}
-            onChange={(e) =>
-              setComposeData((prev) => ({ ...prev, subject: e.target.value }))
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            aria-label="Email subject"
-          />
-          <input
-            type="email"
-            placeholder="To"
-            value={composeData.toEmail}
-            onChange={(e) =>
-              setComposeData((prev) => ({ ...prev, toEmail: e.target.value }))
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-            aria-label="Recipient email"
-          />
-          <textarea
-            placeholder="Message"
-            value={composeData.body}
-            onChange={(e) => setComposeData((prev) => ({ ...prev, body: e.target.value }))}
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
-            aria-label="Email body"
-          />
-          <div className="flex gap-2">
-            <button
-              onClick={handleCompose}
-              disabled={composing}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition text-sm"
-            >
-              {composing ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4" />
-                  Send
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setShowCompose(false)}
-              className="px-3 py-2 border border-gray-300 rounded hover:bg-gray-100 transition text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <Box sx={{ p: 2, bgcolor: 'rgba(212,175,55,0.08)' }}>
+          <Stack spacing={2}>
+            <TextField
+              label="Subject"
+              value={composeData.subject}
+              onChange={(e) => setComposeData((prev) => ({ ...prev, subject: e.target.value }))}
+              size="small"
+              fullWidth
+              inputProps={{ 'aria-label': 'Email subject' }}
+            />
+            <TextField
+              label="To"
+              type="email"
+              value={composeData.toEmail}
+              onChange={(e) => setComposeData((prev) => ({ ...prev, toEmail: e.target.value }))}
+              size="small"
+              fullWidth
+              inputProps={{ 'aria-label': 'Recipient email' }}
+            />
+            <TextField
+              label="Message"
+              value={composeData.body}
+              onChange={(e) => setComposeData((prev) => ({ ...prev, body: e.target.value }))}
+              size="small"
+              fullWidth
+              multiline
+              rows={4}
+              inputProps={{ 'aria-label': 'Email body' }}
+            />
+
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleCompose}
+                disabled={composing}
+                startIcon={composing ? <Loader className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                sx={{ flex: 1 }}
+              >
+                {composing ? 'Sending...' : 'Send'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => setShowCompose(false)}
+              >
+                Cancel
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
       )}
+      <Divider />
 
       {/* Threads List */}
       {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader className="w-6 h-6 text-blue-600 animate-spin" />
-        </div>
+        <Box sx={{ flex: 1, display: 'grid', placeItems: 'center' }}>
+          <CircularProgress size={24} />
+        </Box>
       ) : threads.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-          <Mail className="w-12 h-12 mb-3 opacity-50" />
-          <p>No email threads</p>
-        </div>
+        <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', p: 3 }}>
+          <Stack spacing={1} alignItems="center">
+            <Mail className="w-10 h-10" />
+            <Typography variant="body2" color="text.secondary">
+              No email threads
+            </Typography>
+          </Stack>
+        </Box>
       ) : (
-        <div className="flex-1 overflow-y-auto">
-          <div className="divide-y divide-gray-200">
+        <Box sx={{ flex: 1, overflowY: 'auto' }}>
+          <List disablePadding>
             {threads.map((thread) => {
               const isExpanded = expandedThreads.has(thread.thread_id!);
 
               return (
-                <div key={thread.id} className="border-b last:border-b-0">
+                <Box key={thread.id}>
                   {/* Thread Header */}
-                  <button
-                    onClick={() => handleToggleThreadExpand(thread.thread_id!)}
-                    className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition text-left"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{thread.subject}</p>
-                      <div className="flex gap-2 text-sm text-gray-600 mt-1">
-                        <span className="truncate">From: {thread.from_email}</span>
-                        <span className="text-gray-400">→</span>
-                        <span className="truncate">To: {thread.to_email}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                  <ListItemButton onClick={() => handleToggleThreadExpand(thread.thread_id!)}>
+                    <ListItemText
+                      primary={
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }} noWrap>
+                          {thread.subject}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          From: {thread.from_email}  To: {thread.to_email}
+                        </Typography>
+                      }
+                    />
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
+                      <Typography variant="caption" color="text.secondary" noWrap>
                         {formatDate(thread.created_at)}
-                      </span>
+                      </Typography>
                       {isExpanded ? (
-                        <ChevronUp className="w-4 h-4 text-gray-400" />
+                        <ChevronUp className="w-4 h-4" />
                       ) : (
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                        <ChevronDown className="w-4 h-4" />
                       )}
-                    </div>
-                  </button>
+                    </Stack>
+                  </ListItemButton>
 
                   {/* Expanded Thread Content */}
-                  {isExpanded && (
-                    <div className="px-4 pb-4 bg-gray-50 space-y-3">
-                      {/* Thread Body */}
-                      <div className="bg-white p-3 rounded border border-gray-200 text-sm">
-                        <p className="text-gray-700 whitespace-pre-wrap">{thread.body}</p>
-                      </div>
+                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                    <Box sx={{ px: 2, pb: 2, bgcolor: 'grey.50' }}>
+                      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {thread.body}
+                        </Typography>
+                      </Paper>
 
                       {/* Reply Form */}
                       {replyingTo === thread.thread_id ? (
-                        <div className="space-y-2 bg-blue-50 p-3 rounded">
-                          <textarea
-                            placeholder="Type your reply..."
-                            value={replyBody}
-                            onChange={(e) => setReplyBody(e.target.value)}
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-300 rounded text-sm resize-none focus:ring-2 focus:ring-blue-500"
-                            aria-label="Reply text"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleReply}
-                              disabled={replying}
-                              className="flex-1 flex items-center justify-center gap-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition text-sm"
-                            >
-                              {replying ? (
-                                <>
-                                  <Loader className="w-3 h-3 animate-spin" />
-                                  Sending...
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="w-3 h-3" />
-                                  Send Reply
-                                </>
-                              )}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setReplyingTo(null);
-                                setReplyBody('');
-                              }}
-                              className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 transition text-sm"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
+                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(212,175,55,0.08)' }}>
+                          <Stack spacing={2}>
+                            <TextField
+                              label="Reply"
+                              placeholder="Type your reply..."
+                              value={replyBody}
+                              onChange={(e) => setReplyBody(e.target.value)}
+                              size="small"
+                              fullWidth
+                              multiline
+                              rows={3}
+                              inputProps={{ 'aria-label': 'Reply text' }}
+                            />
+                            <Stack direction="row" spacing={1}>
+                              <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={handleReply}
+                                disabled={replying}
+                                startIcon={replying ? <Loader className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                                sx={{ flex: 1 }}
+                              >
+                                {replying ? 'Sending...' : 'Send Reply'}
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                color="inherit"
+                                onClick={() => {
+                                  setReplyingTo(null);
+                                  setReplyBody('');
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </Stack>
+                          </Stack>
+                        </Paper>
                       ) : (
-                        <div className="flex gap-2">
-                          <button
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            variant="outlined"
+                            color="inherit"
                             onClick={() => setReplyingTo(thread.thread_id!)}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 border border-gray-300 rounded hover:bg-gray-100 transition text-sm"
+                            startIcon={<Reply className="w-4 h-4" />}
+                            sx={{ flex: 1 }}
                             aria-label="Reply to email"
                           >
-                            <Reply className="w-4 h-4" />
                             Reply
-                          </button>
-                          <button
-                            onClick={() => handleDelete(thread.thread_id!)}
-                            className="px-3 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition text-sm"
+                          </Button>
+                          <IconButton
+                            onClick={() => handleDeleteClick(thread.thread_id!)}
+                            color="error"
                             aria-label="Delete email"
                           >
                             <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                          </IconButton>
+                        </Stack>
                       )}
-                    </div>
-                  )}
-                </div>
+                    </Box>
+                  </Collapse>
+                  <Divider />
+                </Box>
               );
             })}
-          </div>
-        </div>
+          </List>
+        </Box>
       )}
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setThreadToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        title="Delete Email Thread"
+        message="Are you sure you want to delete this email thread? This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
+    </Paper>
   );
 };
