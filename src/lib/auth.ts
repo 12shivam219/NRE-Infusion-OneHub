@@ -47,16 +47,36 @@ const getClientInfo = () => {
   return { userAgent, browser, os, device };
 };
 
-const fetchPublicIp = async (): Promise<string | null> => {
+type LogAuthEventPayload =
+  | { event: 'register'; userId: string }
+  | { event: 'login_success'; userId: string; clientInfo: ReturnType<typeof getClientInfo> }
+  | {
+      event: 'login_failure';
+      userId?: string | null;
+      email?: string;
+      clientInfo: ReturnType<typeof getClientInfo>;
+      reason: string;
+    };
+
+interface LogAuthEventResponse {
+  success?: boolean;
+  ip?: string;
+}
+
+const logAuthEvent = async (payload: LogAuthEventPayload): Promise<LogAuthEventResponse | null> => {
   try {
-    const response = await fetch('https://api.ipify.org?format=json');
-    if (!response.ok) return null;
-    const data = await response.json();
-    if (typeof data?.ip === 'string' && data.ip.trim().length > 0) {
-      return data.ip.trim();
+    const { data, error } = await supabase.functions.invoke('log-auth-event', {
+      body: payload,
+    });
+
+    if (error) {
+      if (import.meta.env.DEV) console.error('Edge function log-auth-event error:', error);
+      return null;
     }
-    return null;
-  } catch {
+
+    return (data ?? null) as LogAuthEventResponse | null;
+  } catch (error) {
+    if (import.meta.env.DEV) console.error('Edge function log-auth-event exception:', error);
     return null;
   }
 };
@@ -71,8 +91,6 @@ export const register = async (
   fullName: string
 ): Promise<AuthResponse> => {
   try {
-    const originIp = await fetchPublicIp();
-
     // Sign up with Supabase Auth (handles password hashing securely server-side)
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -101,7 +119,6 @@ export const register = async (
         full_name: fullName,
         role: 'user',
         status: 'pending_verification',
-        origin_ip: originIp,
         email_verified: false,
       })
       .select()
@@ -112,6 +129,13 @@ export const register = async (
       return { success: false, error: 'Failed to create user profile' };
     }
 
+    const logResult = await logAuthEvent({
+      event: 'register',
+      userId: authData.user.id,
+    });
+
+    const originIp = logResult?.ip ?? user.origin_ip ?? null;
+
     return {
       success: true,
       user: {
@@ -121,7 +145,7 @@ export const register = async (
         role: user.role,
         status: user.status,
         email_verified: user.email_verified,
-        origin_ip: user.origin_ip,
+        origin_ip: originIp,
       },
       requiresVerification: true,
     };
@@ -141,7 +165,6 @@ export const login = async (
 ): Promise<AuthResponse> => {
   try {
     const clientInfo = getClientInfo();
-    const clientIp = await fetchPublicIp();
 
     // Authenticate with Supabase Auth (server-side password verification with bcrypt)
     const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
@@ -152,12 +175,12 @@ export const login = async (
     if (signInError) {
       if (import.meta.env.DEV) console.error('Supabase Auth Error:', signInError);
       // Log failed login attempt
-      await logFailedLogin(email, clientIp, clientInfo, signInError.message || 'Invalid credentials');
+      await logFailedLogin({ email, clientInfo, reason: signInError.message || 'Invalid credentials' });
       return { success: false, error: signInError.message || 'Invalid credentials' };
     }
 
     if (!authData.user) {
-      await logFailedLogin(email, clientIp, clientInfo, 'Authentication failed');
+      await logFailedLogin({ email, clientInfo, reason: 'Authentication failed' });
       return { success: false, error: 'Authentication failed' };
     }
 
@@ -179,41 +202,20 @@ export const login = async (
 
     // Check account status only if user profile exists
     if (user && user.status && user.status !== 'approved' && user.status !== 'pending_verification') {
-      await logFailedLogin(authData.user.id, clientIp, clientInfo, `Account ${user.status}`);
+      await logFailedLogin({ userId: authData.user.id, clientInfo, reason: `Account ${user.status}` });
       return {
         success: false,
         error: `Account ${user.status.replace('_', ' ')}`
       };
     }
 
-    // Log successful login (silently fail if table doesn't exist)
-    try {
-      await supabase.from('login_history').insert({
-        user_id: authData.user.id,
-        ip_address: clientIp || 'client',
-        user_agent: clientInfo.userAgent,
-        browser: clientInfo.browser,
-        os: clientInfo.os,
-        device: clientInfo.device,
-        success: true,
-        failure_reason: null,
-        suspicious: false,
-      });
-    } catch {
-      // Continue even if login_history doesn't exist or fails
-    }
+    const loginLogResult = await logAuthEvent({
+      event: 'login_success',
+      userId: authData.user.id,
+      clientInfo,
+    });
 
-    // Log activity (silently fail if table doesn't exist)
-    try {
-      await supabase.from('activity_logs').insert({
-        user_id: authData.user.id,
-        action: 'login',
-        resource_type: 'auth',
-        ip_address: clientIp || 'client',
-      });
-    } catch {
-      // Continue even if activity_logs doesn't exist or fails
-    }
+    const resolvedOriginIp = loginLogResult?.ip ?? user?.origin_ip ?? null;
 
     // Store user data in sessionStorage (cleared when tab closes)
     // SECURITY: Use sessionStorage instead of localStorage to prevent persistent token storage
@@ -225,7 +227,7 @@ export const login = async (
       role: 'user',
       status: 'pending_verification',
       email_verified: authData.user.email_confirmed_at ? true : false,
-      origin_ip: clientIp || null,
+      origin_ip: resolvedOriginIp,
     };
 
     // Store ONLY non-sensitive user info in sessionStorage
@@ -257,27 +259,24 @@ export const login = async (
   }
 };
 
-const logFailedLogin = async (
-  _email: string,
-  clientIp: string | null,
-  clientInfo: ReturnType<typeof getClientInfo>,
-  reason: string
-): Promise<void> => {
-  try {
-    await supabase.from('login_history').insert({
-      user_id: null,
-      ip_address: clientIp || 'client',
-      user_agent: clientInfo.userAgent,
-      browser: clientInfo.browser,
-      os: clientInfo.os,
-      device: clientInfo.device,
-      success: false,
-      failure_reason: reason,
-      suspicious: false,
-    });
-  } catch {
-    // Silently fail - don't interrupt login flow, table might not exist yet
-  }
+const logFailedLogin = async ({
+  userId,
+  email,
+  clientInfo,
+  reason,
+}: {
+  userId?: string | null;
+  email?: string;
+  clientInfo: ReturnType<typeof getClientInfo>;
+  reason: string;
+}): Promise<void> => {
+  await logAuthEvent({
+    event: 'login_failure',
+    userId,
+    email,
+    clientInfo,
+    reason,
+  });
 };
 
 export const logout = async (): Promise<void> => {
