@@ -189,8 +189,8 @@ const GmailSyncSettings: React.FC = () => {
       <div className="flex items-center gap-3 pb-4 border-b border-gray-200">
         <Mail className="w-6 h-6 text-blue-600" />
         <div>
-          <h3 className="text-xl font-semibold text-gray-900">Gmail Integration</h3>
-          <p className="text-sm text-gray-600">
+          <h3 className="text-xs font-medium text-gray-900">Gmail Integration</h3>
+          <p className="text-xs text-gray-600">
             Automatically sync and track emails sent via Gmail for your requirements
           </p>
         </div>
@@ -202,7 +202,7 @@ const GmailSyncSettings: React.FC = () => {
           <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
           <div>
             <h4 className="font-medium text-red-900">Error</h4>
-            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <p className="text-xs text-red-700 mt-1">{error}</p>
           </div>
         </div>
       )}
@@ -211,7 +211,7 @@ const GmailSyncSettings: React.FC = () => {
       {success && (
         <div className="rounded-lg bg-green-50 border border-green-200 p-4 flex items-start gap-3">
           <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-green-700">{success}</p>
+          <p className="text-xs text-green-700">{success}</p>
         </div>
       )}
 
@@ -227,13 +227,13 @@ const GmailSyncSettings: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-600" />
-                <h4 className="font-semibold text-green-900">Connected</h4>
+                <h4 className="font-medium text-green-900">Connected</h4>
               </div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                 Active
               </span>
             </div>
-            <p className="text-sm text-green-700 font-medium">{gmailInfo.email}</p>
+            <p className="text-xs text-green-700 font-medium">{gmailInfo.email}</p>
           </div>
 
           {/* Last sync info */}
@@ -243,7 +243,7 @@ const GmailSyncSettings: React.FC = () => {
                 <Clock className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
                   <h4 className="font-medium text-blue-900">Last Sync</h4>
-                  <p className="text-sm text-blue-700">
+                  <p className="text-xs text-blue-700">
                     {new Date(lastSyncTime).toLocaleString()}
                   </p>
                 </div>
@@ -253,14 +253,14 @@ const GmailSyncSettings: React.FC = () => {
 
           {/* Settings */}
           <div className="rounded-lg border border-gray-200 p-4 space-y-4">
-            <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+            <h4 className="font-medium text-gray-900 flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Sync Settings
             </h4>
 
             {/* Sync frequency */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-2">
                 Sync Frequency
               </label>
               <select
@@ -281,7 +281,7 @@ const GmailSyncSettings: React.FC = () => {
 
             {/* Confidence level */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-2">
                 Auto-Link Confidence Level
               </label>
               <select
@@ -329,8 +329,8 @@ const GmailSyncSettings: React.FC = () => {
         // Not connected state
         <div className="text-center py-8">
           <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h4 className="text-lg font-semibold text-gray-900 mb-2">Gmail Not Connected</h4>
-          <p className="text-gray-600 mb-6">
+          <h4 className="text-xs font-medium text-gray-900 mb-2">Gmail Not Connected</h4>
+          <p className="text-gray-600 mb-6 text-xs">
             Connect your Gmail account to automatically sync and track emails sent for your
             requirements. We'll only read your sent emails and never modify anything.
           </p>

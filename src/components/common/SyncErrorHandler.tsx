@@ -100,16 +100,16 @@ export const SyncErrorHandler = () => {
     <>
       {/* Failed Items Indicator */}
       {failedItems.length > 0 && (
-        <div className="fixed top-4 right-4 z-50 bg-red-50 border border-red-300 rounded-lg shadow-lg max-w-sm">
+        <div className="fixed top-4 right-4 z-50 bg-red-500 bg-opacity-10 border border-red-500 border-opacity-30 rounded-lg shadow-lg max-w-sm backdrop-blur-sm">
           <div className="p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-semibold text-red-900">Sync Issues</h3>
-                <p className="text-sm text-red-800 mt-1">
+                <h3 className="font-semibold font-heading text-red-600">Sync Issues</h3>
+                <p className="text-xs font-body text-red-500 mt-1">
                   {failedItems.length} item{failedItems.length !== 1 ? 's' : ''} failed to sync
                 </p>
-                <div className="mt-2 text-xs text-red-700 max-h-20 overflow-y-auto">
+                <div className="mt-2 text-xs text-red-500 max-h-20 overflow-y-auto font-body">
                   {failedItems.slice(0, 3).map(item => (
                     <div key={item.id} className="mb-1">
                       • {item.operation.toUpperCase()} {item.entityType} - Retry {item.retries}
@@ -124,14 +124,14 @@ export const SyncErrorHandler = () => {
                   <button
                     onClick={handleRetryFailed}
                     disabled={isRetrying}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded text-sm font-medium flex items-center gap-1 transition-colors"
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg text-xs font-heading font-bold flex items-center gap-1 transition-all"
                   >
                     <RefreshCw className={`w-3 h-3 ${isRetrying ? 'animate-spin' : ''}`} />
                     Retry
                   </button>
                   <button
                     onClick={() => setShowFailedPanel(true)}
-                    className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded text-sm font-medium transition-colors"
+                    className="px-3 py-1.5 bg-red-500 bg-opacity-20 hover:bg-opacity-30 text-red-600 rounded-lg text-xs font-heading font-bold transition-all"
                   >
                     Details
                   </button>
@@ -139,7 +139,7 @@ export const SyncErrorHandler = () => {
               </div>
               <button
                 onClick={() => setShowFailedPanel(false)}
-                className="p-1 hover:bg-red-100 rounded transition-colors flex-shrink-0"
+                className="p-1 hover:bg-red-500 hover:bg-opacity-10 rounded-lg transition-colors flex-shrink-0"
               >
                 <X className="w-4 h-4 text-red-600" />
               </button>
@@ -150,22 +150,22 @@ export const SyncErrorHandler = () => {
 
       {/* Conflicts Indicator */}
       {conflicts.length > 0 && (
-        <div className="fixed top-4 right-4 z-50 bg-yellow-50 border border-yellow-300 rounded-lg shadow-lg max-w-sm">
+        <div className="fixed top-4 right-4 z-50 bg-[color:var(--gold)] bg-opacity-10 border border-[color:var(--gold)] border-opacity-30 rounded-lg shadow-lg max-w-sm backdrop-blur-sm">
           <div className="p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[color:var(--gold)] flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-semibold text-yellow-900">Data Conflicts</h3>
-                <p className="text-sm text-yellow-800 mt-1">
+                <h3 className="font-semibold font-heading text-[color:var(--gold)]">Data Conflicts</h3>
+                <p className="text-xs font-body text-[color:var(--text-secondary)] mt-1">
                   {conflicts.length} item{conflicts.length !== 1 ? 's' : ''} have conflicting changes
                 </p>
-                <p className="text-xs text-yellow-700 mt-1">
+                <p className="text-xs font-body text-[color:var(--text-secondary)] mt-1">
                   Your local changes were applied (local version wins)
                 </p>
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => setShowConflictPanel(true)}
-                    className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm font-medium transition-colors"
+                    className="px-3 py-1.5 bg-[color:var(--gold)] hover:bg-[#f5d547] text-[color:var(--dark-bg)] rounded-lg text-xs font-heading font-bold transition-all"
                   >
                     Review
                   </button>
@@ -173,9 +173,9 @@ export const SyncErrorHandler = () => {
               </div>
               <button
                 onClick={() => setShowConflictPanel(false)}
-                className="p-1 hover:bg-yellow-100 rounded transition-colors flex-shrink-0"
+                className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-10 rounded-lg transition-colors flex-shrink-0"
               >
-                <X className="w-4 h-4 text-yellow-600" />
+                <X className="w-4 h-4 text-[color:var(--gold)]" />
               </button>
             </div>
           </div>
@@ -185,50 +185,50 @@ export const SyncErrorHandler = () => {
       {/* Failed Items Details Panel */}
       {showFailedPanel && failedItems.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Failed Sync Items</h2>
+          <div className="bg-[color:var(--darkbg-surface)] rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-red-500 border-opacity-20">
+            <div className="sticky top-0 bg-[color:var(--darkbg-surface)] border-b border-red-500 border-opacity-20 p-4 flex items-center justify-between">
+              <h2 className="text-sm font-heading font-bold text-[color:var(--text)] uppercase letter-spacing-wide">Failed Sync Items</h2>
               <button
                 onClick={() => setShowFailedPanel(false)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                className="p-1 hover:bg-red-500 hover:bg-opacity-10 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-red-600" />
               </button>
             </div>
 
             <div className="p-4 space-y-3">
               {failedItems.map(item => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <div key={item.id} className="border border-red-500 border-opacity-20 rounded-lg p-3 bg-red-500 bg-opacity-5">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">
+                      <p className="font-medium font-heading text-[color:var(--text)]">
                         {item.operation.toUpperCase()} - {item.entityType}
                       </p>
-                      <p className="text-xs text-gray-500">ID: {item.entityId.substring(0, 20)}...</p>
+                      <p className="text-xs font-body text-[color:var(--text-secondary)]">ID: {item.entityId.substring(0, 20)}...</p>
                     </div>
                     <div className="text-right">
-                      <span className="inline-block px-2 py-1 bg-red-100 text-red-800 text-xs font-medium rounded">
+                      <span className="inline-block px-2 py-1 bg-red-500 bg-opacity-20 text-red-600 text-xs font-bold font-heading rounded-lg">
                         Retry {item.retries}
                       </span>
                     </div>
                   </div>
 
                   {item.lastError && (
-                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                      <p className="font-semibold mb-1">Error:</p>
+                    <div className="mb-2 p-2 bg-red-500 bg-opacity-10 border border-red-500 border-opacity-20 rounded text-xs text-red-600 font-body">
+                      <p className="font-heading font-bold mb-1">Error:</p>
                       <p className="font-mono text-xs break-words">{item.lastError}</p>
                     </div>
                   )}
 
-                  <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 max-h-32 overflow-y-auto">
-                    <p className="font-semibold mb-1">Data:</p>
+                  <div className="mb-2 p-2 bg-[color:var(--gold)] bg-opacity-10 border border-[color:var(--gold)] border-opacity-20 rounded text-xs text-[color:var(--text-secondary)] max-h-32 overflow-y-auto font-body">
+                    <p className="font-heading font-bold mb-1">Data:</p>
                     <pre className="font-mono text-xs whitespace-pre-wrap break-words">
                       {JSON.stringify(item.payload, null, 2).substring(0, 300)}...
                     </pre>
                   </div>
 
                   {item.nextAttempt && (
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-[color:var(--text-secondary)] font-body">
                       Next attempt: {new Date(item.nextAttempt).toLocaleString()}
                     </p>
                   )}
@@ -236,18 +236,18 @@ export const SyncErrorHandler = () => {
               ))}
             </div>
 
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 flex gap-2">
+            <div className="sticky bottom-0 bg-[color:var(--darkbg-surface-light)] border-t border-red-500 border-opacity-20 p-4 flex gap-2">
               <button
                 onClick={handleRetryFailed}
                 disabled={isRetrying}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg font-heading font-bold flex items-center justify-center gap-2 transition-all"
               >
                 <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
                 Retry All
               </button>
               <button
                 onClick={() => setShowFailedPanel(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg font-medium transition-colors"
+                className="flex-1 px-4 py-2 bg-[color:var(--darkbg-surface)] hover:bg-[color:var(--darkbg-surface-light)] text-[color:var(--text)] rounded-lg font-heading font-bold border border-[color:var(--gold)] border-opacity-20 transition-all"
               >
                 Close
               </button>
@@ -259,52 +259,52 @@ export const SyncErrorHandler = () => {
       {/* Conflicts Details Panel */}
       {showConflictPanel && conflicts.length > 0 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-900">Data Conflicts</h2>
+          <div className="bg-[color:var(--darkbg-surface)] rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto border border-[color:var(--gold)] border-opacity-20">
+            <div className="sticky top-0 bg-[color:var(--darkbg-surface)] border-b border-[color:var(--gold)] border-opacity-20 p-4 flex items-center justify-between">
+              <h2 className="text-sm font-heading font-bold text-[color:var(--text)] uppercase letter-spacing-wide">Data Conflicts</h2>
               <button
                 onClick={() => setShowConflictPanel(false)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-10 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-[color:var(--gold)]" />
               </button>
             </div>
 
             <div className="p-4 space-y-3">
               {conflicts.map(conflict => (
-                <div key={conflict.id} className="border border-gray-200 rounded-lg p-3 bg-yellow-50">
+                <div key={conflict.id} className="border border-[color:var(--gold)] border-opacity-20 rounded-lg p-3 bg-[color:var(--gold)] bg-opacity-5">
                   <div className="mb-2">
-                    <p className="font-semibold text-gray-900">{conflict.entityType} - {conflict.entityId}</p>
-                    <p className="text-xs text-gray-500">Resolution: <span className="font-medium">{conflict.strategy.toUpperCase()}</span></p>
+                    <p className="font-medium font-heading text-[color:var(--text)]">{conflict.entityType} - {conflict.entityId}</p>
+                    <p className="text-xs font-body text-[color:var(--text-secondary)]">Resolution: <span className="font-heading font-bold">{conflict.strategy.toUpperCase()}</span></p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2 bg-green-50 border border-green-200 rounded">
-                      <p className="text-xs font-semibold text-green-800 mb-1">✓ Your Version (Applied)</p>
-                      <pre className="font-mono text-xs text-green-700 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
+                    <div className="p-2 bg-green-500 bg-opacity-10 border border-green-500 border-opacity-30 rounded">
+                      <p className="text-xs font-heading font-bold text-green-600 mb-1">✓ Your Version (Applied)</p>
+                      <pre className="font-mono text-xs text-green-600 whitespace-pre-wrap break-words max-h-24 overflow-y-auto font-body">
                         {JSON.stringify(conflict.localVersion, null, 2).substring(0, 200)}...
                       </pre>
                     </div>
 
-                    <div className="p-2 bg-red-50 border border-red-200 rounded">
-                      <p className="text-xs font-semibold text-red-800 mb-1">✕ Remote Version</p>
-                      <pre className="font-mono text-xs text-red-700 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
+                    <div className="p-2 bg-red-500 bg-opacity-10 border border-red-500 border-opacity-30 rounded">
+                      <p className="text-xs font-heading font-bold text-red-600 mb-1">✕ Remote Version</p>
+                      <pre className="font-mono text-xs text-red-600 whitespace-pre-wrap break-words max-h-24 overflow-y-auto font-body">
                         {JSON.stringify(conflict.remoteVersion, null, 2).substring(0, 200)}...
                       </pre>
                     </div>
                   </div>
 
-                  <p className="text-xs text-yellow-700 mt-2">
+                  <p className="text-xs text-[color:var(--text-secondary)] mt-2 font-body">
                     Timestamp: {new Date(conflict.timestamp).toLocaleString()}
                   </p>
                 </div>
               ))}
             </div>
 
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4">
+            <div className="sticky bottom-0 bg-[color:var(--darkbg-surface-light)] border-t border-[color:var(--gold)] border-opacity-20 p-4">
               <button
                 onClick={() => setShowConflictPanel(false)}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                className="w-full px-4 py-2 bg-[color:var(--gold)] hover:bg-[#f5d547] text-[color:var(--dark-bg)] rounded-lg font-heading font-bold transition-all"
               >
                 Close
               </button>

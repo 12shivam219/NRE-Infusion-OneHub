@@ -5,7 +5,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
-import Button from '@mui/material/Button';
+import { BrandButton } from '../brand';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
@@ -164,12 +164,13 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
       </DialogContent>
 
       <DialogActions>
-        <Button type="submit" form="quick-add-interview-form" variant="contained" startIcon={<Plus className="w-4 h-4" />}>
+        <BrandButton type="submit" form="quick-add-interview-form" variant="primary" size="md">
+          <Plus className="w-4 h-4 mr-2" />
           Schedule
-        </Button>
-        <Button type="button" variant="outlined" color="inherit" onClick={onClose}>
+        </BrandButton>
+        <BrandButton type="button" variant="secondary" size="md" onClick={onClose}>
           Cancel
-        </Button>
+        </BrandButton>
       </DialogActions>
     </Dialog>
   );

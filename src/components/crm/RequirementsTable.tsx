@@ -37,13 +37,13 @@ interface RequirementsTableProps {
 }
 
 const statusColorMap: Record<RequirementStatus, { bg: string; text: string; border: string; dot: string }> = {
-  'NEW': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-600' },
-  'IN_PROGRESS': { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', dot: 'bg-yellow-600' },
-  'INTERVIEW': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-600' },
-  'OFFER': { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', dot: 'bg-green-600' },
-  'CLOSED': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', dot: 'bg-gray-600' },
-  'REJECTED': { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-600' },
-  'SUBMITTED': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', dot: 'bg-indigo-600' },
+  'NEW': { bg: 'bg-[color:var(--gold)] bg-opacity-10', text: 'text-[color:var(--gold)]', border: 'border-[color:var(--gold)] border-opacity-30', dot: 'bg-[color:var(--gold)]' },
+  'IN_PROGRESS': { bg: 'bg-amber-500 bg-opacity-10', text: 'text-amber-600', border: 'border-amber-500 border-opacity-30', dot: 'bg-amber-600' },
+  'INTERVIEW': { bg: 'bg-purple-500 bg-opacity-10', text: 'text-purple-600', border: 'border-purple-500 border-opacity-30', dot: 'bg-purple-600' },
+  'OFFER': { bg: 'bg-green-500 bg-opacity-10', text: 'text-green-600', border: 'border-green-500 border-opacity-30', dot: 'bg-green-600' },
+  'CLOSED': { bg: 'bg-[color:var(--text-secondary)] bg-opacity-10', text: 'text-[color:var(--text-secondary)]', border: 'border-[color:var(--text-secondary)] border-opacity-30', dot: 'bg-[color:var(--text-secondary)]' },
+  'REJECTED': { bg: 'bg-red-500 bg-opacity-10', text: 'text-red-600', border: 'border-red-500 border-opacity-30', dot: 'bg-red-600' },
+  'SUBMITTED': { bg: 'bg-indigo-500 bg-opacity-10', text: 'text-indigo-600', border: 'border-indigo-500 border-opacity-30', dot: 'bg-indigo-600' },
 };
 
 const TableRow = memo(({
@@ -75,47 +75,45 @@ const TableRow = memo(({
     <tr
       ref={rowRef}
       data-index={dataIndex}
-      className={`transition-all duration-150 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-primary-50`}
+        className={`transition-all duration-150 ${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10`}
     > 
-      
-      {/* Checkbox */}
-      <td className="px-2 py-3 text-center align-middle w-8 border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-center align-middle w-8 border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="flex items-center justify-center">
           <button
             onClick={() => toggleRowSelected(req.id)}
-            className="p-1 hover:bg-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-1"
+            className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-offset-1"
             aria-pressed={isSelected}
             title={isSelected ? 'Deselect requirement' : 'Select requirement'}
             aria-label={isSelected ? `Deselect ${req.title}` : `Select ${req.title}`}
           >
             {isSelected ? (
-              <CheckSquare className="w-4 h-4 text-primary-600" />
+              <CheckSquare className="w-4 h-4 text-[color:var(--gold)]" />
             ) : (
-              <Square className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+              <Square className="w-4 h-4 text-[color:var(--text-secondary)] hover:text-[color:var(--gold)]" />
             )}
           </button>
         </div>
       </td>
       
       {/* Requirement Number */}
-      <td className="px-2 py-3 text-left align-middle w-14 font-mono text-xs sm:text-sm font-bold text-gray-700 border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-middle w-14 font-mono text-xs font-medium text-[color:var(--text-secondary)] border-b border-r border-[color:var(--gold)] border-opacity-10">
         {String(req.requirement_number || 1).padStart(3, '0')}
       </td>
       
       {/* Title */}
-      <td className="px-2 py-3 text-left align-top min-w-[160px] max-w-[320px] whitespace-normal break-words border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-top min-w-[160px] max-w-[320px] whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="min-w-0">
           <button
             onClick={() => onViewDetails(req)}
-            className="text-left w-full hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors duration-150 group"
+            className="text-left w-full hover:text-[color:var(--gold)] focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors duration-150 group"
             title={`${req.title}${req.company ? ` - ${req.company}` : ''}`}
             aria-label={`View details for ${req.title}`}
           >
-            <div className="font-semibold text-xs xs:text-sm sm:text-base text-gray-900 group-hover:text-primary-600 leading-relaxed break-words pr-1 xs:pr-2">
+            <div className="font-heading font-bold text-xs text-[color:var(--text)] group-hover:text-[color:var(--gold)] leading-relaxed break-words pr-1 xs:pr-2">
               {req.title}
             </div>
             {req.company && (
-              <div className="text-xs text-gray-500 mt-0.5 xs:mt-1 sm:mt-1.5 break-words pr-1 xs:pr-2" title={req.company}>
+              <div className="text-xs font-body text-[color:var(--text-secondary)] mt-0.5 xs:mt-1 sm:mt-1.5 break-words pr-1 xs:pr-2" title={req.company}>
                 {req.company}
               </div>
             )}
@@ -124,9 +122,9 @@ const TableRow = memo(({
       </td>
       
       {/* Status */}
-      <td className="px-2 py-3 text-left align-middle min-w-[100px] whitespace-normal break-words border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-middle min-w-[100px] whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="flex items-center">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${colors.bg} ${colors.text} ${colors.border} shadow-sm`} style={{backgroundColor: 'rgba(0,0,0,0.03)'}}>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold font-heading border ${colors.bg} ${colors.text} ${colors.border}`}>
             <span className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0 mr-1`} />
             <span>{req.status}</span>
           </span>
@@ -134,79 +132,79 @@ const TableRow = memo(({
       </td>
       
       {/* Vendor Company */}
-      <td className="px-2 py-3 text-left align-top min-w-[140px] max-w-[220px] font-semibold whitespace-normal break-words border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-top min-w-[140px] max-w-[220px] font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="min-w-0">
           {req.vendor_company ? (
             <div 
-              className="text-xs sm:text-sm text-gray-900 font-medium break-words leading-relaxed pr-1 xs:pr-2" 
+              className="text-xs font-body text-[color:var(--text)] break-words leading-relaxed pr-1 xs:pr-2" 
               title={req.vendor_company}
             >
               {req.vendor_company}
             </div>
           ) : (
-            <span className="text-xs sm:text-sm text-gray-400 italic">—</span>
+            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Vendor Person */}
-      <td className="px-2 py-3 text-left align-top min-w-[120px] max-w-[180px] font-medium whitespace-normal break-words border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-top min-w-[120px] max-w-[180px] font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="min-w-0">
           {req.vendor_person_name ? (
             <div 
-              className="text-xs sm:text-sm text-gray-700 break-words leading-relaxed pr-1 xs:pr-2" 
+              className="text-xs font-body text-[color:var(--text)] break-words leading-relaxed pr-1 xs:pr-2" 
               title={req.vendor_person_name}
             >
               {req.vendor_person_name}
             </div>
           ) : (
-            <span className="text-xs sm:text-sm text-gray-400 italic">—</span>
+            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Vendor Phone */}
-      <td className="px-2 py-3 text-left align-top min-w-[120px] max-w-[160px] font-mono text-xs whitespace-normal break-words border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-top min-w-[120px] max-w-[160px] font-mono text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="min-w-0 max-w-full">
           {req.vendor_phone ? (
             <a 
               href={`tel:${req.vendor_phone}`}
-              className="text-xs sm:text-sm text-gray-700 hover:text-primary-600 hover:underline block font-mono break-words max-w-full"
+              className="text-xs font-body text-[color:var(--text)] hover:text-[color:var(--gold)] hover:underline block break-words max-w-full transition-colors"
               title={`Call ${req.vendor_phone}`}
               onClick={(e) => e.stopPropagation()}
             >
               {req.vendor_phone}
             </a>
           ) : (
-            <span className="text-xs sm:text-sm text-gray-400 italic">—</span>
+            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Vendor Email */}
-      <td className="px-2 py-3 text-left align-top min-w-[140px] max-w-[200px] text-xs whitespace-normal break-words border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-top min-w-[140px] max-w-[200px] text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="min-w-0 max-w-full">
           {req.vendor_email ? (
             <a 
               href={`mailto:${req.vendor_email}`}
-              className="text-xs sm:text-sm text-gray-700 hover:text-primary-600 hover:underline break-words max-w-full"
+              className="text-xs font-body text-[color:var(--text)] hover:text-[color:var(--gold)] hover:underline break-words max-w-full transition-colors"
               title={`Email ${req.vendor_email}`}
               onClick={(e) => e.stopPropagation()}
             >
               {req.vendor_email}
             </a>
           ) : (
-            <span className="text-xs sm:text-sm text-gray-400 italic">—</span>
+            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Actions */}
-      <td className="px-2 py-3 text-left align-middle min-w-[80px] border-b border-r border-gray-200">
+      <td className="px-2 py-3 text-left align-middle min-w-[80px] border-b border-r border-[color:var(--gold)] border-opacity-10">
         <div className="flex gap-1 justify-end items-center">
           <button
             onClick={() => onViewDetails(req)}
-            className="btn-icon-sm text-primary-600 hover:bg-primary-100 hover:text-primary-800 focus:ring-2 focus:ring-primary-300"
+            className="p-1.5 text-[color:var(--gold)] hover:bg-[color:var(--gold)] hover:bg-opacity-10 hover:text-[color:var(--gold)] focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 rounded-lg transition-all"
             title="View details"
             aria-label={`View details for ${req.title}`}
           >
@@ -214,7 +212,7 @@ const TableRow = memo(({
           </button>
           <button
             onClick={() => onCreateInterview?.(req.id)}
-            className="btn-icon-sm text-green-600 hover:bg-green-100 hover:text-green-800 focus:ring-2 focus:ring-green-300"
+            className="p-1.5 text-green-600 hover:bg-green-500 hover:bg-opacity-10 hover:text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-opacity-30 rounded-lg transition-all"
             title="Create interview"
             aria-label={`Create interview for ${req.title}`}
           >
@@ -223,7 +221,7 @@ const TableRow = memo(({
           {isAdmin && (
             <button
               onClick={() => onDelete(req.id)}
-              className="btn-icon-sm text-red-600 hover:bg-red-100 hover:text-red-800 focus:ring-2 focus:ring-red-300"
+              className="p-1.5 text-red-600 hover:bg-red-500 hover:bg-opacity-10 hover:text-red-600 focus:ring-2 focus:ring-red-500 focus:ring-opacity-30 rounded-lg transition-all"
               title="Delete requirement"
               aria-label={`Delete ${req.title}`}
             >
@@ -237,7 +235,7 @@ const TableRow = memo(({
 });
 
 
-export const RequirementsTable = ({
+export const RequirementsTable = memo(({
   requirements,
   onViewDetails,
   onCreateInterview,
@@ -333,31 +331,32 @@ export const RequirementsTable = ({
       variant="outlined"
       sx={{
         overflow: 'hidden',
-        borderWidth: 2,
-        borderColor: 'divider',
+        borderWidth: 1,
+        borderColor: 'rgba(234,179,8,0.2)',
         borderRadius: 2,
+        bgcolor: 'var(--darkbg-surface)',
       }}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Results</h3>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-[color:var(--gold)] border-opacity-10 bg-[color:var(--darkbg-surface)]">
+        <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">Results</h3>
         <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-          <span className="text-sm text-gray-600">Page: {page + 1}</span>
-          <span className="text-sm text-gray-600">|</span>
-          <span className="text-sm text-gray-600">Rows: {sortedRequirements.length}</span>
-          <span className="text-sm text-gray-600">|</span>
-          <span className="text-sm text-gray-600">Selected: {selectedRows.size}</span>
+          <span className="text-xs font-body text-[color:var(--text-secondary)]">Page: {page + 1}</span>
+          <span className="text-xs font-body text-[color:var(--text-secondary)]">|</span>
+          <span className="text-xs font-body text-[color:var(--text-secondary)]">Rows: {sortedRequirements.length}</span>
+          <span className="text-xs font-body text-[color:var(--text-secondary)]">|</span>
+          <span className="text-xs font-body text-[color:var(--text-secondary)]">Selected: {selectedRows.size}</span>
           
           <button
             onClick={() => onPageChange(page - 1)}
             disabled={page === 0 || isFetchingPage}
-            className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary-500 disabled:opacity-50"
+            className="px-3 py-1 text-xs font-body text-[color:var(--text)] bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg hover:bg-[color:var(--darkbg-surface-light)] focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 transition-all"
           >
             Prev
           </button>
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={!hasNextPage || isFetchingPage}
-            className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary-500 disabled:opacity-50"
+            className="px-3 py-1 text-xs font-body text-[color:var(--text)] bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg hover:bg-[color:var(--darkbg-surface-light)] focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 transition-all"
           >
             Next
           </button>
@@ -372,31 +371,31 @@ export const RequirementsTable = ({
           pb: 1,
         }}
       >
-        <table className="min-w-full w-max border-separate border-spacing-0 border border-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+        <table className="min-w-full w-max border-separate border-spacing-0 border border-[color:var(--gold)] border-opacity-20 rounded-lg">
+          <thead className="bg-[color:var(--darkbg-surface-light)] sticky top-0 z-10">
             <tr>
               
-              <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-10 border-b border-r border-gray-200">
+              <th className="px-2 py-3 text-center text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide w-10 border-b border-r border-[color:var(--gold)] border-opacity-10">
                 <button
                   onClick={toggleSelectAll}
-                  className="p-1 hover:bg-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:ring-offset-1"
+                  className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 focus:ring-offset-1 transition-all"
                   title={selectedRows.size === sortedRequirements.length ? 'Deselect all' : 'Select all'}
                 >
                   {selectedRows.size === sortedRequirements.length && sortedRequirements.length > 0 ? (
-                    <CheckSquare className="w-4 h-4 text-primary-600" />
+                    <CheckSquare className="w-4 h-4 text-[color:var(--gold)]" />
                   ) : (
-                    <Square className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                    <Square className="w-4 h-4 text-[color:var(--text-secondary)] hover:text-[color:var(--gold)]" />
                   )}
                 </button>
               </th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">REQ</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Title</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Status</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Vendor Company</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Contact Person</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Phone</th>
-              <th className="px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Email</th>
-              <th className="px-2 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-r border-gray-200">Actions</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">REQ</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Title</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Status</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Vendor Company</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Contact Person</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Phone</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Email</th>
+              <th className="px-2 py-3 text-right text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Actions</th>
             </tr>
           </thead>
           <tbody
@@ -406,12 +405,12 @@ export const RequirementsTable = ({
               <tr>
                 <td colSpan={9} className="px-2 py-12 text-center">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Calendar className="w-8 h-8 text-gray-400" />
+                    <div className="w-14 h-14 rounded-full bg-[color:var(--gold)] bg-opacity-10 flex items-center justify-center">
+                      <Calendar className="w-8 h-8 text-[color:var(--gold)]" />
                     </div>
                     <div>
-                      <p className="text-gray-900 font-semibold text-lg">No requirements found</p>
-                      <p className="text-gray-500 text-sm mt-2">Try adjusting your filters or create a new requirement</p>
+                      <p className="text-[color:var(--text)] font-medium text-xs">No requirements found</p>
+                      <p className="text-[color:var(--text-secondary)] text-xs mt-2">Try adjusting your filters or create a new requirement</p>
                     </div>
                   </div>
                 </td>
@@ -458,4 +457,4 @@ export const RequirementsTable = ({
       </Box>
     </Paper>
   );
-};
+});

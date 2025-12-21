@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertCircle, X, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { UserFriendlyError } from '../../lib/errorMessages';
+import { BrandButton } from '../brand/BrandButton';
 
 interface ErrorAlertProps {
   title: string;
@@ -13,6 +14,10 @@ interface ErrorAlertProps {
   showTechnical?: boolean;
 }
 
+/**
+ * Error Alert Component
+ * Displays errors with brand styling and recovery actions
+ */
 export const ErrorAlert = ({
   title,
   message,
@@ -27,59 +32,65 @@ export const ErrorAlert = ({
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   return (
-    <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 sm:p-5 shadow-sm">
+    <div className="bg-red-500 bg-opacity-10 border border-red-500 border-opacity-40 rounded-card p-4 sm:p-5 shadow-card">
       <div className="flex gap-3 flex-col sm:flex-row">
-        <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" aria-hidden="true" />
+        <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
         
         <div className="flex-1">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-semibold text-red-900 text-base">{title}</h3>
+            <h3 className="font-bold font-heading text-red-300 text-base">{title}</h3>
             {!isOnline && (
-              <div className="flex items-center gap-1 text-red-700 text-xs">
+              <div className="flex items-center gap-1 text-red-300 text-xs font-semibold">
                 <WifiOff className="w-4 h-4" aria-hidden="true" />
                 <span>Offline</span>
               </div>
             )}
           </div>
-          <p className="text-red-800 text-sm mb-3 leading-relaxed">{message}</p>
+          <p className="text-red-200 text-sm mb-3 leading-relaxed">{message}</p>
           
           {/* Recovery Actions */}
           <div className="flex flex-wrap gap-2 mb-2">
             {recovery && recovery.length > 0 ? (
               recovery.map((action, idx) => (
-                <button
+                <BrandButton
                   key={idx}
+                  variant="danger"
+                  size="sm"
                   onClick={action.action}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition text-sm flex items-center gap-2 focus-ring"
+                  className="flex items-center gap-2"
                 >
                   {action.label === 'Check Connection' && <Wifi className="w-4 h-4" aria-hidden="true" />}
                   {action.label === 'Retry' && <RefreshCw className="w-4 h-4" aria-hidden="true" />}
                   {action.label}
-                </button>
+                </BrandButton>
               ))
             ) : onRetry ? (
-              <button
+              <BrandButton
+                variant="danger"
+                size="sm"
                 onClick={onRetry}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition text-sm flex items-center gap-2 focus-ring"
+                className="flex items-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" aria-hidden="true" />
                 {retryLabel}
-              </button>
+              </BrandButton>
             ) : null}
-            <button
+            <BrandButton
+              variant="secondary"
+              size="sm"
               onClick={onDismiss}
-              className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg font-medium hover:bg-gray-300 transition text-sm flex items-center gap-1 focus-ring"
+              className="flex items-center gap-1"
             >
               <X className="w-4 h-4" aria-hidden="true" />
               Dismiss
-            </button>
+            </BrandButton>
           </div>
 
           {/* Technical Details (collapsible) */}
           {technical && (showTechnical || showTechDetails) && (
             <details className="mt-3">
               <summary
-                className="text-xs text-red-700 cursor-pointer hover:text-red-900 font-medium"
+                className="text-xs text-red-300 cursor-pointer hover:text-red-200 font-semibold"
                 onClick={(e) => {
                   e.preventDefault();
                   setShowTechDetails(!showTechDetails);
@@ -87,7 +98,7 @@ export const ErrorAlert = ({
               >
                 {showTechDetails ? 'Hide' : 'Show'} technical details
               </summary>
-              <pre className="mt-2 p-2 bg-red-100 rounded text-xs text-red-900 overflow-auto max-h-32">
+              <pre className="mt-2 p-2 bg-red-500 bg-opacity-20 rounded text-xs text-red-200 overflow-auto max-h-32 font-mono border border-red-500 border-opacity-20">
                 {technical}
               </pre>
             </details>

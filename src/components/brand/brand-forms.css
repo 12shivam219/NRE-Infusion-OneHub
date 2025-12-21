@@ -1,0 +1,299 @@
+/**
+ * NRETech Brand Button & Form Enhancement
+ * Applies consistent gold-accented styling across all form components
+ */
+
+/* ========== Enhanced Button Styles ========== */
+
+/* Primary Action - Gold with premium effects */
+.btn-primary {
+  position: relative;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.btn-primary:not(:disabled):hover {
+  filter: brightness(0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(234, 179, 8, 0.35),
+              0 10px 20px -5px rgba(0, 0, 0, 0.15);
+}
+
+.btn-primary:not(:disabled):active {
+  transform: translateY(0);
+  filter: brightness(0.9);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+
+/* Secondary - Outline with gold accent */
+.btn-secondary {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-secondary:not(:disabled):hover {
+  box-shadow: 0 0 20px rgba(234, 179, 8, 0.2);
+}
+
+/* Danger Button */
+.btn-danger {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+}
+
+.btn-danger:not(:disabled):hover {
+  background-color: #dc2626;
+  box-shadow: 0 8px 24px rgba(220, 38, 38, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Success Button */
+.btn-success {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+}
+
+.btn-success:not(:disabled):hover {
+  background-color: #15803d;
+  box-shadow: 0 8px 24px rgba(21, 128, 61, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Icon Buttons with gold hover */
+.btn-icon,
+.btn-icon-sm {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 500;
+}
+
+.btn-icon:not(:disabled):hover,
+.btn-icon-sm:not(:disabled):hover {
+  color: #EAB308;
+  box-shadow: 0 0 20px rgba(234, 179, 8, 0.15);
+  background-color: rgba(234, 179, 8, 0.1);
+}
+
+.btn-icon:not(:disabled):active,
+.btn-icon-sm:not(:disabled):active {
+  transform: scale(0.95);
+}
+
+/* ========== Form Input Enhancements ========== */
+
+/* Base input styling with gold focus */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="date"],
+input[type="time"],
+textarea,
+select {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.875rem;
+  font-weight: 400;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:not(:disabled):hover,
+textarea:not(:disabled):hover,
+select:not(:disabled):hover {
+  border-color: rgba(234, 179, 8, 0.4);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: #EAB308;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.1),
+              0 0 0 1px rgba(234, 179, 8, 0.5);
+}
+
+/* Disabled state */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error state */
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: #ef4444;
+  color: #fecaca;
+}
+
+input[aria-invalid="true"]:focus-visible,
+textarea[aria-invalid="true"]:focus-visible,
+select[aria-invalid="true"]:focus-visible {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1),
+              0 0 0 1px rgba(239, 68, 68, 0.5);
+  border-color: #ef4444;
+}
+
+/* Checkboxes with gold accent */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: #EAB308;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+
+input[type="checkbox"]:hover,
+input[type="radio"]:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.3);
+}
+
+/* ========== Label Styles ========== */
+
+label {
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #FFFFFF;
+  transition: color 200ms ease;
+}
+
+/* ========== Form Group ========== */
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group--error input,
+.form-group--error textarea,
+.form-group--error select {
+  border-color: #ef4444;
+}
+
+/* ========== Placeholder Styling ========== */
+
+::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  opacity: 1;
+}
+
+::-webkit-input-placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+::-moz-placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+:-ms-input-placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ========== Select Dropdown ========== */
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23EAB308' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+/* ========== Loading States ========== */
+
+.btn-loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  width: 1rem;
+  height: 1rem;
+  top: 50%;
+  left: 50%;
+  margin-left: -0.5rem;
+  margin-top: -0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #FFFFFF;
+  animation: spinner 600ms linear infinite;
+}
+
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========== Form Validation Messages ========== */
+
+.form-error,
+.form-help {
+  font-size: 0.75rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin-top: 0.25rem;
+}
+
+.form-error {
+  color: #fecaca;
+  font-weight: 500;
+}
+
+.form-help {
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 0.85;
+}
+
+/* ========== Textarea Specific ========== */
+
+textarea {
+  resize: vertical;
+  min-height: 6rem;
+}
+
+textarea:not(:disabled):hover {
+  border-color: rgba(234, 179, 8, 0.4);
+}
+
+/* ========== Mobile-Optimized ========== */
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select,
+  button {
+    min-height: 44px; /* Touch target size */
+  }
+
+  button {
+    padding: 0.75rem 1rem !important;
+  }
+}
+
+/* ========== Dark Mode Support ========== */
+
+@supports (color: #0D1117) {
+  input,
+  textarea,
+  select {
+    background-color: #1C2128;
+    color: #FFFFFF;
+    border-color: rgba(234, 179, 8, 0.2);
+  }
+}

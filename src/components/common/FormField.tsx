@@ -29,17 +29,17 @@ export const FormField = ({
   const helpId = helpText ? `${fieldId}-help` : undefined;
 
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`space-y-2 ${className}`}>
       <label
         htmlFor={fieldId}
-        className="block text-sm font-medium text-gray-700"
+        className="block text-sm font-heading font-bold text-[color:var(--text)] uppercase letter-spacing-wide"
       >
         {label}
         {required && <span className="text-red-600 ml-1" aria-label="required">*</span>}
       </label>
       
       {helpText && (
-        <p id={helpId} className="text-xs text-gray-500">
+        <p id={helpId} className="text-xs font-body text-[color:var(--text-secondary)] letter-spacing-wide">
           {helpText}
         </p>
       )}
@@ -59,7 +59,7 @@ export const FormField = ({
       {error && (
         <p
           id={errorId}
-          className="text-sm text-red-600"
+          className="text-xs font-body text-red-500 letter-spacing-wide"
           role="alert"
           aria-live="polite"
         >

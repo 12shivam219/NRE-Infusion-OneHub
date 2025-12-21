@@ -1,3 +1,7 @@
+/**
+ * Loading Spinner Component
+ * Brand-styled loader with gold accent
+ */
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -15,7 +19,10 @@ export const LoadingSpinner = ({ size = 'md', className = '', label = 'Loading' 
     <div
       role="status"
       aria-label={label}
-      className={`${sizeClasses[size]} border-primary-600 border-t-transparent rounded-full animate-spin ${className}`}
+      className={`${sizeClasses[size]} border-gold border-opacity-30 border-t-gold rounded-full animate-spin ${className}`}
+      style={{
+        borderTopColor: '#EAB308',
+      }}
     ></div>
   );
 };

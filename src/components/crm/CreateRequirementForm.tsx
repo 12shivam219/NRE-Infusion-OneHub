@@ -11,13 +11,13 @@ import { sanitizeText } from '../../lib/utils';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
+import { BrandButton } from '../brand';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import type { SelectChangeEvent } from '@mui/material/Select';
@@ -103,7 +103,7 @@ interface CreateRequirementFormProps {
 
 const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
-    <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
+    <h3 className="text-xs font-medium text-gray-900 mb-4">{title}</h3>
     <div className="space-y-4">{children}</div>
   </div>
 );
@@ -144,23 +144,25 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
     const { name, value } = e.target as { name: string; value: string };
-    setFormData(prevState => {
-      // Don't trim during input - preserve spaces as user types
-      // Trimming will happen during form submission
-      const newFormData = { ...prevState, [name]: value };
-      
-      // Check for similar requirements whenever company or tech stack changes
-      if (name === 'company' || name === 'primary_tech_stack' || name === 'title') {
-        const similar = findSimilarRequirements(
-          { title: newFormData.title, company: newFormData.company, primary_tech_stack: newFormData.primary_tech_stack },
-          allRequirements
-        );
-        setSimilarRequirements(similar);
-      }
-      
-      return newFormData;
-    });
-  }, [allRequirements]);
+    setFormData(prevState => ({ ...prevState, [name]: value }));
+  }, []);
+
+  // Separate effect for debounced similarity check
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const similar = findSimilarRequirements(
+        { 
+          title: formData.title, 
+          company: formData.company, 
+          primary_tech_stack: formData.primary_tech_stack 
+        },
+        allRequirements
+      );
+      setSimilarRequirements(similar);
+    }, 300); // Wait 300ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [formData.title, formData.company, formData.primary_tech_stack, allRequirements]);
 
   const loadConsultants = useCallback(async () => {
     if (!user) return;
@@ -347,7 +349,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-yellow-900 mb-1">Similar Requirements Found</p>
-                <p className="text-sm text-yellow-800">
+                <p className="text-xs text-yellow-800">
                   We found {similarRequirements.length} similar requirement(s) already in your system. Consider reviewing them before creating a new one.
                 </p>
               </div>
@@ -553,27 +555,28 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={2}
-            sx={{ pt: 3, borderTop: 1, borderColor: 'divider' }}
+            sx={{ pt: 3, borderTop: 1, borderColor: 'rgba(234,179,8,0.2)' }}
           >
-            <Button
+            <BrandButton
               type="submit"
-              variant="contained"
+              variant="primary"
+              size="md"
               disabled={loading}
               aria-busy={loading}
               aria-label="Create requirement"
-              sx={{ flex: 1 }}
+              className="flex-1"
             >
               {loading ? 'Creating...' : 'Create Requirement'}
-            </Button>
-            <Button
+            </BrandButton>
+            <BrandButton
               type="button"
-              variant="outlined"
-              color="inherit"
+              variant="secondary"
+              size="md"
               onClick={onClose}
-              sx={{ flex: 1 }}
+              className="flex-1"
             >
               Cancel
-            </Button>
+            </BrandButton>
           </Stack>
         </form>
       </DialogContent>

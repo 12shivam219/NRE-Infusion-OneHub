@@ -74,14 +74,14 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
   if (loading) {
     return (
       <div className="border border-gray-200 rounded-lg p-4 bg-white">
-        <p className="text-sm text-gray-500">Loading audit trail…</p>
+        <p className="text-xs text-gray-500">Loading audit trail…</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="border border-amber-200 rounded-lg p-4 bg-amber-50 text-amber-800 text-sm">
+      <div className="border border-amber-200 rounded-lg p-4 bg-amber-50 text-amber-800 text-xs">
         {error}
       </div>
     );
@@ -90,7 +90,7 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
   if (!logs.length) {
     return (
       <div className="border border-gray-200 rounded-lg p-4 bg-white">
-        <p className="text-sm text-gray-500">No audit entries yet.</p>
+        <p className="text-xs text-gray-500">No audit entries yet.</p>
       </div>
     );
   }
@@ -99,7 +99,7 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
     <div className="border border-gray-200 rounded-lg bg-white">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
         <Activity className="w-4 h-4 text-primary-600" />
-        <h4 className="text-sm font-semibold text-gray-900">{title}</h4>
+        <h4 className="text-xs font-medium text-gray-900">{title}</h4>
       </div>
       <ul className="divide-y divide-gray-100">
         {logs.map((log) => {
@@ -111,7 +111,7 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
               : '';
           return (
             <li key={log.id} className="px-4 py-3 space-y-1">
-              <div className="flex items-center gap-2 text-sm text-gray-700">
+              <div className="flex items-center gap-2 text-xs text-gray-700">
                 <Shield className="w-4 h-4 text-gray-400" />
                 <span className="font-semibold text-gray-900">{log.action.replace(/_/g, ' ')}</span>
               </div>

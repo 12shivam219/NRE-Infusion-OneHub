@@ -81,16 +81,16 @@ export const OfflineIndicator = () => {
   if (!isOnline) {
     return (
       <>
-        <div id="offline-indicator" className="fixed bottom-4 left-4 z-50 bg-orange-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-sm">
+        <div id="offline-indicator" className="fixed bottom-4 left-4 z-50 bg-amber-600 text-[color:var(--text)] px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-sm border border-[color:var(--gold)] border-opacity-30">
           <WifiOff className="w-5 h-5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="font-semibold">Working offline</p>
-            <p className="text-xs opacity-90">Changes will sync when online</p>
+            <p className="font-medium font-heading">Working offline</p>
+            <p className="text-xs opacity-90 font-body">Changes will sync when online</p>
           </div>
           {!hasSeenOfflineInfo && (
             <button
               onClick={() => setShowOfflineInfo(true)}
-              className="ml-2 p-1 hover:bg-orange-600 rounded transition-colors"
+              className="ml-2 p-1 hover:bg-amber-700 rounded transition-colors"
               aria-label="Learn more about offline mode"
               title="Learn more about offline mode"
             >
@@ -101,12 +101,12 @@ export const OfflineIndicator = () => {
 
         {/* Educational Info Banner - Shows on first offline experience */}
         {showOfflineInfo && !hasSeenOfflineInfo && (
-          <div className="fixed bottom-24 left-4 z-50 bg-blue-600 text-white px-5 py-4 rounded-lg shadow-xl max-w-md transform transition-all duration-300 ease-out">
+          <div className="fixed bottom-24 left-4 z-50 bg-[color:var(--gold)] text-[color:var(--dark-bg)] px-5 py-4 rounded-lg shadow-xl max-w-md transform transition-all duration-300 ease-out border border-[color:var(--gold)] border-opacity-40">
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-bold text-sm mb-2">✨ Offline Mode Active</h3>
-                <p className="text-xs opacity-95 mb-3">
+                <h3 className="font-medium text-xs mb-2 font-heading">✨ Offline Mode Active</h3>
+                <p className="text-xs opacity-95 mb-3 font-body">
                   You can continue working offline! Create, edit, and delete requirements. 
                   All changes will automatically sync when you're back online.
                 </p>
@@ -117,13 +117,13 @@ export const OfflineIndicator = () => {
                       setHasSeenOfflineInfo(true);
                       localStorage.setItem('hasSeenOfflineInfo', 'true');
                     }}
-                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 rounded text-xs font-semibold transition-colors"
+                    className="px-3 py-1.5 bg-[color:var(--dark-bg)] text-[color:var(--gold)] hover:bg-opacity-80 rounded text-xs font-medium transition-colors border border-[color:var(--gold)] font-heading"
                   >
                     Got it!
                   </button>
                   <button
                     onClick={() => setShowOfflineInfo(false)}
-                    className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 rounded text-xs font-semibold transition-colors"
+                    className="px-3 py-1.5 bg-[color:var(--dark-bg)] bg-opacity-50 text-[color:var(--text)] hover:bg-opacity-70 rounded text-xs font-medium transition-colors font-body"
                   >
                     Dismiss
                   </button>
@@ -135,7 +135,7 @@ export const OfflineIndicator = () => {
                   setHasSeenOfflineInfo(true);
                   localStorage.setItem('hasSeenOfflineInfo', 'true');
                 }}
-                className="p-1 hover:bg-blue-700 rounded transition-colors flex-shrink-0"
+                className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-20 rounded transition-colors flex-shrink-0"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -150,22 +150,22 @@ export const OfflineIndicator = () => {
   // Syncing mode
   if (syncStatus?.isSyncing) {
     return (
-      <div id="syncing-indicator" className="fixed bottom-4 left-4 z-50 bg-blue-500 text-white px-4 py-3 rounded-lg shadow-lg">
+      <div id="syncing-indicator" className="fixed bottom-4 left-4 z-50 bg-[color:var(--gold)] text-[color:var(--dark-bg)] px-4 py-3 rounded-lg shadow-lg border border-[color:var(--gold)] border-opacity-40">
         <div className="flex items-center gap-2 mb-2">
           <Wifi className="w-5 h-5 animate-pulse" />
-          <p className="font-semibold">Syncing data</p>
+          <p className="font-semibold font-heading">Syncing data</p>
         </div>
-        <div className="w-48 bg-blue-600 rounded-full h-2">
+        <div className="w-48 bg-[color:var(--gold)] bg-opacity-30 rounded-full h-2">
           <div
-            className="bg-white h-2 rounded-full transition-all duration-300"
+            className="bg-[color:var(--gold)] h-2 rounded-full transition-all duration-300"
             style={{ width: `${syncStatus.progress}%` }}
           />
         </div>
-        <p className="text-xs mt-1 opacity-90">
+        <p className="text-xs mt-1 opacity-90 font-body">
           {syncStatus.itemsRemaining} item{syncStatus.itemsRemaining !== 1 ? 's' : ''} remaining
         </p>
         {syncStatus.failedItems > 0 && (
-          <p className="text-xs text-red-200 mt-1">
+          <p className="text-xs text-red-600 mt-1 font-body">
             ⚠️ {syncStatus.failedItems} item{syncStatus.failedItems !== 1 ? 's' : ''} failed
           </p>
         )}

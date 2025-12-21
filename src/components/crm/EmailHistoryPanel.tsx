@@ -139,18 +139,18 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
+        <h3 className="text-xs font-medium flex items-center gap-2">
           <Mail className="w-5 h-5" />
           Email History
         </h3>
-        <span className="text-sm font-medium text-gray-600">{emails.length} emails</span>
+        <span className="text-xs font-medium text-gray-600">{emails.length} emails</span>
       </div>
 
       {error && (
         <div className="rounded-lg bg-red-50 border border-red-200 p-4">
           <div className="flex gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-xs text-red-700">{error}</p>
           </div>
         </div>
       )}
@@ -180,7 +180,7 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <User className="w-3 h-3 text-gray-400" />
-                        <p className="text-sm text-gray-600 truncate">
+                        <p className="text-xs text-gray-600 truncate">
                           {email.recipient_name || email.recipient_email}
                         </p>
                       </div>
@@ -202,16 +202,16 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
                 <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
                   {/* Recipient details */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                    <p className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">
                       Recipient
                     </p>
-                    <p className="text-sm text-gray-900 break-all">{email.recipient_email}</p>
+                    <p className="text-xs text-gray-900 break-all">{email.recipient_email}</p>
                   </div>
 
                   {/* Match confidence for Gmail synced emails */}
                   {email.sent_via === 'gmail_synced' && (
                     <div>
-                      <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                      <p className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">
                         Match Confidence
                       </p>
                       <div className="flex items-center gap-2">
@@ -228,10 +228,10 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
                   {/* Email preview */}
                   {email.body_preview && (
                     <div>
-                      <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                      <p className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">
                         Preview
                       </p>
-                      <p className="text-sm text-gray-700 bg-white rounded p-2 border border-gray-200 line-clamp-3">
+                      <p className="text-xs text-gray-700 bg-white rounded p-2 border border-gray-200 line-clamp-3">
                         {email.body_preview}
                       </p>
                     </div>
@@ -239,10 +239,10 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
 
                   {/* Status */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                    <p className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">
                       Status
                     </p>
-                    <p className="text-sm text-gray-900 capitalize flex items-center gap-2">
+                    <p className="text-xs text-gray-900 capitalize flex items-center gap-2">
                       {getStatusIcon(email.status)}
                       {email.status}
                     </p>
@@ -250,10 +250,10 @@ const EmailHistoryPanel: React.FC<EmailHistoryPanelProps> = ({ requirementId }) 
 
                   {/* Sent date and time */}
                   <div>
-                    <p className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">
+                    <p className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">
                       Sent
                     </p>
-                    <p className="text-sm text-gray-900">
+                    <p className="text-xs text-gray-900">
                       {new Date(email.sent_date).toLocaleString()}
                     </p>
                   </div>

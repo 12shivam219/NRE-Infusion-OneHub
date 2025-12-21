@@ -34,17 +34,13 @@ export function useSyncStatus() {
 
     updateStatus();
 
-    // Listen for custom sync events
-    window.addEventListener('sync-complete', updateStatus);
-    window.addEventListener('start-sync', updateStatus);
-    window.addEventListener('sync-error', updateStatus);
-    window.addEventListener('sync-queue-changed', updateStatus as EventListener);
+    // Consolidate all sync event listeners into a single handler
+    const handleSyncEvent = updateStatus as EventListener;
+    const syncEvents = ['sync-complete', 'start-sync', 'sync-error', 'sync-queue-changed'];
+    syncEvents.forEach(event => window.addEventListener(event, handleSyncEvent));
 
     return () => {
-      window.removeEventListener('sync-complete', updateStatus);
-      window.removeEventListener('start-sync', updateStatus);
-      window.removeEventListener('sync-error', updateStatus);
-      window.removeEventListener('sync-queue-changed', updateStatus as EventListener);
+      syncEvents.forEach(event => window.removeEventListener(event, handleSyncEvent));
     };
   }, []);
 
@@ -89,17 +85,13 @@ export function useSyncQueue() {
 
     loadPending();
 
-    const onSyncEvent = () => void loadPending();
-    window.addEventListener('sync-complete', onSyncEvent);
-    window.addEventListener('start-sync', onSyncEvent);
-    window.addEventListener('sync-error', onSyncEvent);
-    window.addEventListener('sync-queue-changed', onSyncEvent);
+    // Consolidate all sync event listeners into a single handler
+    const onSyncEvent = (() => void loadPending()) as EventListener;
+    const syncEvents = ['sync-complete', 'start-sync', 'sync-error', 'sync-queue-changed'];
+    syncEvents.forEach(event => window.addEventListener(event, onSyncEvent));
 
     return () => {
-      window.removeEventListener('sync-complete', onSyncEvent);
-      window.removeEventListener('start-sync', onSyncEvent);
-      window.removeEventListener('sync-error', onSyncEvent);
-      window.removeEventListener('sync-queue-changed', onSyncEvent);
+      syncEvents.forEach(event => window.removeEventListener(event, onSyncEvent));
     };
   }, []);
 

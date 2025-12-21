@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Mail, Send, Trash2, Reply, ChevronDown, ChevronUp, Loader } from 'lucide-react';
+import { Mail, Send, Trash2, Reply, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { LogoLoader } from '../common/LogoLoader';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -16,6 +17,7 @@ import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import CircularProgress from '@mui/material/CircularProgress';
+import { BrandButton } from '../brand';
 import {
   getEmailThreads,
   createEmailThread,
@@ -256,22 +258,21 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
       <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ p: 2, bgcolor: 'grey.50' }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
           <Mail className="w-5 h-5" />
-          <Typography variant="h6" sx={{ fontWeight: 800 }} noWrap>
+          <Typography variant="h6" sx={{ fontWeight: 500 }} noWrap>
             Email Threads
           </Typography>
         </Stack>
 
         <Stack direction="row" spacing={1} alignItems="center">
-          <Button
-            variant="contained"
-            color="primary"
-            size="small"
+          <BrandButton
+            variant="primary"
+            size="sm"
             onClick={() => setShowCompose(!showCompose)}
-            startIcon={<Send className="w-4 h-4" />}
             aria-label="Compose new email"
           >
+            <Send className="w-4 h-4 mr-2" />
             Compose
-          </Button>
+          </BrandButton>
           {onClose && (
             <IconButton onClick={onClose} aria-label="Close email panel" size="small">
               <span aria-hidden>✕</span>
@@ -319,7 +320,7 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
                 color="primary"
                 onClick={handleCompose}
                 disabled={composing}
-                startIcon={composing ? <Loader className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                startIcon={composing ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : <Send className="w-4 h-4" />}
                 sx={{ flex: 1 }}
               >
                 {composing ? 'Sending...' : 'Send'}
@@ -415,7 +416,7 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
                                 color="primary"
                                 onClick={handleReply}
                                 disabled={replying}
-                                startIcon={replying ? <Loader className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                                startIcon={replying ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : <Send className="w-4 h-4" />}
                                 sx={{ flex: 1 }}
                               >
                                 {replying ? 'Sending...' : 'Send Reply'}

@@ -4,7 +4,7 @@
  * Enhanced with sync queue, preloading, and analytics
  */
 
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import {
   cacheRequirements,
   getCachedRequirements,
@@ -20,22 +20,14 @@ import {
 } from '../lib/offlineDB';
 
 export function useOfflineCache() {
-  const [isOnlineState, setIsOnlineState] = useState(() => {
+  const [isOnline, setIsOnline] = useState(() => {
     // Initialize from navigator.onLine immediately
     return navigator.onLine;
   });
   const [offlineStartTime, setOfflineStartTime] = useState<number | null>(null);
 
-  const isOnlineRef = useRef(isOnlineState);
-  const offlineStartTimeRef = useRef<number | null>(offlineStartTime);
-
-  useEffect(() => {
-    isOnlineRef.current = isOnlineState;
-  }, [isOnlineState]);
-
-  useEffect(() => {
-    offlineStartTimeRef.current = offlineStartTime;
-  }, [offlineStartTime]);
+  // Only sync state values directly via closure
+  // Remove unnecessary ref synchronization
 
   // Function to sync pending items
   const syncPendingItems = useCallback(async () => {
@@ -100,16 +92,14 @@ export function useOfflineCache() {
 
     const handleOnline = () => {
       console.log('App is online - syncing cache');
-      setIsOnlineState(true);
-      isOnlineRef.current = true;
+      setIsOnline(true);
 
       // Log offline duration if we were offline
-      if (offlineStartTimeRef.current) {
-        const durationMs = Date.now() - offlineStartTimeRef.current;
+      if (offlineStartTime) {
+        const durationMs = Date.now() - offlineStartTime;
         const durationMinutes = Math.round(durationMs / 60000);
         void recordAnalytics('offline_time', { minutes: durationMinutes });
         setOfflineStartTime(null);
-        offlineStartTimeRef.current = null;
       }
 
       // Auto sync pending items immediately when coming back online
@@ -118,30 +108,28 @@ export function useOfflineCache() {
 
     const handleOffline = () => {
       console.log('App is offline - using cache');
-      setIsOnlineState(false);
-      isOnlineRef.current = false;
+      setIsOnline(false);
       const now = Date.now();
       setOfflineStartTime(now);
-      offlineStartTimeRef.current = now;
     };
 
     // Handle window focus to sync when user comes back to app
     const handleFocus = () => {
-      if (isOnlineRef.current) {
+      if (isOnline) {
         console.log('[Offline Hook] Window focused - checking for pending sync items');
         void syncPendingItems();
       }
     };
 
     const handleRetrySync = () => {
-      if (isOnlineRef.current && navigator.onLine) {
+      if (isOnline && navigator.onLine) {
         console.log('[Offline Hook] Manual retry requested - syncing pending items');
         void syncPendingItems();
       }
     };
 
     const handleQueueChanged = () => {
-      if (isOnlineRef.current && navigator.onLine) {
+      if (isOnline && navigator.onLine) {
         void syncPendingItems();
       }
     };
@@ -229,7 +217,7 @@ export function useOfflineCache() {
   }, []);
 
   return {
-    isOnline: isOnlineState,
+    isOnline,
     handleLogout,
     cacheRequirements,
     getCachedRequirements,

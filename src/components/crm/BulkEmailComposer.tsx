@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Send, Loader, Mail as MailIcon } from 'lucide-react';
+import { Send, Mail as MailIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { LogoLoader } from '../common/LogoLoader';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -13,7 +14,6 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
@@ -25,6 +25,7 @@ import Paper from '@mui/material/Paper';
 import LinearProgress from '@mui/material/LinearProgress';
 import { createBulkEmailCampaign, sendBulkEmailCampaign } from '../../lib/api/bulkEmailCampaigns';
 import { getEmailAccounts } from '../../lib/api/emailAccounts';
+import { BrandButton } from '../brand';
 
 interface BulkEmailCampaignRow {
   id: string;
@@ -199,7 +200,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
 
   if (!user) {
     return (
-      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
         <Typography variant="body2" color="text.secondary">
           Please sign in to send bulk emails
         </Typography>
@@ -230,7 +231,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
       <DialogTitle sx={{ pr: 7 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
           <MailIcon className="w-5 h-5" />
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+          <Typography variant="h6" sx={{ fontWeight: 500 }}>
             Bulk Email Campaign
           </Typography>
         </Stack>
@@ -282,7 +283,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
             {/* Step 2: Compose */}
             {step === 'compose' && (
               <Stack spacing={2}>
-                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(212,175,55,0.10)', borderColor: 'rgba(212,175,55,0.35)' }}>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.35)' }}>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>
                     ✓ {recipients.length} recipients selected
                   </Typography>
@@ -346,7 +347,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
                 </Paper>
 
                 <Stack spacing={0.5}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
                     Campaign Summary
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -360,7 +361,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
                   </Typography>
                 </Stack>
 
-                <Paper variant="outlined" sx={{ p: 2, maxHeight: 220, overflowY: 'auto', bgcolor: 'background.default' }}>
+                <Paper variant="outlined" sx={{ p: 2, maxHeight: 220, overflowY: 'auto', bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
                     {campaign.body}
                   </Typography>
@@ -372,19 +373,13 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
             {step === 'sending' && sendingProgress && (
               <Stack spacing={2}>
                 <Stack spacing={0.5} alignItems="center">
-                  <Loader className="w-10 h-10 animate-spin" />
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    Sending Campaign
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Please wait while we send your emails...
-                  </Typography>
+                  <LogoLoader size="lg" showText label="Sending Campaign" />
                 </Stack>
 
                 <Stack spacing={1}>
                   <Stack direction="row" justifyContent="space-between">
                     <Typography variant="body2" color="text.secondary">Progress</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {sendingProgress.sent + sendingProgress.failed}/{sendingProgress.total}
                     </Typography>
                   </Stack>
@@ -402,15 +397,15 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
                   }}
                 >
                   <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'success.main' }}>{sendingProgress.sent}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 500, color: 'success.main' }}>{sendingProgress.sent}</Typography>
                     <Typography variant="caption" color="text.secondary">Sent</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>{sendingProgress.failed}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 500, color: 'error.main' }}>{sendingProgress.failed}</Typography>
                     <Typography variant="caption" color="text.secondary">Failed</Typography>
                   </Paper>
                   <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
-                    <Typography variant="h5" sx={{ fontWeight: 900, color: 'text.secondary' }}>{sendingProgress.total}</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 500, color: 'text.secondary' }}>{sendingProgress.total}</Typography>
                     <Typography variant="caption" color="text.secondary">Total</Typography>
                   </Paper>
                 </Box>
@@ -425,59 +420,58 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
         {step !== 'sending' ? (
           <Stack direction="row" spacing={1} sx={{ width: '100%' }}>
             {step !== 'recipients' ? (
-              <Button
-                variant="outlined"
-                color="inherit"
+              <BrandButton
+                variant="secondary"
+                size="md"
                 onClick={() => {
                   if (step === 'compose') setStep('recipients');
                   if (step === 'review') setStep('compose');
                 }}
-                sx={{ flex: 1 }}
+                className="flex-1"
               >
                 Back
-              </Button>
+              </BrandButton>
             ) : (
-              <Button
-                variant="outlined"
-                color="inherit"
+              <BrandButton
+                variant="secondary"
+                size="md"
                 onClick={() => onClose?.()}
-                sx={{ flex: 1 }}
+                className="flex-1"
               >
                 Cancel
-              </Button>
+              </BrandButton>
             )}
 
             {step === 'recipients' ? (
-              <Button
-                variant="contained"
-                color="primary"
+              <BrandButton
+                variant="primary"
+                size="md"
                 onClick={handleParseRecipients}
                 disabled={!recipientsText.trim()}
-                sx={{ flex: 1 }}
+                className="flex-1"
               >
                 Continue with {parseRecipients(recipientsText).length} Recipients
-              </Button>
+              </BrandButton>
             ) : step === 'compose' ? (
-              <Button
-                variant="contained"
-                color="primary"
+              <BrandButton
+                variant="primary"
+                size="md"
                 onClick={handleCreateCampaign}
                 disabled={loading}
-                startIcon={loading ? <Loader className="w-4 h-4 animate-spin" /> : undefined}
-                sx={{ flex: 1 }}
+                className="flex-1"
               >
                 {loading ? 'Creating...' : 'Review Campaign'}
-              </Button>
+              </BrandButton>
             ) : step === 'review' && campaign ? (
-              <Button
-                variant="contained"
-                color="success"
+              <BrandButton
+                variant="primary"
+                size="md"
                 onClick={handleSendCampaign}
-                startIcon={<Send className="w-4 h-4" />}
-                sx={{ flex: 1 }}
+                className="flex-1"
               >
+                <Send className="w-4 h-4 mr-2" />
                 Send Campaign Now
-              </Button>
+              </BrandButton>
             ) : null}
           </Stack>
         ) : null}

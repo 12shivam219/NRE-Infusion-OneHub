@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Modal } from './Modal';
+import { BrandButton } from '../brand/BrandButton';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ interface ConfirmDialogProps {
  * - Keyboard navigation (Escape to cancel, Enter to confirm)
  * - ARIA attributes
  * - Loading states
- * - Variant styling
+ * - Brand styling with variant support
  */
 export const ConfirmDialog = ({
   isOpen,
@@ -82,17 +83,17 @@ export const ConfirmDialog = ({
   const variantStyles = {
     danger: {
       icon: 'text-red-600',
-      confirmButton: 'bg-red-600 hover:bg-red-700 text-white',
+      confirmVariant: 'danger' as const,
       title: 'text-red-900',
     },
     warning: {
-      icon: 'text-yellow-600',
-      confirmButton: 'bg-yellow-600 hover:bg-yellow-700 text-white',
-      title: 'text-yellow-900',
+      icon: 'text-amber-600',
+      confirmVariant: 'primary' as const,
+      title: 'text-amber-900',
     },
     info: {
       icon: 'text-blue-600',
-      confirmButton: 'bg-blue-600 hover:bg-blue-700 text-white',
+      confirmVariant: 'primary' as const,
       title: 'text-blue-900',
     },
   };
@@ -112,39 +113,35 @@ export const ConfirmDialog = ({
             <h3 className="sr-only" id="confirm-dialog-title">
               {title}
             </h3>
-            <p className="text-[color:var(--muted)]" id="confirm-dialog-message">
+            <p className="text-[color:var(--text-secondary)]" id="confirm-dialog-message">
               {message}
             </p>
           </div>
         </div>
 
         <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-4 border-t border-[color:var(--border)]">
-          <button
+          <BrandButton
             ref={cancelButtonRef}
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
+            variant="secondary"
+            size="sm"
             aria-label={cancelLabel}
           >
             {cancelLabel}
-          </button>
-          <button
+          </BrandButton>
+          <BrandButton
             ref={confirmButtonRef}
             onClick={handleConfirm}
             disabled={isLoading}
-            className={`px-4 py-2.5 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed focus-ring ${styles.confirmButton}`}
+            variant={styles.confirmVariant}
+            size="sm"
+            isLoading={isLoading}
             aria-label={confirmLabel}
             aria-busy={isLoading}
           >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Processing...
-              </span>
-            ) : (
-              confirmLabel
-            )}
-          </button>
+            {confirmLabel}
+          </BrandButton>
         </div>
       </div>
     </Modal>

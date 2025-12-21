@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { TrendingUp, Download, Plus, BarChart3, Calendar, UserPlus } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { TrendingUp, Download, Plus, BarChart3, Calendar, UserPlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getRequirementsPage } from '../../lib/api/requirements';
 import { getInterviewsPage } from '../../lib/api/interviews';
@@ -19,6 +19,9 @@ import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import Skeleton from '@mui/material/Skeleton';
+import ListItemButton from '@mui/material/ListItemButton';
+import Collapse from '@mui/material/Collapse';
+import { alpha, type Theme } from '@mui/material/styles';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type Interview = Database['public']['Tables']['interviews']['Row'];
@@ -28,13 +31,16 @@ interface MarketingHubDashboardProps {
   onQuickAdd?: (type: 'requirement' | 'interview' | 'consultant') => void;
 }
 
-export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps) => {
+export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboardProps) => {
   const { user } = useAuth();
   const [showOrgWide, setShowOrgWide] = useState(false);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [totalConsultants, setTotalConsultants] = useState<number | null>(null);
+  
+  // Track which accordion sections are expanded
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['overview']));
 
   const [counts, setCounts] = useState({
     activeRequirements: 0,
@@ -50,6 +56,16 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
   });
 
   const [loading, setLoading] = useState(true);
+
+  const toggleSection = (sectionId: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId);
+    } else {
+      newExpanded.add(sectionId);
+    }
+    setExpandedSections(newExpanded);
+  };
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -184,30 +200,38 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
   if (loading) {
     return (
       <Box sx={{ minHeight: '100vh', p: { xs: 2, sm: 3, md: 4 } }}>
-        <Stack spacing={4}>
+        <Stack spacing={2}>
+          {/* Header skeleton */}
           <Paper sx={{ p: { xs: 3, sm: 4 }, borderRadius: 3 }}>
             <Skeleton variant="text" width={260} height={36} />
             <Skeleton variant="text" width={420} />
           </Paper>
 
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
-              gap: 2,
-            }}
-          >
-            {[...Array(4)].map((_, i) => (
-              <Card key={i}>
-                <CardContent>
-                  <Skeleton variant="text" width={140} />
-                  <Skeleton variant="text" width={80} height={40} />
-                  <Skeleton variant="text" width={200} />
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
+          {/* Overview accordion skeleton */}
+          <Card sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ pb: 3 }}>
+              <Skeleton variant="text" width={200} height={32} />
+            </CardContent>
+            <CardContent>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+                  gap: 2,
+                }}
+              >
+                {[...Array(4)].map((_, i) => (
+                  <Box key={i}>
+                    <Skeleton variant="text" width={140} />
+                    <Skeleton variant="text" width={80} height={40} />
+                    <Skeleton variant="text" width={200} />
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
 
+          {/* Activity and Actions accordion skeleton */}
           <Box
             sx={{
               display: 'grid',
@@ -215,20 +239,24 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
               gap: 2,
             }}
           >
-            <Card>
+            <Card sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ pb: 3 }}>
+                <Skeleton variant="text" width={180} height={32} />
+              </CardContent>
               <CardContent>
-                <Skeleton variant="text" width={180} />
-                <Stack spacing={2} sx={{ mt: 2 }}>
+                <Stack spacing={2}>
                   {[...Array(3)].map((_, i) => (
                     <Skeleton key={i} variant="rounded" height={56} />
                   ))}
                 </Stack>
               </CardContent>
             </Card>
-            <Card>
+            <Card sx={{ borderRadius: 2 }}>
+              <CardContent sx={{ pb: 3 }}>
+                <Skeleton variant="text" width={150} height={32} />
+              </CardContent>
               <CardContent>
-                <Skeleton variant="text" width={180} />
-                <Stack spacing={1.5} sx={{ mt: 2 }}>
+                <Stack spacing={1.5}>
                   {[...Array(3)].map((_, i) => (
                     <Skeleton key={i} variant="rounded" height={44} />
                   ))}
@@ -243,7 +271,8 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
 
   return (
     <Box sx={{ minHeight: '100vh', p: { xs: 2, sm: 3, md: 4 } }}>
-      <Stack spacing={4}>
+      <Stack spacing={2}>
+        {/* Header Section */}
         <Paper
           sx={{
             p: { xs: 3, sm: 4 },
@@ -294,39 +323,70 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
           </Stack>
         </Paper>
 
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
-            gap: 2,
-          }}
-        >
-          <StatCard
-            title="Active Requirements"
-            value={counts.activeRequirements}
-            subtitle={`New: ${counts.newRequirements} | In Progress: ${counts.inProgressRequirements}`}
-            icon={<TrendingUp className="w-6 h-6" />}
-          />
-          <StatCard
-            title="Upcoming Interviews"
-            value={counts.upcomingInterviews}
-            subtitle={`Completed: ${counts.completedInterviews}`}
-            icon={<TrendingUp className="w-6 h-6" />}
-          />
-          <StatCard
-            title="Active Consultants"
-            value={counts.activeConsultants}
-            subtitle={`Recently Placed: ${counts.placedConsultants}`}
-            icon={<TrendingUp className="w-6 h-6" />}
-          />
-          <StatCard
-            title="Placement Rate"
-            value={`${counts.placementRate}%`}
-            subtitle={`${counts.placedConsultants} of ${totalConsultants ?? 0} placed`}
-            icon={<TrendingUp className="w-6 h-6" />}
-          />
-        </Box>
+        {/* Accordion Sections */}
+        {/* Overview Section */}
+        <Card sx={{ borderRadius: 2 }}>
+          <ListItemButton
+            onClick={() => toggleSection('overview')}
+            aria-expanded={expandedSections.has('overview')}
+            aria-controls="accordion-overview"
+            sx={{
+              backgroundColor: (theme: Theme) => alpha(theme.palette.primary.main, 0.08),
+              '&:hover': {
+                backgroundColor: (theme: Theme) => alpha(theme.palette.primary.main, 0.12),
+              },
+            }}
+          >
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                📊 Overview & Metrics
+              </Typography>
+              <ChevronDown
+                className={`w-5 h-5 transition-transform duration-300 ${expandedSections.has('overview') ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </Box>
+          </ListItemButton>
 
+          <Collapse in={expandedSections.has('overview')} timeout="auto" id="accordion-overview">
+            <CardContent>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+                  gap: 2,
+                }}
+              >
+                <StatCard
+                  title="Active Requirements"
+                  value={counts.activeRequirements}
+                  subtitle={`New: ${counts.newRequirements} | In Progress: ${counts.inProgressRequirements}`}
+                  icon={<TrendingUp className="w-6 h-6" />}
+                />
+                <StatCard
+                  title="Upcoming Interviews"
+                  value={counts.upcomingInterviews}
+                  subtitle={`Completed: ${counts.completedInterviews}`}
+                  icon={<TrendingUp className="w-6 h-6" />}
+                />
+                <StatCard
+                  title="Active Consultants"
+                  value={counts.activeConsultants}
+                  subtitle={`Recently Placed: ${counts.placedConsultants}`}
+                  icon={<TrendingUp className="w-6 h-6" />}
+                />
+                <StatCard
+                  title="Placement Rate"
+                  value={`${counts.placementRate}%`}
+                  subtitle={`${counts.placedConsultants} of ${totalConsultants ?? 0} placed`}
+                  icon={<TrendingUp className="w-6 h-6" />}
+                />
+              </Box>
+            </CardContent>
+          </Collapse>
+        </Card>
+
+        {/* Activity & Quick Actions Section */}
         <Box
           sx={{
             display: 'grid',
@@ -334,10 +394,10 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
             gap: 2,
           }}
         >
-          <Card>
+          <Card sx={{ borderRadius: 2 }}>
             <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                Recent Activity
+              <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
+                📋 Recent Activity
               </Typography>
               {recentActivity.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 3, textAlign: 'center' }}>
@@ -369,10 +429,10 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
             </CardContent>
           </Card>
 
-          <Card>
+          <Card sx={{ borderRadius: 2 }}>
             <CardContent>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                Quick Actions
+              <Typography variant="body1" sx={{ fontWeight: 700, mb: 2 }}>
+                ⚡ Quick Actions
               </Typography>
               <Stack spacing={1.5}>
                 <Button
@@ -406,7 +466,7 @@ export const MarketingHubDashboard = ({ onQuickAdd }: MarketingHubDashboardProps
       </Stack>
     </Box>
   );
-};
+});
 
 /* --- Reusable Components --- */
 

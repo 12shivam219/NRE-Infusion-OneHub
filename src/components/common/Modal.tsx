@@ -200,7 +200,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md', initialFo
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 animate-fade-in"
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-4 animate-fade-in backdrop-blur-sm"
       role="presentation"
       onClick={handleBackdropClick}
     >
@@ -210,16 +210,16 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md', initialFo
         aria-modal="true"
         aria-labelledby={hasTitle ? titleElementId : undefined}
         aria-label={hasTitle ? undefined : 'Dialog'}
-        className={`bg-[color:var(--surface)] rounded-xl shadow-xl w-full ${sizeClasses[size]} max-h-[95vh] sm:max-h-[90vh] flex flex-col animate-slide-up`}
+        className={`bg-darkbg-surface rounded-card shadow-xl w-full ${sizeClasses[size]} max-h-[95vh] sm:max-h-[90vh] flex flex-col animate-slide-up border border-gold border-opacity-10`}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[color:var(--border)] flex-shrink-0">
-          <h2 id={titleElementId} className="text-xl sm:text-2xl font-bold text-[color:var(--text)] pr-4">{title}</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gold border-opacity-10 flex-shrink-0">
+          <h2 id={titleElementId} className="text-base sm:text-lg font-bold font-heading text-text pr-4 letter-spacing-tight">{title}</h2>
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition focus-ring flex-shrink-0"
+            className="p-2 text-text-secondary hover:text-gold hover:bg-gold hover:bg-opacity-10 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-gold flex-shrink-0"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />

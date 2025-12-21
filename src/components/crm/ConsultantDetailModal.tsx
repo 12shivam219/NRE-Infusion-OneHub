@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Loader } from 'lucide-react';
+import { X, Edit2, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant } from '../../lib/api/consultants';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { LogoLoader } from '../common/LogoLoader';
 import { subscribeToConsultantById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 import Dialog from '@mui/material/Dialog';
@@ -213,7 +214,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Name
                 </Typography>
                 <Typography variant="body1" sx={{ fontWeight: 700 }}>
@@ -237,7 +238,7 @@ export const ConsultantDetailModal = ({
               </TextField>
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Status
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -257,7 +258,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Email
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -277,7 +278,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Phone
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -296,7 +297,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Location
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -315,7 +316,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Total Experience
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -337,7 +338,7 @@ export const ConsultantDetailModal = ({
                 />
               ) : (
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                     Primary Skills
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -360,7 +361,7 @@ export const ConsultantDetailModal = ({
                 />
               ) : (
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                     Secondary Skills
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
@@ -381,7 +382,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   LinkedIn Profile
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -406,7 +407,7 @@ export const ConsultantDetailModal = ({
               />
             ) : (
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Expected Rate
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -435,7 +436,7 @@ export const ConsultantDetailModal = ({
               color="primary"
               onClick={handleSave}
               disabled={isLoading}
-              startIcon={isLoading ? <Loader className="w-4 h-4" /> : undefined}
+              startIcon={isLoading ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : undefined}
             >
               Save Changes
             </Button>
@@ -466,7 +467,7 @@ export const ConsultantDetailModal = ({
                 color="error"
                 onClick={handleDeleteClick}
                 disabled={isDeleting}
-                startIcon={isDeleting ? <Loader className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                startIcon={isDeleting ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : <Trash2 className="w-4 h-4" />}
               >
                 Delete
               </Button>

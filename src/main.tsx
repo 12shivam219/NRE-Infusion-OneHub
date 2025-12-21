@@ -1,5 +1,5 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { StrictMode, memo } from 'react';
+import { createRoot, Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -19,9 +19,9 @@ initSentry();
 // Setup global error handlers
 setupGlobalErrorHandler();
 
-document.title = 'NRE Infusion OneHub Suite';
+document.title = 'NRETech OneHub';
 
-export const ThemedApp = () => {
+export const ThemedApp = memo(() => {
   const { themeMode } = useThemeMode();
   const theme = themeMode === 'dark' ? crmThemeDark : crmThemeLight;
 
@@ -31,11 +31,14 @@ export const ThemedApp = () => {
       <App />
     </ThemeProvider>
   );
-};
+});
 
-const rootElement = document.getElementById('root');
-if (rootElement && !rootElement._reactRootContainer) {
-  createRoot(rootElement).render(
+const rootElement = document.getElementById('root') as HTMLElement & { __reactRoot?: Root };
+if (rootElement && !rootElement.__reactRoot) {
+  const root = createRoot(rootElement);
+  // Mark the root element so we don't try to create root again
+  rootElement.__reactRoot = root;
+  root.render(
     <StrictMode>
       <BrowserRouter>
         <ErrorBoundary>

@@ -8,13 +8,13 @@ import { getConsultants } from '../../lib/api/consultants';
 import { validateInterviewForm, getAllInterviewStatuses } from '../../lib/interviewValidation';
 import { sanitizeText } from '../../lib/utils';
 import type { Database } from '../../lib/database.types';
+import { BrandButton } from '../brand';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Accordion from '@mui/material/Accordion';
@@ -312,7 +312,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
       <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+        <Typography variant="h6" sx={{ fontWeight: 500 }}>
           Schedule Interview
         </Typography>
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
@@ -361,7 +361,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
                 onChange={handleChange}
               />
             </div>
-              <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-800">
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-xs text-primary-800">
               <AlertCircle className="w-4 h-4 inline mr-2" />
               These fields must be filled to create an interview.
             </div>
@@ -560,23 +560,26 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={2}
-            sx={{ pt: 3, borderTop: 1, borderColor: 'divider' }}
+            sx={{ pt: 3, borderTop: 1, borderColor: 'rgba(234,179,8,0.2)' }}
           >
-            <Button
+            <BrandButton
               type="submit"
-              variant="contained"
+              variant="primary"
+              size="md"
               disabled={loading}
+              className="flex-1"
             >
               {loading ? 'Scheduling...' : 'Schedule Interview'}
-            </Button>
-            <Button
+            </BrandButton>
+            <BrandButton
               type="button"
-              variant="outlined"
-              color="inherit"
+              variant="secondary"
+              size="md"
               onClick={onClose}
+              className="flex-1"
             >
               Cancel
-            </Button>
+            </BrandButton>
           </Stack>
         </form>
       </DialogContent>

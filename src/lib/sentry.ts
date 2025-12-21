@@ -29,8 +29,10 @@ export const initSentry = () => {
         blockAllMedia: true,
       }),
     ],
-    // Performance monitoring
-    tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0, // 10% in production, 100% in dev
+    // ✅ OPTIMIZATION: Reduced tracing overhead in development
+    // Dev: 1% sampling (1 in 100), Prod: 10% sampling (1 in 10)
+    // Prevents dev environment slowdown from Sentry performance tracking
+    tracesSampleRate: import.meta.env.PROD ? 0.1 : 0.01,
     replaysSessionSampleRate: 0.1, // Session replay 10% of all sessions
     replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
     // Release tracking

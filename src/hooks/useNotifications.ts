@@ -33,17 +33,42 @@ export const useNotifications = () => {
   }, [user]);
 
   const handleMarkAsRead = useCallback(async (notificationId: string) => {
+    if (!user) return;
+    
     await markAsRead(notificationId);
-    await loadNotifications();
-    await loadUnreadCount();
-  }, [loadNotifications, loadUnreadCount]);
+    
+    // Batch both API calls
+    const [notificationsResult, unreadResult] = await Promise.all([
+      getNotifications(user.id),
+      getUnreadCount(user.id),
+    ]);
+    
+    // Single state update instead of multiple
+    if (notificationsResult.success && notificationsResult.notifications) {
+      setNotifications(notificationsResult.notifications);
+    }
+    if (unreadResult.success && unreadResult.count !== undefined) {
+      setUnreadCount(unreadResult.count);
+    }
+  }, [user?.id]);
 
   const handleMarkAllAsRead = useCallback(async () => {
     if (!user) return;
     await markAllAsRead(user.id);
-    await loadNotifications();
-    await loadUnreadCount();
-  }, [user, loadNotifications, loadUnreadCount]);
+    
+    // Batch both API calls
+    const [notificationsResult, unreadResult] = await Promise.all([
+      getNotifications(user.id),
+      getUnreadCount(user.id),
+    ]);
+    
+    if (notificationsResult.success && notificationsResult.notifications) {
+      setNotifications(notificationsResult.notifications);
+    }
+    if (unreadResult.success && unreadResult.count !== undefined) {
+      setUnreadCount(unreadResult.count);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (user) {

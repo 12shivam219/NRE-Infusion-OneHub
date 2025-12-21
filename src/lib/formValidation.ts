@@ -9,6 +9,13 @@ export interface ValidationError {
   errors: Record<string, string>;
 }
 
+export interface PasswordValidationResult {
+  isValid: boolean;
+  errors: string[];
+  isLeaked?: boolean;
+  leakCount?: number;
+}
+
 /**
  * Validate email format - stricter validation
  */
@@ -150,6 +157,44 @@ export const validateConsultantForm = (data: {
 
   return {
     isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+};
+
+/**
+ * Validate password strength (minimum 8 characters)
+ * Checks for: uppercase, lowercase, number, special character
+ */
+export const validatePasswordStrength = (password: string): PasswordValidationResult => {
+  const errors: string[] = [];
+
+  // Length check (minimum 8 characters)
+  if (!password || password.length < 8) {
+    errors.push('Password must be at least 8 characters long');
+  }
+
+  // Uppercase check
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain at least one uppercase letter');
+  }
+
+  // Lowercase check
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain at least one lowercase letter');
+  }
+
+  // Number check
+  if (!/[0-9]/.test(password)) {
+    errors.push('Password must contain at least one number');
+  }
+
+  // Special character check
+  if (!/[@$!%*?&]/.test(password)) {
+    errors.push('Password must contain at least one special character (@$!%*?&)');
+  }
+
+  return {
+    isValid: errors.length === 0,
     errors,
   };
 };

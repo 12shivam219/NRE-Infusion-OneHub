@@ -1,6 +1,33 @@
-# NRE Infusion OneHub Suite
+# NRETech OneHub
 
 A comprehensive, production-ready enterprise resume management system for job seekers and professionals to manage and optimize their resumes with advanced document processing, CRM capabilities, and enterprise security.
+
+## Launch Narrative & Messaging
+
+### Positioning Pillars
+1. **All-in-one command center** – OneHub unifies resumes, CRM, interviews, and outreach so staffing teams operate from a single orbit.
+2. **Precision automation** – Document intelligence, sync controls, and guided workflows remove manual drag while keeping teams in motion.
+3. **Enterprise-grade trust** – JWT security, granular roles, audit trails, and rate limiting ensure every action is protected.
+4. **Human-centric clarity** – Orbital UI cues, live dashboards, and notifications surface what matters the moment it matters.
+
+### Hero Copy
+- **Headline:** *Your talent operations, perfectly in orbit.*
+- **Subheadline:** *NRETech OneHub centralizes resumes, CRM, interviews, and outreach in a single intelligent workspace built for premium staffing teams.*
+
+### Feature Highlights
+- **Resume intelligence:** Import, version, and deliver production-ready DOCX docs with real-time collaborative editing.
+- **Pipeline mastery:** Track requirements, consultants, and interviews with live status telemetry and guided workflows.
+- **Connected communications:** Sync email threads, schedule outreach, and trigger bulk campaigns without leaving OneHub.
+- **Enterprise safeguards:** JWT auth, granular roles, audit logs, and rate limiting keep every action protected.
+
+### Calls to Action
+- **Primary CTA:** *Launch OneHub*
+- **Supporting copy:** *Schedule a guided walkthrough or start in sandbox mode—your operations migrate in minutes.*
+
+### Tagline Options
+1. *One platform. Every mission-critical orbit.*
+2. *Command talent workflows with precision.*
+3. *Where staffing intelligence takes shape.*
 
 ## Features
 
@@ -68,7 +95,7 @@ A comprehensive, production-ready enterprise resume management system for job se
 
 \`\`\`bash
 git clone <repository-url>
-cd nre-infusion-onehub-suite
+cd nretech-onehub
 \`\`\`
 
 ### 2. Install Dependencies

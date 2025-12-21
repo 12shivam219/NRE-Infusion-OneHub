@@ -10,6 +10,7 @@ import {
 import type { CachePreferences } from '../lib/offlineDB';
 
 const DEFAULT_PREFERENCES: CachePreferences = {
+  key: 'cache-preferences',
   cacheRequirements: true,
   cacheConsultants: true,
   cacheInterviews: true,

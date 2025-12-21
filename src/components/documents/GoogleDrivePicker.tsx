@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { Cloud, Plus, Loader, X, Check } from 'lucide-react';
+import { Cloud, Plus, X, Check } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { LogoLoader } from '../common/LogoLoader';
 import {
   listGoogleDriveFiles,
   downloadGoogleDriveFile,
@@ -207,7 +208,7 @@ export const GoogleDrivePicker = ({
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
         <Cloud className="w-12 h-12 text-blue-600 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-xs font-semibold text-gray-900 mb-2">
           Google Drive Integration Not Configured
         </h3>
         <p className="text-gray-700 mb-4">
@@ -223,7 +224,7 @@ export const GoogleDrivePicker = ({
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Cloud className="w-6 h-6 text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Import from Google Drive</h2>
+          <h2 className="text-xs font-bold text-gray-900">Import from Google Drive</h2>
         </div>
         {onClose && (
           <button
@@ -265,7 +266,7 @@ export const GoogleDrivePicker = ({
 
       {loading && (
         <div className="flex justify-center items-center py-12">
-          <Loader className="w-6 h-6 text-primary-700 animate-spin" />
+          <LogoLoader size="md" />
         </div>
       )}
 
@@ -301,7 +302,7 @@ export const GoogleDrivePicker = ({
 
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{file.name}</p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs text-gray-600">
                         {formatFileSize(file.size)} • {file.mimeType}
                       </p>
                     </div>
@@ -309,11 +310,11 @@ export const GoogleDrivePicker = ({
                     <button
                       onClick={() => handleImportFile(file.id, file.name)}
                       disabled={isImporting || selectedFiles.size > 0}
-                      className="flex items-center gap-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="flex items-center gap-2 px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                       aria-label={`Import ${file.name}`}
                     >
                       {isImporting ? (
-                        <Loader className="w-4 h-4 animate-spin" />
+                        <span className="w-4 h-4"><LogoLoader size="sm" /></span>
                       ) : (
                         <Check className="w-4 h-4" />
                       )}
@@ -335,7 +336,7 @@ export const GoogleDrivePicker = ({
               >
                 {importing ? (
                   <>
-                    <Loader className="w-4 h-4 animate-spin" />
+                    <span className="w-4 h-4"><LogoLoader size="sm" /></span>
                     Importing...
                   </>
                 ) : (

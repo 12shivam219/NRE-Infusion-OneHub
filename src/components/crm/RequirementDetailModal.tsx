@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Loader, Mail } from 'lucide-react';
+import { X, Edit2, Mail } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { updateRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { EmailThreading } from './EmailThreading';
+import { LogoLoader } from '../common/LogoLoader';
 import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
@@ -191,7 +192,7 @@ export const RequirementDetailModal = ({
       >
         <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 900 }} noWrap>
+            <Typography variant="h6" sx={{ fontWeight: 500 }} noWrap>
               {isEditing ? 'Edit Requirement' : 'Requirement Details'}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
@@ -227,11 +228,11 @@ export const RequirementDetailModal = ({
               <div className="p-3 sm:p-5 lg:p-8 space-y-6 sm:space-y-8">
                 {/* Form Section Header */}
                 <div className="border-b-2 border-primary-200 pb-3 sm:pb-4 mb-4 sm:mb-6">
-                  <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 flex items-center gap-2 mb-1">
+                  <h3 className="text-xs font-medium text-gray-900 flex items-center gap-2 mb-1">
                     <div className="w-1 h-5 sm:h-6 bg-primary-600 rounded-full"></div>
                     Requirement Information
                   </h3>
-                  <p className="text-xs sm:text-sm lg:text-base text-gray-600 mt-2 ml-3">Edit and manage all requirement details below</p>
+                  <p className="text-xs text-gray-600 mt-2 ml-3">Edit and manage all requirement details below</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 bg-white p-4 sm:p-5 lg:p-6 rounded-lg sm:rounded-xl shadow-sm border border-gray-200">
@@ -245,7 +246,7 @@ export const RequirementDetailModal = ({
                         fullWidth
                       />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.title}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.title}</p>
               )}
             </div>
 
@@ -259,7 +260,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.company || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.company || '-'}</p>
               )}
             </div>
 
@@ -282,7 +283,7 @@ export const RequirementDetailModal = ({
                   <MenuItem value="CLOSED">Closed</MenuItem>
                 </TextField>
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.status || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.status || '-'}</p>
               )}
             </div>
 
@@ -296,7 +297,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.location || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.location || '-'}</p>
               )}
             </div>
 
@@ -310,7 +311,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.rate || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.rate || '-'}</p>
               )}
             </div>
 
@@ -342,7 +343,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.vendor_email || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.vendor_email || '-'}</p>
               )}
             </div>
 
@@ -357,7 +358,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.vendor_phone || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.vendor_phone || '-'}</p>
               )}
             </div>
 
@@ -372,7 +373,7 @@ export const RequirementDetailModal = ({
                   placeholder="e.g., 6 months, 1 year"
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.duration || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.duration || '-'}</p>
               )}
             </div>
 
@@ -392,7 +393,7 @@ export const RequirementDetailModal = ({
                   <MenuItem value="Onsite">Onsite</MenuItem>
                 </TextField>
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.remote || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.remote || '-'}</p>
               )}
             </div>
 
@@ -407,7 +408,7 @@ export const RequirementDetailModal = ({
                   placeholder="e.g., LinkedIn, Referral, Portal"
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.applied_for || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.applied_for || '-'}</p>
               )}
             </div>
 
@@ -423,7 +424,7 @@ export const RequirementDetailModal = ({
                   rows={2}
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.primary_tech_stack || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.primary_tech_stack || '-'}</p>
               )}
             </div>
 
@@ -453,7 +454,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.vendor_company || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.vendor_company || '-'}</p>
               )}
             </div>
 
@@ -467,7 +468,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.imp_name || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.imp_name || '-'}</p>
               )}
             </div>
 
@@ -483,7 +484,7 @@ export const RequirementDetailModal = ({
                   placeholder="https://example.com"
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.client_website || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.client_website || '-'}</p>
               )}
             </div>
 
@@ -499,7 +500,7 @@ export const RequirementDetailModal = ({
                   placeholder="https://example.com"
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.imp_website || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.imp_website || '-'}</p>
               )}
             </div>
 
@@ -515,7 +516,7 @@ export const RequirementDetailModal = ({
                   placeholder="https://example.com"
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.vendor_website || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.vendor_website || '-'}</p>
               )}
             </div>
 
@@ -529,7 +530,7 @@ export const RequirementDetailModal = ({
                   fullWidth
                 />
               ) : (
-                <p className="text-gray-600 text-sm sm:text-base py-2">{formData.vendor_person_name || '-'}</p>
+                <p className="text-gray-600 text-xs py-2">{formData.vendor_person_name || '-'}</p>
               )}
             </div>
           </div>
@@ -582,7 +583,7 @@ export const RequirementDetailModal = ({
                 color="primary"
                 onClick={handleSave}
                 disabled={isLoading}
-                startIcon={isLoading ? <Loader className="w-4 h-4" /> : undefined}
+                startIcon={isLoading ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : undefined}
                 sx={{ flex: 1 }}
               >
                 Save Changes

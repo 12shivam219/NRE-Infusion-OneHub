@@ -72,7 +72,7 @@ export const DocumentPreviewModal = ({ isOpen, document, onClose }: DocumentPrev
       <div className="space-y-4">
         <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{document.filename}</p>
+            <p className="text-xs font-medium text-gray-900 truncate">{document.filename}</p>
             <p className="text-xs text-gray-500 mt-1">
               {document.file_size ? `${(document.file_size / 1024).toFixed(2)} KB` : 'Size unknown'}
             </p>
@@ -112,7 +112,7 @@ export const DocumentPreviewModal = ({ isOpen, document, onClose }: DocumentPrev
         <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 min-h-[400px] flex items-center justify-center">
           {isPdf ? (
             isLoadingPreview ? (
-              <div className="text-sm text-gray-600">Loading preview...</div>
+              <div className="text-xs text-gray-600">Loading preview...</div>
             ) : previewUrl ? (
               <iframe
                 src={previewUrl}
@@ -123,14 +123,14 @@ export const DocumentPreviewModal = ({ isOpen, document, onClose }: DocumentPrev
               <div className="text-center p-8">
                 <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600 mb-2">Preview unavailable</p>
-                <p className="text-sm text-gray-500">Please download to view the document</p>
+                <p className="text-xs text-gray-500">Please download to view the document</p>
               </div>
             )
           ) : (
             <div className="text-center p-8">
               <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-600 mb-2">Preview not available for this file type</p>
-              <p className="text-sm text-gray-500">Please download to view the document</p>
+              <p className="text-xs text-gray-500">Please download to view the document</p>
             </div>
           )}
         </div>

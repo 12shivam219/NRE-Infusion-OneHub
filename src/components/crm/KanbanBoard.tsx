@@ -19,14 +19,14 @@ interface KanbanColumnProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>, requirement: Requirement) => void;
 }
 
-const statusConfig: Record<RequirementStatus, { title: string; color: string; bgColor: string }> = {
-  'NEW': { title: 'New', color: 'blue', bgColor: 'bg-blue-50' },
-  'IN_PROGRESS': { title: 'In Progress', color: 'yellow', bgColor: 'bg-yellow-50' },
-  'INTERVIEW': { title: 'Interview', color: 'purple', bgColor: 'bg-purple-50' },
-  'OFFER': { title: 'Offer', color: 'green', bgColor: 'bg-green-50' },
-  'CLOSED': { title: 'Closed', color: 'gray', bgColor: 'bg-gray-50' },
-  'REJECTED': { title: 'Rejected', color: 'red', bgColor: 'bg-red-50' },
-  'SUBMITTED': { title: 'Submitted', color: 'indigo', bgColor: 'bg-indigo-50' },
+const statusConfig: Record<RequirementStatus, { title: string; color: string; bgColor: string; borderColor: string }> = {
+  'NEW': { title: 'New', color: 'gold', bgColor: 'bg-[color:var(--gold)] bg-opacity-10', borderColor: 'border-l-[color:var(--gold)]' },
+  'IN_PROGRESS': { title: 'In Progress', color: 'amber', bgColor: 'bg-amber-600 bg-opacity-10', borderColor: 'border-l-amber-600' },
+  'INTERVIEW': { title: 'Interview', color: 'purple', bgColor: 'bg-purple-600 bg-opacity-10', borderColor: 'border-l-purple-600' },
+  'OFFER': { title: 'Offer', color: 'green', bgColor: 'bg-green-600 bg-opacity-10', borderColor: 'border-l-green-600' },
+  'CLOSED': { title: 'Closed', color: 'gray', bgColor: 'bg-[color:var(--text-secondary)] bg-opacity-10', borderColor: 'border-l-[color:var(--text-secondary)]' },
+  'REJECTED': { title: 'Rejected', color: 'red', bgColor: 'bg-red-600 bg-opacity-10', borderColor: 'border-l-red-600' },
+  'SUBMITTED': { title: 'Submitted', color: 'indigo', bgColor: 'bg-indigo-600 bg-opacity-10', borderColor: 'border-l-indigo-600' },
 };
 
 const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; onDragStart: (e: React.DragEvent<HTMLDivElement>, req: Requirement) => void }) => {
@@ -36,28 +36,28 @@ const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; on
     <div
       draggable
       onDragStart={(e) => onDragStart(e, requirement)}
-      className="bg-white border border-gray-200 rounded-lg p-3 mb-3 cursor-move shadow-card hover:shadow-card-hover transition-all duration-200 hover:border-gray-300 group"
+      className="bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg p-3 mb-3 cursor-move shadow-card hover:shadow-lg transition-all duration-200 hover:border-opacity-40 group"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <p title={requirement.title} className="font-semibold text-sm text-gray-900 line-clamp-1 md:line-clamp-none md:overflow-visible">{requirement.title}</p>
-          <p title={requirement.company || 'No company'} className="text-xs text-gray-600 line-clamp-1 md:line-clamp-none md:overflow-visible mt-0.5">{requirement.company || 'No company'}</p>
+          <p title={requirement.title} className="font-heading font-medium text-xs text-[color:var(--text)] line-clamp-1 md:line-clamp-none md:overflow-visible">{requirement.title}</p>
+          <p title={requirement.company || 'No company'} className="text-xs text-[color:var(--text-secondary)] line-clamp-1 md:line-clamp-none md:overflow-visible mt-0.5">{requirement.company || 'No company'}</p>
         </div>
-        <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-gray-400 transition-colors" />
+        <GripVertical className="w-4 h-4 text-[color:var(--gold)] text-opacity-40 flex-shrink-0 group-hover:text-opacity-60 transition-colors" />
       </div>
 
       <div className="flex gap-1.5 mb-2.5 flex-wrap">
         {requirement.primary_tech_stack && (
-          <span title={requirement.primary_tech_stack?.split(',')[0]?.trim()} className="px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-700 overflow-hidden whitespace-nowrap text-ellipsis md:overflow-visible md:whitespace-normal">
+          <span title={requirement.primary_tech_stack?.split(',')[0]?.trim()} className="px-2 py-1 rounded text-xs font-medium bg-[color:var(--gold)] bg-opacity-10 text-[color:var(--gold)] overflow-hidden whitespace-nowrap text-ellipsis md:overflow-visible md:whitespace-normal">
             {requirement.primary_tech_stack.split(',')[0].trim()}
           </span>
         )}
       </div>
 
-      <div className="text-xs text-gray-600 space-y-1.5 border-t border-gray-100 pt-2.5">
-        {requirement.rate && <p className="font-medium">💰 {requirement.rate}</p>}
-        <p className="text-gray-500">⏳ {daysOpen} days open</p>
-        {requirement.next_step && <p title={requirement.next_step} className="line-clamp-1 md:line-clamp-none md:overflow-visible md:whitespace-normal text-gray-600 italic">→ {requirement.next_step}</p>}
+      <div className="text-xs text-[color:var(--text-secondary)] space-y-1.5 border-t border-[color:var(--gold)] border-opacity-10 pt-2.5">
+        {requirement.rate && <p className="font-medium text-[color:var(--gold)]">💰 {requirement.rate}</p>}
+        <p>⏳ {daysOpen} days open</p>
+        {requirement.next_step && <p title={requirement.next_step} className="line-clamp-1 md:line-clamp-none md:overflow-visible md:whitespace-normal text-[color:var(--text-secondary)] italic">→ {requirement.next_step}</p>}
       </div>
     </div>
   );
@@ -73,20 +73,20 @@ const KanbanColumn = ({
 }: KanbanColumnProps) => {
   const config = statusConfig[status];
   const borderColor = {
-    blue: 'border-l-4 border-l-blue-500 bg-blue-50',
-    yellow: 'border-l-4 border-l-yellow-500 bg-yellow-50',
-    purple: 'border-l-4 border-l-purple-500 bg-purple-50',
-    green: 'border-l-4 border-l-green-500 bg-green-50',
-    gray: 'border-l-4 border-l-gray-500 bg-gray-50',
-    red: 'border-l-4 border-l-red-500 bg-red-50',
+    gold: 'border-l-4 border-l-[color:var(--gold)]',
+    amber: 'border-l-4 border-l-amber-600',
+    purple: 'border-l-4 border-l-purple-600',
+    green: 'border-l-4 border-l-green-600',
+    gray: 'border-l-4 border-l-[color:var(--text-secondary)]',
+    red: 'border-l-4 border-l-red-600',
   }[config.color];
 
   return (
-    <div className={`flex-1 min-w-80 rounded-lg p-4 border border-gray-200 shadow-card ${borderColor}`}>
+    <div className={`flex-1 min-w-80 rounded-lg p-4 border border-[color:var(--gold)] border-opacity-20 shadow-card bg-[color:var(--darkbg-surface)] ${borderColor}`}>
       <div className="mb-4">
-        <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+        <h3 className="font-heading font-medium text-[color:var(--text)] text-xs flex items-center gap-2">
           {title}
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-sm font-bold text-gray-700 shadow-sm">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[color:var(--gold)] bg-opacity-10 text-xs font-medium text-[color:var(--gold)] shadow-sm">
             {requirements.length}
           </span>
         </h3>
@@ -95,11 +95,11 @@ const KanbanColumn = ({
       <div
         onDragOver={onDragOver}
         onDrop={(e) => onDrop(e, status)}
-        className="space-y-2 min-h-96 bg-white bg-opacity-60 rounded-lg p-3"
+        className="space-y-2 min-h-96 bg-[color:var(--darkbg-surface-light)] bg-opacity-40 rounded-lg p-3"
       >
         {requirements.length === 0 ? (
-          <div className="flex items-center justify-center h-96 text-gray-400">
-            <p className="text-sm">Drop items here</p>
+          <div className="flex items-center justify-center h-96 text-[color:var(--text-secondary)]">
+            <p className="text-xs">Drop items here</p>
           </div>
         ) : (
           requirements.map(req => (
@@ -218,17 +218,17 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
   };
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading kanban board...</div>;
+    return <div className="p-6 text-center text-[color:var(--text-secondary)]">Loading kanban board...</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Requirement Pipeline</h2>
+        <h2 className="text-xs font-heading font-medium text-[color:var(--text)]">Requirement Pipeline</h2>
         <div className="flex gap-3 flex-wrap items-start sm:items-center">
           <button
             onClick={() => onQuickAdd?.('requirement')}
-            className="px-4 py-2.5 bg-primary-800 text-white rounded-lg font-semibold hover:bg-primary-900 active:bg-primary-950 transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm whitespace-nowrap"
+            className="px-4 py-2.5 bg-[color:var(--gold)] text-[color:var(--dark-bg)] rounded-lg font-heading font-medium hover:bg-[#f5d547] active:bg-[#ecc91f] transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-xs whitespace-nowrap"
           >
             + Add Requirement
           </button>
@@ -280,9 +280,9 @@ export const KanbanBoard = ({ onQuickAdd }: KanbanBoardProps) => {
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-8">
         {Object.entries(groupedByStatus).map(([status, reqs]) => (
-          <div key={status} className="card-base card-p-md text-center">
-            <p className="text-gray-600 text-sm font-medium mb-2">{statusConfig[status as RequirementStatus].title}</p>
-            <p className="text-3xl sm:text-4xl font-bold text-blue-600">{reqs.length}</p>
+          <div key={status} className="bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg p-3 text-center">
+            <p className="text-[color:var(--text-secondary)] text-xs font-heading font-medium mb-2">{statusConfig[status as RequirementStatus].title}</p>
+            <p className="text-xs font-heading font-medium text-[color:var(--gold)]">{reqs.length}</p>
           </div>
         ))}
       </div>

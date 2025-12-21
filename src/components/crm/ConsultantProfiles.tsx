@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Search, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,11 +12,11 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { EmptyStateNoData } from '../common/EmptyState';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
+import { BrandButton } from '../brand';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import FormControl from '@mui/material/FormControl';
@@ -38,7 +38,7 @@ interface ConsultantProfilesProps {
   onQuickAdd?: () => void;
 }
 
-export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
+export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
   const [consultants, setConsultants] = useState<Consultant[]>([]);
@@ -192,7 +192,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+        <Typography variant="h5" sx={{ fontWeight: 500 }}>
           Consultant Profiles
         </Typography>
         <Box
@@ -228,22 +228,22 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
         justifyContent="space-between"
         spacing={2}
       >
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+        <Typography variant="h5" sx={{ fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
           Consultant Profiles
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
+        <BrandButton
+          variant="primary"
+          size="md"
           onClick={onQuickAdd}
-          startIcon={<Plus className="w-4 h-4" />}
-          sx={{ width: { xs: '100%', sm: 'auto' } }}
+          className="w-full sm:w-auto"
         >
+          <Plus className="w-4 h-4 mr-2" />
           Quick Add
-        </Button>
+        </BrandButton>
       </Stack>
 
       {/* Search and Filter */}
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
             <TextField
@@ -357,7 +357,7 @@ export const ConsultantProfiles = ({ onQuickAdd }: ConsultantProfilesProps) => {
       />
     </Box>
   );
-};
+});
 
 interface ConsultantGridVirtualizerProps {
   consultants: Consultant[];
@@ -409,7 +409,7 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
               <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 } }}>
                 <CardContent>
                   <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, pr: 1, wordBreak: 'break-word' }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 500, pr: 1, wordBreak: 'break-word' }}>
                       {consultant.name}
                     </Typography>
                     <Chip size="small" variant="outlined" label={`${statusEmoji} ${consultant.status ?? ''}`} />
@@ -422,7 +422,7 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
                       </Typography>
                     ) : null}
                     {consultant.primary_skills ? (
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
                         {consultant.primary_skills}
                       </Typography>
                     ) : null}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Plus, Search, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,11 +12,11 @@ import { InterviewDetailModal } from './InterviewDetailModal';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { EmptyStateNoData } from '../common/EmptyState';
+import { BrandButton } from '../brand';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tabs from '@mui/material/Tabs';
@@ -39,7 +39,7 @@ interface InterviewTrackingProps {
   onQuickAdd?: () => void;
 }
 
-export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
+export const InterviewTracking = memo(({ onQuickAdd }: InterviewTrackingProps) => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
   const [interviews, setInterviews] = useState<Interview[]>([]);
@@ -270,21 +270,21 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
         justifyContent="space-between"
         spacing={2}
       >
-        <Typography variant="h5" sx={{ fontWeight: 800 }}>
+        <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
           Interview Tracking
         </Typography>
-        <Button
-          variant="contained"
-          color="primary"
+        <BrandButton
+          variant="primary"
+          size="md"
           onClick={onQuickAdd}
-          startIcon={<Plus className="w-4 h-4" />}
-          sx={{ width: { xs: '100%', sm: 'auto' } }}
+          className="w-full sm:w-auto"
         >
+          <Plus className="w-4 h-4 mr-2" />
           Quick Add
-        </Button>
+        </BrandButton>
       </Stack>
 
-      <Paper variant="outlined" sx={{ p: 2 }}>
+      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
         <Box
           sx={{
             display: 'grid',
@@ -308,6 +308,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
                 </InputAdornment>
               ),
             }}
+            sx={{ '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } }, '& .MuiInputBase-input::placeholder': { color: 'var(--text-secondary)', opacity: 0.7 } }}
           />
 
           <TextField
@@ -320,6 +321,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
               setCurrentPage(1);
             }}
             InputLabelProps={{ shrink: true }}
+            sx={{ '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
           />
 
           <TextField
@@ -332,29 +334,27 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
               setCurrentPage(1);
             }}
             InputLabelProps={{ shrink: true }}
+            sx={{ '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
           />
         </Box>
 
         {(searchTerm || filterDateFrom || filterDateTo) ? (
-          <Button
-            variant="text"
-            color="inherit"
-            size="small"
-            startIcon={<X className="w-4 h-4" />}
+          <button
             onClick={() => {
               setSearchTerm('');
               setFilterDateFrom('');
               setFilterDateTo('');
               setCurrentPage(1);
             }}
-            sx={{ mt: 1 }}
+            className="mt-1 text-xs font-body text-[color:var(--text-secondary)] hover:text-[color:var(--gold)] transition-colors flex items-center gap-1"
           >
+            <X className="w-3 h-3" />
             Clear Filters
-          </Button>
+          </button>
         ) : null}
       </Paper>
 
-      <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+      <Paper variant="outlined" sx={{ overflow: 'hidden', bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
         <Tabs
           value={activeTab}
           onChange={(_, value) => {
@@ -363,6 +363,10 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
           }}
           variant="scrollable"
           scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': { color: 'var(--text-secondary)', '&.Mui-selected': { color: 'var(--gold)' } },
+            '& .MuiTabs-indicator': { backgroundColor: 'var(--gold)' },
+          }}
         >
           {tabs.map((tab) => (
             <Tab
@@ -371,17 +375,17 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
               label={
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Box component="span">{tab.label}</Box>
-                  <Chip size="small" label={tab.count} variant="outlined" />
+                  <Chip size="small" label={tab.count} variant="outlined" sx={{ borderColor: 'rgba(234,179,8,0.3)', color: 'var(--gold)' }} />
                 </Stack>
               }
             />
           ))}
         </Tabs>
-        <Divider />
+        <Divider sx={{ borderColor: 'rgba(234,179,8,0.1)' }} />
 
         <Box sx={{ p: 2 }}>
           {filteredInterviews.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 3, bgcolor: 'background.default' }}>
+            <Paper variant="outlined" sx={{ p: 3, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
               <EmptyStateNoData type="interviews" onCreate={onQuickAdd} />
             </Paper>
           ) : (
@@ -403,7 +407,9 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
                     count={totalPages}
                     page={currentPage}
                     onChange={(_, page) => handlePageChange(page)}
-                    color="primary"
+                    sx={{
+                      '& .MuiPaginationItem-root': { color: 'var(--text-secondary)', '&.Mui-selected': { bgcolor: 'var(--gold)', color: 'var(--dark-bg)' }, '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } },
+                    }}
                     showFirstButton
                     showLastButton
                     siblingCount={1}
@@ -466,7 +472,7 @@ export const InterviewTracking = ({ onQuickAdd }: InterviewTrackingProps) => {
       />
     </Box>
   );
-};
+});
 
 interface InterviewListVirtualizerProps {
   interviews: Interview[];
@@ -489,7 +495,7 @@ const InterviewListVirtualizer = ({ interviews, getRequirementTitle, onStatusCha
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <Paper variant="outlined" ref={parentRef} sx={{ maxHeight: 700, overflowY: 'auto' }}>
+    <Paper variant="outlined" ref={parentRef} sx={{ maxHeight: 700, overflowY: 'auto', bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
       <div
         style={{
           display: 'grid',

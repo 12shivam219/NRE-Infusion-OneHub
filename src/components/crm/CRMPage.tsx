@@ -1,16 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { LayoutGrid, Briefcase, Calendar, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
 import AppBar from '@mui/material/AppBar';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { MarketingHubDashboard } from './MarketingHubDashboard';
 import { RequirementsManagement } from './RequirementsManagement';
 import { InterviewTracking } from './InterviewTracking';
@@ -25,13 +21,23 @@ type View = 'dashboard' | 'requirements' | 'interviews' | 'consultants';
 type QuickAddType = 'requirement' | 'interview' | 'consultant';
 
 export const CRMPage = () => {
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [searchParams] = useSearchParams();
+  const viewParam = searchParams.get('view') as View | null;
+  const [currentView, setCurrentView] = useState<View>(viewParam || 'dashboard');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateInterview, setShowCreateInterview] = useState(false);
   const [selectedRequirementIdForInterview, setSelectedRequirementIdForInterview] = useState<string | undefined>();
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
   const [showBulkEmailComposer, setShowBulkEmailComposer] = useState(false);
 
+  // Sync currentView with query parameter
+  useEffect(() => {
+    if (viewParam && viewParam !== currentView) {
+      setCurrentView(viewParam);
+    }
+  }, [viewParam, currentView]);
+
+  // Handle overflow for requirements view
   useEffect(() => {
     const main = document.getElementById('main-content');
     if (!main) return;
@@ -50,7 +56,7 @@ export const CRMPage = () => {
     };
   }, [currentView]);
 
-  const navTabs = [
+  const navTabs: Array<{ id: View; label: string; icon: LucideIcon }> = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'requirements', label: 'Requirements', icon: Briefcase },
     { id: 'interviews', label: 'Interviews', icon: Calendar },
@@ -58,17 +64,21 @@ export const CRMPage = () => {
   ];
 
   // Accessibility: close modals on navigation change
+  const closeAllModals = useCallback(() => {
+    setShowCreateForm(false);
+    setShowCreateInterview(false);
+    setShowCreateConsultant(false);
+    setShowBulkEmailComposer(false);
+    setSelectedRequirementIdForInterview(undefined);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
       await Promise.resolve();
       if (cancelled) return;
-      setShowCreateForm(false);
-      setShowCreateInterview(false);
-      setShowCreateConsultant(false);
-      setShowBulkEmailComposer(false);
-      setSelectedRequirementIdForInterview(undefined);
+      closeAllModals();
     };
 
     void run();
@@ -76,7 +86,7 @@ export const CRMPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentView]);
+  }, [currentView, closeAllModals]);
 
   // Listen for global event to open bulk email composer (header trigger)
   useEffect(() => {
@@ -93,7 +103,7 @@ export const CRMPage = () => {
             position="sticky"
             elevation={0}
             color="inherit"
-            sx={{ borderBottom: 1, borderColor: 'divider', zIndex: 30 }}
+            sx={{ borderBottom: 1, borderColor: 'rgba(234,179,8,0.2)', zIndex: 30, bgcolor: 'var(--darkbg-surface)' }}
           >
             <Box sx={{ px: 2, py: 1.5 }}>
               <Box
@@ -105,53 +115,9 @@ export const CRMPage = () => {
                   flexWrap: { xs: 'wrap', md: 'nowrap' },
                 }}
               >
-                <Box sx={{ display: { xs: 'block', md: 'none' }, width: { xs: '100%', md: 'auto' } }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel id="crm-nav-select-label">Section</InputLabel>
-                    <Select
-                      labelId="crm-nav-select-label"
-                      value={currentView}
-                      label="Section"
-                      onChange={(e) => setCurrentView(e.target.value as View)}
-                      aria-label="CRM Navigation"
-                    >
-                      {navTabs.map((tab) => {
-                        const Icon = tab.icon;
-                        return (
-                          <MenuItem key={tab.id} value={tab.id}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <Icon className="w-5 h-5" />
-                              <span>{tab.label}</span>
-                            </Stack>
-                          </MenuItem>
-                        );
-                      })}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                <Tabs
-                  value={currentView}
-                  onChange={(_, value) => setCurrentView(value as View)}
-                  variant="scrollable"
-                  scrollButtons="auto"
-                  aria-label="CRM Navigation"
-                  sx={{ display: { xs: 'none', md: 'flex' }, flex: 1, minWidth: 0 }}
-                >
-                  {navTabs.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                      <Tab
-                        key={tab.id}
-                        value={tab.id}
-                        label={tab.label}
-                        icon={<Icon className="w-5 h-5" />}
-                        iconPosition="start"
-                        aria-label={tab.label}
-                      />
-                    );
-                  })}
-                </Tabs>
+                <Typography variant="h6" sx={{ fontWeight: 700, minWidth: 0, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
+                  {navTabs.find(tab => tab.id === currentView)?.label || 'Marketing & CRM'}
+                </Typography>
 
                 <Box
                   id="crm-requirements-actions"
@@ -171,7 +137,7 @@ export const CRMPage = () => {
             sx={{
               flex: 1,
               overflowY: currentView === 'requirements' ? 'hidden' : 'auto',
-              bgcolor: 'background.default',
+              bgcolor: 'var(--darkbg)',
             }}
           >
             <Box
@@ -184,31 +150,31 @@ export const CRMPage = () => {
               <ErrorBoundary>
                 {currentView === 'dashboard' ? (
                     <MarketingHubDashboard
-                      onQuickAdd={(type: QuickAddType) => {
+                      onQuickAdd={useCallback((type: QuickAddType) => {
                         if (type === 'requirement') setShowCreateForm(true);
                         else if (type === 'interview') setShowCreateInterview(true);
                         else if (type === 'consultant') setShowCreateConsultant(true);
-                      }}
+                      }, [])}
                     />
                 ) : null}
 
                 {currentView === 'requirements' ? (
                     <RequirementsManagement
-                      onQuickAdd={() => setShowCreateForm(true)}
-                      onCreateInterview={(requirementId) => {
+                      onQuickAdd={useCallback(() => setShowCreateForm(true), [])}
+                      onCreateInterview={useCallback((requirementId: string) => {
                         setSelectedRequirementIdForInterview(requirementId);
                         setShowCreateInterview(true);
-                      }}
+                      }, [])}
                       toolbarPortalTargetId="crm-requirements-actions"
                     />
                 ) : null}
 
                 {currentView === 'interviews' ? (
-                    <InterviewTracking onQuickAdd={() => setShowCreateInterview(true)} />
+                    <InterviewTracking onQuickAdd={useCallback(() => setShowCreateInterview(true), [])} />
                 ) : null}
 
                 {currentView === 'consultants' ? (
-                    <ConsultantProfiles onQuickAdd={() => setShowCreateConsultant(true)} />
+                    <ConsultantProfiles onQuickAdd={useCallback(() => setShowCreateConsultant(true), [])} />
                 ) : null}
               </ErrorBoundary>
             </Box>

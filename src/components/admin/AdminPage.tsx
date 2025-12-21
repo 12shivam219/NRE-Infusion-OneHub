@@ -832,9 +832,9 @@ export const AdminPage = () => {
     return (
       <div className="p-8">
         <div className="max-w-2xl mx-auto card-base p-6 text-center">
-          <h2 className="text-2xl font-semibold text-gray-900">Not authorized</h2>
-          <p className="text-gray-600 mt-2">You do not have permission to view the Admin Panel.</p>
-          <p className="text-gray-500 mt-4">Use the sidebar to access available sections for your role.</p>
+          <h2 className="text-xs font-medium text-gray-900">Not authorized</h2>
+          <p className="text-gray-600 mt-2 text-xs">You do not have permission to view the Admin Panel.</p>
+          <p className="text-gray-500 mt-4 text-xs">Use the sidebar to access available sections for your role.</p>
         </div>
       </div>
     );
@@ -843,32 +843,59 @@ export const AdminPage = () => {
   return (
     <div className="p-8 space-y-6">
       <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
+        <h1 className="text-xs font-medium text-gray-900">Administration</h1>
         <p className="text-gray-600">
           Monitor users, onboard new accounts, investigate security events, and keep the system healthy.
         </p>
       </header>
 
       <nav className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="flex border-b border-gray-200 overflow-x-auto">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 font-medium transition whitespace-nowrap ${
-                  isActive
-                    ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-gray-200">
+          <div className="flex items-center gap-2 text-gray-900">
+            {(() => {
+              const activeConfig = tabs.find((tab) => tab.id === activeTab);
+              if (!activeConfig) return null;
+              const ActiveIcon = activeConfig.icon;
+              return (
+                <>
+                  <ActiveIcon className="w-4 h-4 text-primary-600" aria-hidden="true" />
+                  <span className="text-xs font-medium">{activeConfig.label}</span>
+                </>
+              );
+            })()}
+          </div>
+
+          <div className="w-full sm:w-64">
+            <label htmlFor="admin-section-select" className="sr-only">
+              Select admin section
+            </label>
+            <div className="relative">
+              <select
+                id="admin-section-select"
+                value={activeTab}
+                onChange={(event) => setActiveTab(event.target.value as TabType)}
+                className="w-full appearance-none border border-gray-300 rounded-lg px-3 py-2 pr-10 text-xs font-medium text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-600"
               >
-                <Icon className="w-5 h-5" />
-                {tab.label}
-              </button>
-            );
-          })}
+                {tabs.map((tab) => (
+                  <option key={tab.id} value={tab.id}>
+                    {tab.label}
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 12a1 1 0 0 1-.707-.293l-4-4a1 1 0 1 1 1.414-1.414L10 9.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-4 4A1 1 0 0 1 10 12Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+          </div>
         </div>
 
         <div className="p-6">
@@ -878,8 +905,8 @@ export const AdminPage = () => {
                 <div className="bg-primary-50 border border-primary-100 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-primary-800">Total Users</p>
-                      <p className="text-2xl font-semibold text-primary-900">{users.length}</p>
+                      <p className="text-xs text-primary-800">Total Users</p>
+                      <p className="text-xs font-medium text-primary-900">{users.length}</p>
                     </div>
                     <UsersIcon className="w-8 h-8 text-primary-400" />
                   </div>
@@ -887,8 +914,8 @@ export const AdminPage = () => {
                 <div className="bg-green-50 border border-green-100 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-green-700">Joined (7 days)</p>
-                      <p className="text-2xl font-semibold text-green-900">{recentUsersCount}</p>
+                      <p className="text-xs text-green-700">Joined (7 days)</p>
+                      <p className="text-xs font-medium text-green-900">{recentUsersCount}</p>
                     </div>
                     <CheckCircle2 className="w-8 h-8 text-green-400" />
                   </div>
@@ -896,8 +923,8 @@ export const AdminPage = () => {
                 <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-purple-700">Admins</p>
-                      <p className="text-2xl font-semibold text-purple-900">{roleCounts.admin}</p>
+                      <p className="text-xs text-purple-700">Admins</p>
+                      <p className="text-xs font-medium text-purple-900">{roleCounts.admin}</p>
                     </div>
                     <ShieldAlert className="w-8 h-8 text-purple-400" />
                   </div>
@@ -908,8 +935,8 @@ export const AdminPage = () => {
                 <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-amber-700">Pending Actions</p>
-                      <p className="text-2xl font-semibold text-amber-900">
+                      <p className="text-xs text-amber-700">Pending Actions</p>
+                      <p className="text-xs font-medium text-amber-900">
                         {approvalStats?.totalPending ?? '-'}
                       </p>
                     </div>
@@ -925,8 +952,8 @@ export const AdminPage = () => {
                 <section className="lg:col-span-2 bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-inner">
                   <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">User Management</h2>
-                      <p className="text-gray-600 text-sm">
+                      <h2 className="text-xs font-medium text-gray-900">User Management</h2>
+                      <p className="text-gray-600 text-xs">
                         Search, filter, and manage account access. Open a profile for full history and devices.
                       </p>
                     </div>
@@ -966,7 +993,7 @@ export const AdminPage = () => {
                     ) : (
                       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                         <div className="overflow-x-auto max-h-96">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-xs">
                             <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide sticky top-0 z-10">
                               <tr>
                                 <th className="px-6 py-3 text-left">User</th>
@@ -981,7 +1008,7 @@ export const AdminPage = () => {
                                 <tr key={user.id} className="hover:bg-gray-50">
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                      <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-800 flex items-center justify-center font-semibold flex-shrink-0">
+                                      <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-800 flex items-center justify-center font-medium flex-shrink-0">
                                         {getInitials(user.full_name)}
                                       </div>
                                       <div className="min-w-0">
@@ -994,7 +1021,7 @@ export const AdminPage = () => {
                                     <select
                                       value={user.role}
                                       onChange={(event) => handleUserRoleChange(user.id, event.target.value as UserRole)}
-                                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary-600"
+                                      className="border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-primary-600"
                                     >
                                       <option value="user">User</option>
                                       <option value="marketing">Marketing</option>
@@ -1005,7 +1032,7 @@ export const AdminPage = () => {
                                     <select
                                       value={user.status}
                                       onChange={(event) => handleUserStatusChange(user.id, event.target.value as UserStatus)}
-                                      className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                                      className="border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500"
                                     >
                                       {userStatusOptions.map((option) => (
                                         <option key={option.value} value={option.value}>
@@ -1018,7 +1045,7 @@ export const AdminPage = () => {
                                   <td className="px-6 py-4">
                                     <button
                                       onClick={() => handleOpenUser(user)}
-                                      className="text-primary-700 hover:text-primary-800 font-medium text-sm"
+                                      className="text-primary-700 hover:text-primary-800 font-medium text-xs"
                                     >
                                       View
                                     </button>
@@ -1035,47 +1062,47 @@ export const AdminPage = () => {
 
                 <aside className="space-y-4">
                   <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <h3 className="text-xs font-medium text-gray-900 mb-4 flex items-center gap-2">
                       <ShieldAlert className="w-5 h-5 text-primary-500" />
                       Role Directory
                     </h3>
                     <div className="space-y-4">
                       {roleDirectory.map((entry) => (
                         <div key={entry.role} className="border border-gray-200 rounded-lg p-4">
-                          <p className="font-semibold text-gray-900">{entry.label}</p>
-                          <p className="text-sm text-gray-500 mt-1">{entry.description}</p>
+                          <p className="font-medium text-gray-900">{entry.label}</p>
+                          <p className="text-xs text-gray-500 mt-1">{entry.description}</p>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Approval snapshot</h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <h3 className="text-xs font-medium text-gray-900 mb-2">Approval snapshot</h3>
+                    <p className="text-xs text-gray-600 mb-4">
                       Track the onboarding pipeline. Daily signups and approval staging are refreshed automatically.
                     </p>
-                    <div className="space-y-3 text-sm">
+                    <div className="space-y-3 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500">Pending approval</span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-medium text-gray-900">
                           {approvalStats?.pendingApproval ?? '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500">Pending verification</span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-medium text-gray-900">
                           {approvalStats?.pendingVerification ?? '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500">Approved overall</span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-medium text-gray-900">
                           {approvalStats?.totalApproved ?? '-'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-gray-500">New today</span>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-medium text-gray-900">
                           {approvalStats?.todaySignups ?? '-'}
                         </span>
                       </div>
@@ -1090,8 +1117,8 @@ export const AdminPage = () => {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Pending Approvals</h2>
-                  <p className="text-gray-600 text-sm">
+                  <h2 className="text-xs font-medium text-gray-900">Pending Approvals</h2>
+                  <p className="text-gray-600 text-xs">
                     Review new signups, approve qualified accounts, or provide guidance when rejecting.
                   </p>
                 </div>
@@ -1100,7 +1127,7 @@ export const AdminPage = () => {
                   {bulkActionInProgress && bulkActionProgress.total > 0 && (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-blue-900">
+                        <span className="text-xs font-medium text-blue-900">
                           {bulkActionProgress.action} {bulkActionProgress.current} of {bulkActionProgress.total}
                         </span>
                         <span className="text-xs text-blue-700">
@@ -1119,7 +1146,7 @@ export const AdminPage = () => {
                     <button
                       onClick={handleBulkApprove}
                       disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium ${
                         selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
                           ? 'bg-green-100 text-green-400 cursor-not-allowed'
                           : 'bg-green-600 text-white hover:bg-green-700'
@@ -1131,7 +1158,7 @@ export const AdminPage = () => {
                     <button
                       onClick={handleBulkReject}
                       disabled={selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress}
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium ${
                         selectedApprovals.length === 0 || approvalsLoading || bulkActionInProgress
                           ? 'bg-red-100 text-red-400 cursor-not-allowed'
                           : 'bg-red-600 text-white hover:bg-red-700'
@@ -1156,7 +1183,7 @@ export const AdminPage = () => {
                 </div>
                 <button
                   onClick={loadApprovals}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Refresh
@@ -1170,7 +1197,7 @@ export const AdminPage = () => {
                   <div className="py-12 text-center text-gray-500">No accounts awaiting action.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-xs">
                       <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
                         <tr>
                           <th className="px-6 py-3">
@@ -1236,7 +1263,7 @@ export const AdminPage = () => {
                 )}
               </div>
 
-              <div className="flex items-center justify-between text-sm text-gray-600">
+              <div className="flex items-center justify-between text-xs text-gray-600">
                 <p>
                   Showing page {approvalPage} of {totalApprovalPages} ({filteredApprovals.length} records)
                 </p>
@@ -1270,14 +1297,14 @@ export const AdminPage = () => {
             <div className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Security Watch</h2>
-                  <p className="text-gray-600 text-sm">
+                  <h2 className="text-xs font-medium text-gray-900">Security Watch</h2>
+                  <p className="text-gray-600 text-xs">
                     Investigate anomalies quickly. Filter by email, location, or status and open a user’s history.
                   </p>
                 </div>
                 <button
                   onClick={loadSecurityEvents}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100"
                 >
                   <RefreshCw className="w-4 h-4" /> Refresh now
                 </button>
@@ -1285,20 +1312,20 @@ export const AdminPage = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Suspicious logins</p>
-                  <p className="text-2xl font-semibold text-gray-900">{securityStats.suspiciousCount}</p>
+                  <p className="text-xs text-gray-500">Suspicious logins</p>
+                  <p className="text-xs font-medium text-gray-900">{securityStats.suspiciousCount}</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Failed attempts</p>
-                  <p className="text-2xl font-semibold text-gray-900">{securityStats.failedCount}</p>
+                  <p className="text-xs text-gray-500">Failed attempts</p>
+                  <p className="text-xs font-medium text-gray-900">{securityStats.failedCount}</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Users affected</p>
-                  <p className="text-2xl font-semibold text-gray-900">{securityStats.affectedUsers}</p>
+                  <p className="text-xs text-gray-500">Users affected</p>
+                  <p className="text-xs font-medium text-gray-900">{securityStats.affectedUsers}</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Alerts (last hour)</p>
-                  <p className="text-2xl font-semibold text-gray-900">{securityStats.alertsLastHour}</p>
+                  <p className="text-xs text-gray-500">Alerts (last hour)</p>
+                  <p className="text-xs font-medium text-gray-900">{securityStats.alertsLastHour}</p>
                 </div>
               </div>
 
@@ -1342,7 +1369,7 @@ export const AdminPage = () => {
                   <div className="py-12 text-center text-gray-500">No events match the current filters.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-xs">
                       <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
                         <tr>
                           <th className="px-6 py-3 text-left">User</th>
@@ -1434,14 +1461,14 @@ export const AdminPage = () => {
             <div className="space-y-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Error Reports</h2>
-                  <p className="text-gray-600 text-sm">
+                  <h2 className="text-xs font-medium text-gray-900">Error Reports</h2>
+                  <p className="text-gray-600 text-xs">
                     Triage issues, inspect stack traces, add notes, and keep everyone aligned.
                   </p>
                 </div>
                 <button
                   onClick={loadErrors}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100"
                 >
                   <RefreshCw className="w-4 h-4" /> Refresh
                 </button>
@@ -1455,7 +1482,7 @@ export const AdminPage = () => {
                     <p>Unable to load error reports: {errorsError}</p>
                     <button
                       onClick={loadErrors}
-                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100"
                     >
                       <RefreshCw className="w-4 h-4" /> Retry
                     </button>
@@ -1464,7 +1491,7 @@ export const AdminPage = () => {
                   <div className="py-12 text-center text-gray-500">No error reports available.</div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
+                    <table className="min-w-full text-xs">
                       <thead className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wide">
                         <tr>
                           <th className="px-6 py-3 text-left">Summary</th>
@@ -1530,19 +1557,19 @@ export const AdminPage = () => {
           <div className="w-full max-w-xl h-full bg-white shadow-2xl overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex items-start justify-between">
               <div>
-                <h3 className="text-xl font-semibold text-gray-900">{selectedUser.full_name}</h3>
+                <h3 className="text-xs font-medium text-gray-900">{selectedUser.full_name}</h3>
                 <p className="text-gray-600">{selectedUser.email}</p>
-                <p className="text-sm text-gray-500 mt-1 capitalize">{selectedUser.status.replace(/_/g, ' ')}</p>
+                <p className="text-xs text-gray-500 mt-1 capitalize">{selectedUser.status.replace(/_/g, ' ')}</p>
               </div>
               <button onClick={handleCloseUser} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
 
             <div className="p-6 space-y-6">
               <section className="space-y-3">
-                <h4 className="text-lg font-semibold text-gray-900">Account controls</h4>
+                <h4 className="text-lg font-medium text-gray-900">Account controls</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Role</label>
+                    <label className="block text-xs text-gray-500 mb-1">Role</label>
                     <select
                       value={selectedUser.role}
                       onChange={async (event) => {
@@ -1558,7 +1585,7 @@ export const AdminPage = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Status</label>
+                    <label className="block text-xs text-gray-500 mb-1">Status</label>
                     <select
                       value={selectedUser.status}
                       onChange={async (event) => {
@@ -1582,7 +1609,7 @@ export const AdminPage = () => {
                 <button
                   onClick={handleForceLogoutClick}
                   disabled={forceLogoutLoading}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium ${
                     forceLogoutLoading
                       ? 'bg-red-100 text-red-400 cursor-not-allowed'
                       : 'bg-red-600 text-white hover:bg-red-700'
@@ -1594,8 +1621,8 @@ export const AdminPage = () => {
 
               <section>
                 <header className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-gray-900">Active sessions</h4>
-                  <span className="text-sm text-gray-500">{userSessions.length} active</span>
+                  <h4 className="text-xs font-medium text-gray-900">Active sessions</h4>
+                  <span className="text-xs text-gray-500">{userSessions.length} active</span>
                 </header>
                 <div className="space-y-3">
                   {userDetailLoading ? (
@@ -1615,12 +1642,12 @@ export const AdminPage = () => {
                               <p className="font-medium text-gray-900">
                                 {session.browser || 'Unknown browser'} • {session.os || 'Unknown OS'}
                               </p>
-                              <p className="text-sm text-gray-500">{session.device || 'Unknown device'}</p>
+                              <p className="text-xs text-gray-500">{session.device || 'Unknown device'}</p>
                             </div>
                           </div>
                           <button
                             onClick={() => handleRevokeSessionClick(session.id, session.user_id ?? undefined)}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                            className="text-red-600 hover:text-red-700 text-xs font-medium"
                           >
                             Revoke
                           </button>
@@ -1637,13 +1664,13 @@ export const AdminPage = () => {
               </section>
 
               <section>
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Login history</h4>
+                <h4 className="text-xs font-medium text-gray-900 mb-3">Login history</h4>
                 {userDetailLoading ? (
                   <div className="py-6 text-center text-gray-500">Loading login history…</div>
                 ) : userLoginHistory.length === 0 ? (
                   <div className="py-6 text-center text-gray-500">No login history available.</div>
                 ) : (
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-xs">
                     {userLoginHistory.slice(0, ADMIN_CONSTANTS.LOGIN_HISTORY_SLICE_LIMIT).map((entry) => (
                       <div
                         key={entry.id}
@@ -1679,8 +1706,8 @@ export const AdminPage = () => {
             <div className="sticky top-0 z-10 p-6 border-b border-gray-200 flex items-start justify-between bg-white">
               <div>
                 <p className="text-xs uppercase text-gray-500">Error report</p>
-                <h3 className="text-2xl font-semibold text-gray-900">{selectedError.error_message}</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-xs font-medium text-gray-900">{selectedError.error_message}</h3>
+                <p className="text-xs text-gray-500 mt-1">
                   {selectedError.url || 'No URL provided'} • {formatDateTime(selectedError.created_at)}
                 </p>
               </div>
@@ -1695,9 +1722,9 @@ export const AdminPage = () => {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${errorStatusStyles[selectedError.status]}`}>
                         {selectedError.status.replace(/_/g, ' ')}
                       </span>
-                      <span className="text-sm text-gray-500">Reporter: {selectedError.user_id ? userMap.get(selectedError.user_id)?.email || 'User' : 'System'}</span>
+                      <span className="text-xs text-gray-500">Reporter: {selectedError.user_id ? userMap.get(selectedError.user_id)?.email || 'User' : 'System'}</span>
                     </div>
-                    <p className="text-sm text-gray-600">{selectedError.error_type || 'Unclassified error'}</p>
+                    <p className="text-xs text-gray-600">{selectedError.error_type || 'Unclassified error'}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <select
@@ -1708,7 +1735,7 @@ export const AdminPage = () => {
                         const refreshed = errors.find((error) => error.id === selectedError.id);
                         if (refreshed) setSelectedError(refreshed);
                       }}
-                      className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                      className="border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="new">New</option>
                       <option value="in_progress">In Progress</option>
@@ -1717,7 +1744,7 @@ export const AdminPage = () => {
                     </select>
                     <button
                       onClick={handleRetryError}
-                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100"
+                      className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100"
                     >
                       <RefreshCw className="w-4 h-4" /> Trigger retry
                     </button>
@@ -1726,16 +1753,16 @@ export const AdminPage = () => {
               </section>
 
               <section>
-                <h4 className="text-lg font-semibold text-gray-900 mb-2">Stack trace</h4>
+                <h4 className="text-xs font-medium text-gray-900 mb-2">Stack trace</h4>
                 <pre className="bg-gray-900 text-gray-100 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">
 {selectedError.error_stack || 'No stack trace captured.'}
                 </pre>
               </section>
 
               <section>
-                <h4 className="text-lg font-semibold text-gray-900 mb-2">Attachments</h4>
+                <h4 className="text-xs font-medium text-gray-900 mb-2">Attachments</h4>
                 <div className="flex flex-wrap items-center gap-3 mb-3">
-                  <label className={`inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium cursor-pointer ${
+                  <label className={`inline-flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-xs font-medium cursor-pointer ${
                     attachmentUploading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-100'
                   }`}>
                     <input
@@ -1747,20 +1774,20 @@ export const AdminPage = () => {
                     />
                     Upload attachment
                   </label>
-                  {attachmentUploading && <span className="text-sm text-gray-500">Uploading…</span>}
+                  {attachmentUploading && <span className="text-xs text-gray-500">Uploading…</span>}
                 </div>
                 {attachmentUploadError && (
-                  <p className="text-sm text-red-600 mb-2">{attachmentUploadError}</p>
+                  <p className="text-xs text-red-600 mb-2">{attachmentUploadError}</p>
                 )}
                 {errorAttachmentError && (
-                  <p className="text-sm text-amber-600 mb-2">{errorAttachmentError}</p>
+                  <p className="text-xs text-amber-600 mb-2">{errorAttachmentError}</p>
                 )}
                 {errorDetailLoading ? (
-                  <p className="text-gray-500 text-sm">Loading attachments…</p>
+                  <p className="text-gray-500 text-xs">Loading attachments…</p>
                 ) : errorAttachments.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No attachments provided.</p>
+                  <p className="text-gray-500 text-xs">No attachments provided.</p>
                 ) : (
-                  <ul className="space-y-2 text-sm text-blue-600">
+                  <ul className="space-y-2 text-xs text-blue-600">
                     {errorAttachments.map((attachment) => {
                       const href = (attachment as Attachment & { download_url?: string | null }).download_url ?? null;
                       const sizeKb = Math.max(1, Math.round(attachment.file_size / 1024));
@@ -1788,16 +1815,16 @@ export const AdminPage = () => {
               </section>
 
               <section className="space-y-3">
-                <h4 className="text-lg font-semibold text-gray-900">Internal notes</h4>
+                <h4 className="text-xs font-medium text-gray-900">Internal notes</h4>
                 <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
                   {errorDetailLoading ? (
-                    <p className="text-gray-500 text-sm">Loading notes…</p>
+                    <p className="text-gray-500 text-xs">Loading notes…</p>
                   ) : errorNotes.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No notes yet. Use notes to keep admins aligned.</p>
+                    <p className="text-gray-500 text-xs">No notes yet. Use notes to keep admins aligned.</p>
                   ) : (
                     errorNotes.map((note) => (
                       <div key={note.id} className="border border-gray-200 rounded-lg p-3">
-                        <p className="text-sm text-gray-900">{String((note.details as Record<string, unknown>)?.note || 'Note added.')}</p>
+                        <p className="text-xs text-gray-900">{String((note.details as Record<string, unknown>)?.note || 'Note added.')}</p>
                         <p className="text-xs text-gray-500 mt-2">
                           {formatDateTime(note.created_at)} ({timeAgo(note.created_at)})
                         </p>
@@ -1816,7 +1843,7 @@ export const AdminPage = () => {
                   <button
                     onClick={handleAddErrorNote}
                     disabled={!errorNoteDraft.trim()}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    className={`px-4 py-2 rounded-lg text-xs font-medium ${
                       errorNoteDraft.trim()
                         ? 'bg-primary-800 text-white hover:bg-primary-900'
                         : 'bg-primary-100 text-primary-300 cursor-not-allowed'

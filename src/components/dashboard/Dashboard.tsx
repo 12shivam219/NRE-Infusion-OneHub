@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FileText, Briefcase, Users, TrendingUp, Upload, Plus, Calendar } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getDocuments } from '../../lib/api/documents';
@@ -36,18 +36,18 @@ export const Dashboard = () => {
     };
   }, [user]);
 
-  const stats = [
+  const stats = useMemo(() => [
     { label: 'Total Documents', value: documentCount, icon: FileText, color: 'text-primary-800 bg-primary-50' },
     { label: 'Active Requirements', value: requirementCount, icon: Briefcase, color: 'text-green-600 bg-green-50' },
     { label: 'Interviews', value: 0, icon: Users, color: 'text-orange-600 bg-orange-50' },
     { label: 'Success Rate', value: '0%', icon: TrendingUp, color: 'text-purple-600 bg-purple-50' },
-  ];
+  ], [documentCount, requirementCount]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 md:p-10">
       {/* Header */}
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900">
+        <h1 className="text-xs font-medium text-gray-900">
           Welcome back, {user?.full_name} 👋
         </h1>
         <p className="text-gray-500 mt-1">
@@ -82,8 +82,8 @@ export const Dashboard = () => {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">{label}</p>
-                  <p className="text-3xl font-semibold text-gray-900 mt-1">{value}</p>
+                  <p className="text-xs text-gray-500">{label}</p>
+                  <p className="text-xs font-medium text-gray-900 mt-1">{value}</p>
                 </div>
                 <div className={`p-3 rounded-lg ${color}`}>
                   <Icon className="w-6 h-6" />
@@ -106,7 +106,7 @@ export const Dashboard = () => {
 
         {/* Quick Actions */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+          <h2 className="text-xs font-medium text-gray-900 mb-4">Quick Actions</h2>
           <div className="space-y-3">
             <ActionButton color="blue" icon={<Upload className="w-4 h-4" />} label="Upload New Resume" />
             <ActionButton color="green" icon={<Plus className="w-4 h-4" />} label="Create Requirement" />

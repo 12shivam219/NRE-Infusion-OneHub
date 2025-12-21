@@ -67,17 +67,17 @@ export const SyncQueueModal = () => {
     >
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-sm text-gray-700">
+          <div className="text-xs font-body text-[color:var(--text)]">
             <div>
-              Pending items: <span className="font-semibold">{pendingCount}</span>
+              Pending items: <span className="font-heading font-bold">{pendingCount}</span>
             </div>
             <div>
               Status:{' '}
-              <span className="font-semibold">
+              <span className="font-heading font-bold">
                 {syncStatus?.isSyncing ? 'Syncing…' : 'Idle'}
               </span>
               {failedCount > 0 && (
-                <span className="ml-2 text-xs text-red-700">
+                <span className="ml-2 text-xs text-red-600">
                   {failedCount} failed
                 </span>
               )}
@@ -88,7 +88,7 @@ export const SyncQueueModal = () => {
             <button
               onClick={handleProcess}
               disabled={isProcessing || pendingCount === 0}
-              className="px-3 py-2 rounded-lg bg-primary-800 text-white hover:bg-primary-900 disabled:bg-gray-300 disabled:text-gray-600 transition flex items-center gap-2"
+              className="px-3 py-2 rounded-lg bg-[color:var(--gold)] text-[color:var(--dark-bg)] hover:bg-[#f5d547] disabled:bg-[color:var(--gold)] disabled:bg-opacity-30 disabled:text-[color:var(--text-secondary)] transition flex items-center gap-2 font-heading font-bold"
             >
               <CloudLightning className="w-4 h-4" />
               {isProcessing ? 'Processing…' : 'Process'}
@@ -96,7 +96,7 @@ export const SyncQueueModal = () => {
 
             <button
               onClick={handleClear}
-              className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition flex items-center gap-2"
+              className="px-3 py-2 rounded-lg bg-[color:var(--darkbg-surface)] text-[color:var(--text)] hover:bg-[color:var(--darkbg-surface-light)] transition flex items-center gap-2 border border-[color:var(--gold)] border-opacity-20 font-heading font-bold"
             >
               <RefreshCw className="w-4 h-4" />
               Clear
@@ -105,7 +105,7 @@ export const SyncQueueModal = () => {
             <button
               onClick={handleRetryFailed}
               disabled={isProcessing || failedCount === 0}
-              className="px-3 py-2 rounded-lg bg-red-100 text-red-800 hover:bg-red-200 disabled:bg-gray-100 disabled:text-gray-400 transition flex items-center gap-2"
+              className="px-3 py-2 rounded-lg bg-red-500 bg-opacity-10 text-red-600 hover:bg-opacity-20 disabled:bg-[color:var(--gold)] disabled:bg-opacity-5 disabled:text-[color:var(--text-secondary)] transition flex items-center gap-2 font-heading font-bold border border-red-500 border-opacity-20"
             >
               <AlertCircle className="w-4 h-4" />
               Retry failed
@@ -113,27 +113,27 @@ export const SyncQueueModal = () => {
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="max-h-[50vh] overflow-y-auto">
+        <div className="border border-[color:var(--gold)] border-opacity-20 rounded-lg overflow-hidden">
+          <div className="max-h-[50vh] overflow-y-auto bg-[color:var(--darkbg-surface-light)] bg-opacity-50">
             {pendingItems.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500">No items in queue.</div>
+              <div className="p-4 text-xs font-body text-[color:var(--text-secondary)]">No items in queue.</div>
             ) : (
               pendingItems.slice(0, 100).map((item) => (
-                <div key={item.id} className="p-3 border-b border-gray-100">
+                <div key={item.id} className="p-3 border-b border-[color:var(--gold)] border-opacity-10">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-gray-900">
+                      <div className="text-xs font-heading font-bold text-[color:var(--text)]">
                         {item.entityType} · {item.operation}
                       </div>
-                      <div className="text-xs text-gray-600 truncate">
+                      <div className="text-xs font-body text-[color:var(--text-secondary)] truncate">
                         {item.entityId}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs font-body text-[color:var(--text-secondary)] mt-1">
                         Status: {item.status} · Retries: {item.retries}
                         {item.nextAttempt ? ` · Next: ${new Date(item.nextAttempt).toLocaleString()}` : ''}
                       </div>
                       {item.lastError && (
-                        <div className="text-xs text-red-700 mt-1 break-words">
+                        <div className="text-xs font-body text-red-600 mt-1 break-words">
                           {item.lastError}
                         </div>
                       )}
@@ -144,7 +144,7 @@ export const SyncQueueModal = () => {
             )}
           </div>
           {pendingItems.length > 100 && (
-            <div className="p-3 text-xs text-gray-500">
+            <div className="p-3 text-xs font-body text-[color:var(--text-secondary)] bg-[color:var(--darkbg-surface-light)]">
               Showing 100 of {pendingItems.length} items.
             </div>
           )}

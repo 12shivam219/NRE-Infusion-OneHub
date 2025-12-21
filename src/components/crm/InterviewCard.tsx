@@ -3,6 +3,7 @@ import { Trash2, Clock, ExternalLink, AlertCircle } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { isValidStatusTransition, isValidUrl, isMeetingLink } from '../../lib/interviewValidation';
 import type { Database } from '../../lib/database.types';
+import { BrandButton } from '../brand';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -11,12 +12,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select, { type SelectChangeEvent } from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
@@ -57,7 +52,7 @@ const InterviewCard = memo(({
   // Validate meeting link
   const isMeetingUrl = interview.location ? isValidUrl(interview.location) && isMeetingLink(interview.location) : false;
 
-  const handleStatusChange = useCallback((e: SelectChangeEvent<string>) => {
+  const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = String(e.target.value);
     
     // Check if transition is valid
@@ -99,10 +94,10 @@ const InterviewCard = memo(({
       variant="outlined"
       sx={{
         overflow: 'hidden',
-        bgcolor: isOverdue ? 'rgba(239,68,68,0.06)' : isToday ? 'rgba(249,115,22,0.06)' : isSoon ? 'rgba(234,179,8,0.06)' : 'background.paper',
-        borderColor: isOverdue ? 'rgba(239,68,68,0.45)' : isToday ? 'rgba(249,115,22,0.45)' : isSoon ? 'rgba(234,179,8,0.45)' : 'divider',
+        bgcolor: isOverdue ? 'rgba(239,68,68,0.06)' : isToday ? 'rgba(249,115,22,0.06)' : isSoon ? 'rgba(234,179,8,0.06)' : 'var(--darkbg-surface)',
+        borderColor: isOverdue ? 'rgba(239,68,68,0.45)' : isToday ? 'rgba(249,115,22,0.45)' : isSoon ? 'rgba(234,179,8,0.45)' : 'rgba(234,179,8,0.2)',
         transition: 'box-shadow 200ms ease, transform 200ms ease',
-        '&:hover': { boxShadow: 6, transform: 'translateY(-2px)' },
+        '&:hover': { boxShadow: '0 0 16px rgba(234,179,8,0.3)', transform: 'translateY(-2px)' },
         minHeight: 320,
       }}
     >
@@ -110,8 +105,8 @@ const InterviewCard = memo(({
         sx={{
           px: 2,
           py: 1.5,
-          background: 'linear-gradient(90deg, rgba(184,150,15,1) 0%, rgba(212,175,55,1) 100%)',
-          color: 'common.white',
+          background: 'linear-gradient(90deg, var(--gold) 0%, rgba(234,179,8,0.8) 100%)',
+          color: 'var(--dark-bg)',
         }}
       >
         <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
@@ -121,27 +116,27 @@ const InterviewCard = memo(({
                 px: 1.25,
                 py: 0.75,
                 borderRadius: 2,
-                bgcolor: 'common.white',
-                color: 'text.primary',
+                bgcolor: 'var(--dark-bg)',
+                color: 'var(--gold)',
                 textAlign: 'center',
                 minWidth: 56,
               }}
             >
-              <Typography variant="caption" sx={{ fontWeight: 900, letterSpacing: 0.5, display: 'block' }}>
+              <Typography variant="caption" sx={{ fontWeight: 900, letterSpacing: 0.5, display: 'block', fontFamily: 'var(--font-heading)' }}>
                 {monthStr}
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1 }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, lineHeight: 1, fontFamily: 'var(--font-heading)' }}>
                 {dayStr}
               </Typography>
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800 }} noWrap title={jobTitle}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, fontFamily: 'var(--font-heading)' }} noWrap title={jobTitle}>
                 {jobTitle}
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ opacity: 0.95 }}>
                 <Clock className="w-4 h-4" />
-                <Typography variant="caption" noWrap title={`${timeStr} • ${interview.timezone || 'IST'}`}>
+                <Typography variant="caption" sx={{ fontFamily: 'var(--font-body)' }} noWrap title={`${timeStr} • ${interview.timezone || 'IST'}`}>
                   {timeStr} • {interview.timezone || 'IST'}
                 </Typography>
               </Stack>
@@ -154,21 +149,21 @@ const InterviewCard = memo(({
                 size="small"
                 icon={<AlertCircle className="w-4 h-4" />}
                 label="Overdue"
-                sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white', borderColor: 'rgba(255,255,255,0.25)' }}
+                sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'var(--dark-bg)', borderColor: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-heading)', fontWeight: 700 }}
                 variant="outlined"
               />
             ) : isToday ? (
               <Chip
                 size="small"
                 label="Today"
-                sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white', borderColor: 'rgba(255,255,255,0.25)' }}
+                sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'var(--dark-bg)', borderColor: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-heading)', fontWeight: 700 }}
                 variant="outlined"
               />
             ) : isSoon ? (
               <Chip
                 size="small"
                 label="Soon"
-                sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white', borderColor: 'rgba(255,255,255,0.25)' }}
+                sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'var(--dark-bg)', borderColor: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-heading)', fontWeight: 700 }}
                 variant="outlined"
               />
             ) : null}
@@ -176,24 +171,24 @@ const InterviewCard = memo(({
             <Chip
               size="small"
               label={interview.status}
-              sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'common.white', borderColor: 'rgba(255,255,255,0.25)' }}
+              sx={{ bgcolor: 'rgba(255,255,255,0.12)', color: 'var(--dark-bg)', borderColor: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-heading)', fontWeight: 700 }}
               variant="outlined"
             />
           </Stack>
         </Stack>
       </Box>
 
-      <CardContent>
+      <CardContent sx={{ bgcolor: 'var(--darkbg-surface)' }}>
         <Stack spacing={2}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40, fontWeight: 800 }}>
+            <Avatar sx={{ bgcolor: 'var(--gold)', width: 40, height: 40, fontWeight: 500, color: 'var(--dark-bg)', fontFamily: 'var(--font-heading)' }}>
               {candidateInitial}
             </Avatar>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800 }} noWrap title={interview.interview_with || 'TBD'}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontFamily: 'var(--font-heading)', color: 'var(--text)' }} noWrap title={interview.interview_with || 'TBD'}>
                 {interview.interview_with || 'TBD'}
               </Typography>
-              <Typography variant="caption" color="text.secondary" noWrap title={company}>
+              <Typography variant="caption" sx={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }} noWrap title={company}>
                 {company}
               </Typography>
             </Box>
@@ -219,17 +214,17 @@ const InterviewCard = memo(({
               <Stack spacing={0.5}>
                 {interview.interviewer ? (
                   <Typography variant="caption" color="text.secondary">
-                    <Box component="span" sx={{ fontWeight: 700 }}>Panel:</Box> {interview.interviewer}
+                    <Box component="span" sx={{ fontWeight: 500 }}>Panel:</Box> {interview.interviewer}
                   </Typography>
                 ) : null}
                 {interview.mode ? (
                   <Typography variant="caption" color="text.secondary">
-                    <Box component="span" sx={{ fontWeight: 700 }}>Mode:</Box> {interview.mode}
+                    <Box component="span" sx={{ fontWeight: 500 }}>Mode:</Box> {interview.mode}
                   </Typography>
                 ) : null}
                 {interview.duration_minutes ? (
                   <Typography variant="caption" color="text.secondary">
-                    <Box component="span" sx={{ fontWeight: 700 }}>Duration:</Box> {interview.duration_minutes} mins
+                    <Box component="span" sx={{ fontWeight: 500 }}>Duration:</Box> {interview.duration_minutes} mins
                   </Typography>
                 ) : null}
               </Stack>
@@ -240,44 +235,53 @@ const InterviewCard = memo(({
 
       <CardActions sx={{ px: 2, pb: 2, pt: 0 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ width: '100%' }} useFlexGap flexWrap="wrap">
-          <Button
-            variant="contained"
-            color="primary"
+          <BrandButton
+            variant="primary"
+            size="md"
             onClick={() => onViewDetails(interview)}
-            sx={{ flex: 1, minWidth: 120 }}
+            className="flex-1"
           >
             Details
-          </Button>
+          </BrandButton>
 
           {isMeetingUrl ? (
-            <IconButton color="success" onClick={handleJoinCall} title="Join the meeting">
-              <ExternalLink className="w-4 h-4" />
-            </IconButton>
+            <BrandButton 
+              variant="secondary"
+              size="md"
+              onClick={handleJoinCall}
+              title="Join the meeting"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Join Call
+            </BrandButton>
           ) : null}
 
-          <FormControl size="small" sx={{ minWidth: 160 }}>
-            <InputLabel id={`interview-status-${interview.id}`}>Status</InputLabel>
-            <Select
-              labelId={`interview-status-${interview.id}`}
+          <div className="min-w-[160px] bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg p-2">
+            <label className="text-xs font-heading font-bold text-[color:var(--text-secondary)] uppercase letter-spacing-wide block mb-1">
+              Status
+            </label>
+            <select
               value={interview.status}
-              label="Status"
               onChange={handleStatusChange}
               aria-label="Change status"
+              className="w-full bg-[color:var(--darkbg-surface)] text-[color:var(--text)] border border-[color:var(--gold)] border-opacity-20 rounded px-2 py-1 focus:outline-none focus:border-[color:var(--gold)] focus:border-opacity-100 transition-colors"
             >
               {getValidStatuses().map(status => (
-                <MenuItem key={status} value={status}>{status}</MenuItem>
+                <option key={status} value={status} className="bg-[color:var(--darkbg)] text-[color:var(--text)]">{status}</option>
               ))}
-            </Select>
-          </FormControl>
+            </select>
+          </div>
 
-          <IconButton
+          <BrandButton
+            variant="danger"
+            size="md"
             onClick={handleDelete}
-            color="error"
             title="Delete interview"
             aria-label="Delete interview"
           >
-            <Trash2 className="w-4 h-4" />
-          </IconButton>
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete
+          </BrandButton>
         </Stack>
       </CardActions>
     </Card>

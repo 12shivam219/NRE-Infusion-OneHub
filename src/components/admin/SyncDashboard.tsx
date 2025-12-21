@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Clock, CheckCircle, AlertCircle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSyncStatus, useSyncQueue } from '../../hooks/useSyncStatus';
 import { useCacheAnalytics } from '../../hooks/useCacheAnalytics';
 import { processSyncQueue } from '../../lib/offlineDB';
+import { LogoLoader } from '../common/LogoLoader';
 
 /**
  * Feature 6 & 10: Sync Dashboard Component
@@ -41,11 +42,11 @@ export const SyncDashboard = () => {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary-600" />
-            <h3 className="font-semibold text-gray-900">Sync Status</h3>
+            <h3 className="font-medium text-gray-900">Sync Status</h3>
           </div>
           <button
             onClick={refresh}
-            className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200 transition"
+            className="px-3 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg hover:bg-gray-200 transition"
           >
             Refresh
           </button>
@@ -56,13 +57,13 @@ export const SyncDashboard = () => {
             {/* Status Indicator */}
             <div className="flex items-center gap-2">
               {syncStatus.isSyncing ? (
-                <Loader className="w-5 h-5 animate-spin text-blue-500" />
+                <span className="w-5 h-5"><LogoLoader size="sm" /></span>
               ) : syncStatus.failedItems > 0 ? (
                 <AlertCircle className="w-5 h-5 text-red-500" />
               ) : (
                 <CheckCircle className="w-5 h-5 text-green-500" />
               )}
-              <span className={`font-semibold ${getStatusColor(syncStatus.progress)}`}>
+              <span className={`font-medium ${getStatusColor(syncStatus.progress)}`}>
                 {syncStatus.isSyncing
                   ? 'Syncing...'
                   : syncStatus.failedItems > 0
@@ -73,9 +74,9 @@ export const SyncDashboard = () => {
 
             {/* Progress Information */}
             <div className="space-y-2">
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-xs">
                 <span className="text-gray-600">Items Synced:</span>
-                <span className="font-semibold text-gray-900">
+                <span className="font-medium text-gray-900">
                   {syncStatus.totalItems - syncStatus.itemsRemaining} / {syncStatus.totalItems}
                 </span>
               </div>
@@ -108,7 +109,7 @@ export const SyncDashboard = () => {
             {/* Failed Items Warning */}
             {syncStatus.failedItems > 0 && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700">
+                <p className="text-xs text-red-700">
                   ⚠️ {syncStatus.failedItems} item{syncStatus.failedItems !== 1 ? 's' : ''} failed to sync.
                   Try again when online.
                 </p>
@@ -121,21 +122,21 @@ export const SyncDashboard = () => {
       {/* Analytics Card */}
       {analytics && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Offline Statistics</h3>
+          <h3 className="font-medium text-gray-900 mb-4">Offline Statistics</h3>
 
           <div className="grid grid-cols-2 gap-4">
             {/* Offline Time */}
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-600">Offline Time</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {analytics.offlineTime} <span className="text-sm text-gray-600">min</span>
+              <p className="text-xs font-medium text-gray-900">
+                {analytics.offlineTime} <span className="text-xs text-gray-600">min</span>
               </p>
             </div>
 
             {/* Created Offline */}
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-600">Created Offline</p>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-xs font-medium text-gray-900">
                 {analytics.itemsCreatedOffline}
               </p>
             </div>
@@ -143,7 +144,7 @@ export const SyncDashboard = () => {
             {/* Updated Offline */}
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-600">Updated Offline</p>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-xs font-medium text-gray-900">
                 {analytics.itemsUpdatedOffline}
               </p>
             </div>
@@ -151,7 +152,7 @@ export const SyncDashboard = () => {
             {/* Deleted Offline */}
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-600">Deleted Offline</p>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-xs font-medium text-gray-900">
                 {analytics.itemsDeletedOffline}
               </p>
             </div>
@@ -166,7 +167,7 @@ export const SyncDashboard = () => {
                     style={{ width: `${analytics.syncSuccessRate}%` }}
                   />
                 </div>
-                <span className="text-lg font-semibold text-gray-900">
+                <span className="text-xs font-medium text-gray-900">
                   {analytics.syncSuccessRate}%
                 </span>
               </div>
@@ -175,7 +176,7 @@ export const SyncDashboard = () => {
             {/* Total Syncs */}
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-600">Total Sync Events</p>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-xs font-medium text-gray-900">
                 {analytics.totalSyncEvents}
               </p>
             </div>
@@ -183,8 +184,8 @@ export const SyncDashboard = () => {
             {/* Average Sync Time */}
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-600">Avg Sync Time</p>
-              <p className="text-lg font-semibold text-gray-900">
-                {Math.round(analytics.averageSyncTime)} <span className="text-sm text-gray-600">ms</span>
+              <p className="text-xs font-medium text-gray-900">
+                {Math.round(analytics.averageSyncTime)} <span className="text-xs text-gray-600">ms</span>
               </p>
             </div>
           </div>
@@ -196,7 +197,7 @@ export const SyncDashboard = () => {
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => setShowSyncPanel(!showSyncPanel)}
-            className="flex items-center gap-2 font-semibold text-gray-900 hover:text-primary-600 transition"
+            className="flex items-center gap-2 font-medium text-gray-900 hover:text-primary-600 transition"
           >
             {showSyncPanel ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
             Sync Queue ({pendingCount})
@@ -206,7 +207,7 @@ export const SyncDashboard = () => {
         {showSyncPanel && (
           <div className="space-y-3 border-t border-gray-200 pt-4">
             {pendingItems.length === 0 ? (
-              <div className="py-4 text-center text-sm text-gray-500">No items in queue</div>
+              <div className="py-4 text-center text-xs text-gray-500">No items in queue</div>
             ) : (
               <>
                 <div className="flex items-center gap-2 mb-3">
@@ -220,7 +221,7 @@ export const SyncDashboard = () => {
                         setIsProcessingQueue(false);
                       }
                     }}
-                    className="px-3 py-1 bg-primary-600 text-white rounded text-sm hover:bg-primary-700 transition"
+                    className="px-3 py-1 bg-primary-600 text-white rounded text-xs hover:bg-primary-700 transition"
                     disabled={isProcessingQueue || pendingItems.length === 0}
                   >
                     {isProcessingQueue ? 'Processing...' : 'Process Queue'}
@@ -230,7 +231,7 @@ export const SyncDashboard = () => {
                       await clearSynced();
                       window.dispatchEvent(new CustomEvent('sync-complete'));
                     }}
-                    className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50 transition"
+                    className="px-3 py-1 border border-gray-300 rounded text-xs hover:bg-gray-50 transition"
                   >
                     Clear Synced
                   </button>
@@ -243,7 +244,7 @@ export const SyncDashboard = () => {
                   {pendingItems.slice(0, 10).map(item => (
                     <div key={item.id} className="flex items-start justify-between p-3 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition">
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-gray-900">{item.entityType} · {item.operation}</div>
+                        <div className="text-xs font-medium text-gray-900">{item.entityType} · {item.operation}</div>
                         <div className="text-xs text-gray-600 truncate">ID: {item.entityId} • Retries: {item.retries}</div>
                         {item.lastError && <div className="text-xs text-red-600 mt-1 truncate">⚠️ {item.lastError}</div>}
                       </div>

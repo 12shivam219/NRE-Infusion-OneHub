@@ -49,7 +49,7 @@ export const Breadcrumbs = ({ items, className = '' }: BreadcrumbsProps) => {
   return (
     <nav 
       aria-label="Breadcrumb" 
-      className={`flex items-center gap-2 text-sm text-gray-600 mb-4 ${className}`}
+      className={`flex items-center gap-2 text-sm font-body text-[color:var(--text-secondary)] mb-4 letter-spacing-wide ${className}`}
     >
       <ol className="flex items-center gap-2 flex-wrap">
         {breadcrumbItems.map((item, index) => {
@@ -58,14 +58,14 @@ export const Breadcrumbs = ({ items, className = '' }: BreadcrumbsProps) => {
           return (
             <li key={index} className="flex items-center gap-2">
               {index === 0 ? (
-                <Home className="w-4 h-4" aria-hidden="true" />
+                <Home className="w-4 h-4 text-[color:var(--text-secondary)]" aria-hidden="true" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                <ChevronRight className="w-4 h-4 text-[color:var(--gold)]" aria-hidden="true" />
               )}
               
               {isLast || !item.path ? (
                 <span 
-                  className="text-gray-900 font-medium"
+                  className="text-[color:var(--text)] font-medium font-heading"
                   aria-current="page"
                 >
                   {item.label}
@@ -73,7 +73,7 @@ export const Breadcrumbs = ({ items, className = '' }: BreadcrumbsProps) => {
               ) : (
                 <Link
                   to={item.path}
-                  className="hover:text-primary-600 transition-colors focus-ring rounded px-1"
+                  className="text-[color:var(--text-secondary)] hover:text-[color:var(--gold)] transition-colors focus-ring rounded px-1"
                 >
                   {item.label}
                 </Link>

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Trash2, Loader, ExternalLink, MapPin } from 'lucide-react';
+import { X, Edit2, Trash2, ExternalLink, MapPin } from 'lucide-react';
 import { isValidUrl, isMeetingLink, extractDomainFromUrl } from '../../lib/interviewValidation';
 import { useAuth } from '../../hooks/useAuth';
 import { updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { LogoLoader } from '../common/LogoLoader';
 import { subscribeToInterviewById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 import Dialog from '@mui/material/Dialog';
@@ -45,13 +46,13 @@ const EditableField = ({ label, value, isEditing, children }: {
   children?: React.ReactNode;
 }) => (
   <Stack spacing={0.5}>
-    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
       {label}
     </Typography>
     {isEditing && children ? (
       children
     ) : (
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+      <Typography variant="body2" sx={{ fontWeight: 500 }}>
         {value || '-'}
       </Typography>
     )}
@@ -70,7 +71,7 @@ const AccordionSection = ({ title, children, defaultOpen = false }: { title: str
       sx={{ borderRadius: 2, overflow: 'hidden' }}
     >
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
           {title}
         </Typography>
       </AccordionSummary>
@@ -263,10 +264,10 @@ export const InterviewDetailModal = ({
         <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
           <Chip
             label={(formData.interview_with?.charAt(0)?.toUpperCase() || 'A')}
-            sx={{ bgcolor: 'primary.light', color: 'text.primary', fontWeight: 800, border: 1, borderColor: 'primary.main' }}
+            sx={{ bgcolor: 'primary.light', color: 'text.primary', fontWeight: 500, border: 1, borderColor: 'primary.main' }}
           />
           <Stack spacing={0.25} sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800 }} noWrap>
+            <Typography variant="h6" sx={{ fontWeight: 500 }} noWrap>
               {formData.interview_with || 'Interview'}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
@@ -298,15 +299,15 @@ export const InterviewDetailModal = ({
               }}
             >
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Date
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                   {formData.scheduled_date || '-'}
                 </Typography>
               </Box>
               <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                   Time
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
@@ -332,7 +333,7 @@ export const InterviewDetailModal = ({
                   </TextField>
                 ) : (
                   <Stack spacing={0.5}>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                       Status
                     </Typography>
                     <Box>
@@ -357,12 +358,12 @@ export const InterviewDetailModal = ({
               <Stack direction="row" spacing={1.5} alignItems="flex-start">
                 <MapPin className="w-5 h-5" />
                 <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 500, textTransform: 'uppercase' }}>
                     Meeting Link
                   </Typography>
                   {isMeetingUrl ? (
                     <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" useFlexGap flexWrap="wrap">
-                      <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                         {meetingProvider}
                       </Typography>
                       <Button
@@ -594,7 +595,7 @@ export const InterviewDetailModal = ({
               color="primary"
               onClick={handleSave}
               disabled={isLoading}
-              startIcon={isLoading ? <Loader className="w-4 h-4" /> : undefined}
+              startIcon={isLoading ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : undefined}
             >
               Save Changes
             </Button>

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Download, Loader, AlertCircle } from 'lucide-react';
+import { X, Download, AlertCircle } from 'lucide-react';
 import '@harbour-enterprises/superdoc/style.css';
-import { SuperDoc } from '@harbour-enterprises/superdoc';
+import { LogoLoader } from '../common/LogoLoader';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 import { downloadDocument } from '../../lib/api/documents';
+import { SuperDoc } from '@harbour-enterprises/superdoc';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -465,17 +466,26 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
       }
     };
 
-    // Clear existing timer
-    if (autoSaveTimerRef.current) {
-      clearInterval(autoSaveTimerRef.current);
-    }
+    // ✅ OPTIMIZATION: Only set interval if there are actual edits to save
+    // This prevents unnecessary timer setup when no documents are being edited
+    if (editedDocsRef.current.size > 0) {
+      // Clear existing timer
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
 
-    // Set new timer
-    autoSaveTimerRef.current = setInterval(performAutoSave, AUTO_SAVE_INTERVAL);
+      // Set new timer - only while documents are being edited
+      autoSaveTimerRef.current = setInterval(performAutoSave, AUTO_SAVE_INTERVAL);
+    } else if (autoSaveTimerRef.current) {
+      // Clear timer if no edits
+      clearInterval(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
 
     return () => {
       if (autoSaveTimerRef.current) {
         clearInterval(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
       }
     };
   }, [loading, editedCount, documentsToDisplay, showToast]);
@@ -857,8 +867,8 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
         >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Document Editor</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-xs font-medium text-gray-900">Document Editor</h2>
+              <p className="text-xs text-gray-600">
                 Editing {documentsToDisplay.length} document{documentsToDisplay.length > 1 ? 's' : ''}
               </p>
             </div>
@@ -878,7 +888,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-red-900">File Size Error</p>
-                <p className="text-sm text-red-700">{fileSizeError}</p>
+                <p className="text-xs text-red-700">{fileSizeError}</p>
                 <p className="text-xs text-red-600 mt-1">Maximum file size: 5MB</p>
               </div>
               <button
@@ -895,7 +905,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
               <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-yellow-900">Memory Usage Warning</p>
-                <p className="text-sm text-yellow-700">{memoryWarning}</p>
+                <p className="text-xs text-yellow-700">{memoryWarning}</p>
               </div>
               <button
                 onClick={() => setMemoryWarning(null)}
@@ -910,9 +920,8 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                  <Loader className="w-8 h-8 text-primary-600 animate-spin mx-auto mb-3" />
-                  <p className="text-gray-700 font-medium mb-2">Opening documents...</p>
-                  <p className="text-sm text-gray-500">
+                  <LogoLoader size="lg" showText label="Opening documents..." />
+                  <p className="text-xs text-gray-500">
                     {loadProgress > 0 ? `Loading ${Math.round(loadProgress)}%` : 'Preparing editors'}
                   </p>
 
@@ -938,7 +947,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                     >
                       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
                         <div className="min-w-0">
-                          <h3 className="text-sm font-semibold text-gray-900 truncate">{doc.original_filename}</h3>
+                          <h3 className="text-xs font-medium text-gray-900 truncate">{doc.original_filename}</h3>
                           <p className="text-xs text-gray-500">Version {doc.version}</p>
                           {isPdf && (
                             <p className="mt-1 text-xs font-medium text-primary-600">PDF preview – editing disabled</p>
@@ -970,7 +979,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                               style={{ minHeight: '400px' }}
                             />
                           ) : (
-                            <div className="text-gray-500 text-sm">Preparing PDF preview...</div>
+                            <div className="text-gray-500 text-xs">Preparing PDF preview...</div>
                           )}
                         </div>
                       ) : (
@@ -988,7 +997,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-            <p className="text-sm text-gray-600">
+            <p className="text-xs text-gray-600">
               {editedCount > 0 ? (
                 <>
                   <span className="font-semibold">{editedCount}</span> document
@@ -1011,7 +1020,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
                 disabled={saving || editedCount === 0}
                 className="flex-1 sm:flex-none px-4 py-2 bg-primary-800 text-white rounded-lg font-medium hover:bg-primary-900 transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {saving && <Loader className="w-4 h-4 animate-spin" />}
+                {saving && <span className="w-4 h-4"><LogoLoader size="sm" /></span>}
                 {saving ? 'Saving...' : `Save & Download (${editedCount})`}
               </button>
             </div>
@@ -1022,7 +1031,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
       {showConfirmClose && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="card-base max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Unsaved Changes</h3>
+            <h3 className="text-xs font-medium text-gray-900 mb-2">Unsaved Changes</h3>
             <p className="text-gray-600 mb-6">
               You have <span className="font-semibold">{editedCount}</span> document
               {editedCount !== 1 ? 's' : ''} with unsaved changes.

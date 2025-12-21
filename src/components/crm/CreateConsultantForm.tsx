@@ -111,7 +111,7 @@ interface CreateConsultantFormProps {
 
 const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="border-t border-gray-200 pt-6 mt-6 first:border-t-0 first:pt-0 first:mt-0">
-    <h3 className="text-sm font-semibold text-gray-900 mb-4">{title}</h3>
+    <h3 className="text-xs font-medium text-gray-900 mb-4">{title}</h3>
     <div className="space-y-4">{children}</div>
   </div>
 );
@@ -304,7 +304,7 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
       <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+        <Typography variant="h6" sx={{ fontWeight: 500 }}>
           Add New Consultant
         </Typography>
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">

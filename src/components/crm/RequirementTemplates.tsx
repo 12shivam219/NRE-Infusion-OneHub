@@ -257,14 +257,14 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       {/* Saved Templates */}
       {templates.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Saved Templates</h3>
+          <h3 className="text-xs font-medium text-gray-900 mb-4">Saved Templates</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map(template => (
               <div key={template.id} className="card-base card-p-sm">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{template.name}</p>
-                    <p className="text-sm text-gray-600">{template.title}</p>
+                    <p className="text-xs text-gray-600">{template.title}</p>
                   </div>
                   <button
                     type="button"
@@ -298,14 +298,14 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       {/* Suggested Templates */}
       {suggestedTemplates.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Suggested Templates</h3>
+          <h3 className="text-xs font-medium text-gray-900 mb-4">Suggested Templates</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {suggestedTemplates.map(template => (
               <div key={template.id} className="card-base card-p-sm bg-gradient-to-br from-primary-50 to-primary-100">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{template.name}</p>
-                    <p className="text-sm text-gray-600">{template.title}</p>
+                    <p className="text-xs text-gray-600">{template.title}</p>
                   </div>
                 </div>
 
@@ -343,12 +343,12 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       {/* Create from Existing */}
       {requirements.length > 0 && templates.length < 5 && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Create Template from Requirement</h3>
+          <h3 className="text-xs font-medium text-gray-900 mb-4">Create Template from Requirement</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {requirements.slice(0, 6).map(req => (
               <div key={req.id} className="card-base card-p-sm">
                 <p className="font-medium text-gray-900 mb-1">{req.title}</p>
-                <p className="text-sm text-gray-600 mb-3">{req.company || 'No company'}</p>
+                <p className="text-xs text-gray-600 mb-3">{req.company || 'No company'}</p>
 
                 {req.primary_tech_stack && <p className="text-xs text-gray-500">Tech: {req.primary_tech_stack}</p>}
                 {req.rate && <p className="text-xs text-gray-500">Rate: {req.rate}</p>}
@@ -385,8 +385,8 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
       {templates.length === 0 && suggestedTemplates.length === 0 && requirements.length === 0 && (
         <div className="card-base card-p-md text-center">
           <Save className="w-12 h-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No templates yet</h3>
-          <p className="text-gray-600 text-sm">Create your first requirement to start saving templates.</p>
+          <h3 className="text-xs font-medium text-gray-900 mb-2">No templates yet</h3>
+          <p className="text-gray-600 text-xs">Create your first requirement to start saving templates.</p>
         </div>
       )}
 
@@ -406,7 +406,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
           }}
         >
           <DialogTitle sx={{ pr: 7 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ fontWeight: 500 }}>
               Save as Template
             </Typography>
             <IconButton
@@ -437,7 +437,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
               />
 
               <Box sx={{ maxHeight: 256, overflowY: 'auto' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 500, mb: 1 }}>
                   Template Preview:
                 </Typography>
                 <Stack spacing={0.5}>

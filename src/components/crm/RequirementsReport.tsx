@@ -5,6 +5,7 @@ import { getRequirementsPage } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import { calculateDaysOpen } from '../../lib/requirementUtils';
 import type { Database } from '../../lib/database.types';
+import { BrandButton } from '../brand';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -182,17 +183,19 @@ export const ExportOptionsModal = ({ isOpen, onClose, onExport }: ExportOptionsM
 
       <DialogActions>
         {exportFormat === 'csv' ? (
-          <Button onClick={handleExportCSV} variant="contained" startIcon={<Download className="w-4 h-4" />}>
+          <BrandButton variant="primary" size="md" onClick={handleExportCSV}>
+            <Download className="w-4 h-4 mr-2" />
             Export to CSV
-          </Button>
+          </BrandButton>
         ) : (
-          <Button onClick={handleExportPDF} variant="contained" startIcon={<Download className="w-4 h-4" />}>
+          <BrandButton variant="primary" size="md" onClick={handleExportPDF}>
+            <Download className="w-4 h-4 mr-2" />
             Export to PDF
-          </Button>
+          </BrandButton>
         )}
-        <Button onClick={onClose} variant="outlined" color="inherit">
+        <BrandButton variant="secondary" size="md" onClick={onClose}>
           Cancel
-        </Button>
+        </BrandButton>
       </DialogActions>
     </Dialog>
   );

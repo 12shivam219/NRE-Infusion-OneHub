@@ -91,51 +91,51 @@ export const useSearchFilters = () => {
   const updateFilters = useCallback((newFilters: Partial<SearchFiltersState>) => {
     setFilters(prev => {
       if (!prev) return prev;
-      const updated = { ...prev, ...newFilters };
+      return { ...prev, ...newFilters };
+    });
+  }, []);
 
+  // Separate effect for persistence with debouncing
+  useEffect(() => {
+    if (!filters) return;
+
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    updateTimeoutRef.current = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+
+      const params = new URLSearchParams();
+      if (filters.searchTerm) params.set('search', filters.searchTerm);
+      if (filters.sortBy !== 'date') params.set('sortBy', filters.sortBy);
+      if (filters.sortOrder !== 'desc') params.set('sortOrder', filters.sortOrder);
+      if (filters.filterStatus !== 'ALL') params.set('status', filters.filterStatus);
+      if (filters.minRate) params.set('minRate', filters.minRate);
+      if (filters.maxRate) params.set('maxRate', filters.maxRate);
+      if (filters.remoteFilter !== 'ALL') params.set('remote', filters.remoteFilter);
+      if (filters.dateRangeFrom) params.set('dateFrom', filters.dateRangeFrom);
+      if (filters.dateRangeTo) params.set('dateTo', filters.dateRangeTo);
+
+      const url = params.toString()
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+
+      window.history.replaceState({}, '', url);
+    }, 100);
+
+    return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
       }
-
-      updateTimeoutRef.current = setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-
-        const params = new URLSearchParams();
-        if (updated.searchTerm) params.set('search', updated.searchTerm);
-        if (updated.sortBy !== 'date') params.set('sortBy', updated.sortBy);
-        if (updated.sortOrder !== 'desc') params.set('sortOrder', updated.sortOrder);
-        if (updated.filterStatus !== 'ALL') params.set('status', updated.filterStatus);
-        if (updated.minRate) params.set('minRate', updated.minRate);
-        if (updated.maxRate) params.set('maxRate', updated.maxRate);
-        if (updated.remoteFilter !== 'ALL') params.set('remote', updated.remoteFilter);
-        if (updated.dateRangeFrom) params.set('dateFrom', updated.dateRangeFrom);
-        if (updated.dateRangeTo) params.set('dateTo', updated.dateRangeTo);
-
-        const url = params.toString()
-          ? `${window.location.pathname}?${params.toString()}`
-          : window.location.pathname;
-
-        window.history.replaceState({}, '', url);
-      }, 100);
-
-      return updated;
-    });
-  }, []);
+    };
+  }, [filters]);
 
   const clearFilters = useCallback(() => {
     const defaults = getDefaultFilters();
     setFilters(defaults);
     localStorage.removeItem(STORAGE_KEY);
     window.history.replaceState({}, '', window.location.pathname);
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
-    };
   }, []);
 
   return { filters, updateFilters, clearFilters, isLoaded: filters !== null };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { Plus, Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
@@ -14,6 +14,7 @@ import { RequirementsReport } from './RequirementsReport';
 import { RequirementDetailModal } from './RequirementDetailModal';
 import { RequirementsTable } from './RequirementsTable';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+import { BrandButton } from '../brand';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
 import SearchIcon from '@mui/icons-material/Search';
@@ -21,10 +22,10 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
+import Button from '@mui/material/Button';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
@@ -135,7 +136,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 }));
 
 
-export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
+export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
@@ -322,15 +323,15 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarP
       >
         Tools
       </Button>
-      <Button
-        variant="contained"
-        color="primary"
-        startIcon={<Plus className="w-4 h-4" />}
+      <BrandButton
+        variant="primary"
+        size="md"
         onClick={onQuickAdd}
-        sx={{ flex: { xs: 1, sm: 'unset' } }}
+        className="flex-1 sm:flex-none"
       >
+        <Plus className="w-4 h-4 mr-2" />
         Create Requirement
-      </Button>
+      </BrandButton>
     </Stack>
   );
 
@@ -918,9 +919,9 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarP
         <Stack spacing={2}>
           {/* Active Filters Summary */}
           {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
-            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'background.default' }}>
+            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
                   Active filters:
                 </Typography>
                 {debouncedValue ? <Chip size="small" label={`Search: "${debouncedValue}"`} /> : null}
@@ -932,7 +933,7 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarP
                 {dateRange.to ? <Chip size="small" label={`To: ${dateRange.to}`} /> : null}
                 <Box sx={{ flexGrow: 1 }} />
                 {filteredRequirements.length > 0 ? (
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                  <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.primary' }}>
                     {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
                   </Typography>
                 ) : null}
@@ -962,9 +963,9 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarP
 
       {/* Sync Queue Panel (collapsible) */}
       {showSyncPanel ? (
-        <Paper variant="outlined" sx={{ p: 1.5 }}>
+        <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
           <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ xs: 'flex-start', md: 'center' }} justifyContent="space-between" spacing={1.5}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
               Offline Sync Queue
             </Typography>
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
@@ -1173,4 +1174,4 @@ export const RequirementsManagement = ({ onQuickAdd, onCreateInterview, toolbarP
       />
     </Box>
   );
-};
+});

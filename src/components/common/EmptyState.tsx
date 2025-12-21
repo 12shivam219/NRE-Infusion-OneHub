@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { FileText, Inbox, Search } from 'lucide-react';
+import { BrandButton } from '../brand/BrandButton';
 
 interface EmptyStateProps {
   icon?: ReactNode;
@@ -14,26 +15,26 @@ interface EmptyStateProps {
 
 /**
  * Standardized Empty State Component
- * Provides consistent empty state messaging across the application
+ * Provides consistent empty state messaging with NRETech brand system
  */
 export const EmptyState = ({ icon, title, message, action, className = '' }: EmptyStateProps) => {
-  const defaultIcon = <Inbox className="w-12 h-12 text-gray-400" />;
+  const defaultIcon = <Inbox className="w-12 h-12 text-gold" />;
   
   return (
     <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
-      <div className="mb-4 text-gray-400">
+      <div className="mb-4 text-gold">
         {icon || defaultIcon}
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-600 mb-6 max-w-md">{message}</p>
+      <h3 className="text-lg font-bold font-heading text-text mb-2">{title}</h3>
+      <p className="text-text-secondary mb-6 max-w-md">{message}</p>
       {action && (
-        <button
+        <BrandButton
+          variant="primary"
           onClick={action.onClick}
-          className="btn-primary focus-ring"
           aria-label={action.label}
         >
           {action.label}
-        </button>
+        </BrandButton>
       )}
     </div>
   );
@@ -42,7 +43,7 @@ export const EmptyState = ({ icon, title, message, action, className = '' }: Emp
 // Pre-configured empty states
 export const EmptyStateNoResults = ({ searchTerm, onClear }: { searchTerm?: string; onClear?: () => void }) => (
   <EmptyState
-    icon={<Search className="w-12 h-12 text-gray-400" />}
+    icon={<Search className="w-12 h-12 text-gold" />}
     title="No results found"
     message={searchTerm ? `No items match "${searchTerm}". Try adjusting your search or filters.` : 'No items match your current filters.'}
     action={onClear ? { label: 'Clear filters', onClick: onClear } : undefined}
@@ -57,7 +58,7 @@ export const EmptyStateNoData = ({
   onCreate?: () => void;
 }) => (
   <EmptyState
-    icon={<FileText className="w-12 h-12 text-gray-400" />}
+    icon={<FileText className="w-12 h-12 text-gold" />}
     title={`No ${type} yet`}
     message={`Get started by creating your first ${type.toLowerCase()}.`}
     action={onCreate ? { label: `Create ${type}`, onClick: onCreate } : undefined}

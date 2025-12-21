@@ -1,4 +1,4 @@
-/* Service Worker for NRE Infusion OneHub
+/* Service Worker for NRETech OneHub
    - Caches app shell for offline load
    - Replies to fetches from cache-first then network
    - Listens for `sync` events and posts a message to clients to trigger sync
