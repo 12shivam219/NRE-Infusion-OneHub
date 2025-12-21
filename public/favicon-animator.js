@@ -1,6 +1,6 @@
 /**
  * Animated Favicon Generator
- * Creates an animated rotating logo favicon using canvas
+ * Creates an animated rotating logo favicon using canvas with improved visibility
  */
 
 (function() {
@@ -8,53 +8,90 @@
   let animationFrameId = null;
   let rotation = 0;
   const rotationSpeed = 2; // degrees per frame
+  let logoImage = null;
 
   /**
    * Create canvas favicon
    */
   function createAnimatedFavicon() {
     const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
+    canvas.width = 128;
+    canvas.height = 128;
     return canvas;
   }
 
   /**
-   * Load SVG and draw rotated version on canvas
+   * Load SVG image once
+   */
+  function loadLogoImage() {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = function() {
+        logoImage = img;
+        resolve(img);
+      };
+      img.onerror = function() {
+        console.warn('Failed to load favicon logo');
+        resolve(null);
+      };
+      img.crossOrigin = 'anonymous';
+      img.src = logoSvgUrl;
+    });
+  }
+
+  /**
+   * Draw favicon frame with optimized settings
    */
   function drawFaviconFrame(canvas, rotation) {
+    if (!logoImage) return;
+    
     const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
     
-    // Clear canvas
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw background circle (optional)
-    ctx.fillStyle = '#f8f8f8';
+    // Draw semi-transparent dark background circle for better contrast
+    ctx.fillStyle = 'rgba(13, 17, 23, 0.15)';
     ctx.beginPath();
-    ctx.arc(32, 32, 30, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, centerX - 2, 0, Math.PI * 2);
     ctx.fill();
-
-    // Create image and draw rotated
-    const img = new Image();
-    img.onload = function() {
-      ctx.save();
-      
-      // Translate to center, rotate, translate back
-      ctx.translate(32, 32);
-      ctx.rotate((rotation * Math.PI) / 180);
-      ctx.translate(-32, -32);
-      
-      // Draw image
-      ctx.drawImage(img, 8, 8, 48, 48);
-      
-      ctx.restore();
-      
-      // Update favicon
-      updateFaviconLink(canvas);
-    };
-    img.crossOrigin = 'anonymous';
-    img.src = logoSvgUrl;
+    
+    // Draw border circle
+    ctx.strokeStyle = 'rgba(234, 179, 8, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, centerX - 2, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Save context state
+    ctx.save();
+    
+    // Apply rotation at center
+    ctx.translate(centerX, centerY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.translate(-centerX, -centerY);
+    
+    // Enable smooth rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
+    // Draw logo image (larger to fill more of favicon)
+    const padding = 8;
+    ctx.drawImage(
+      logoImage,
+      padding,
+      padding,
+      canvas.width - (padding * 2),
+      canvas.height - (padding * 2)
+    );
+    
+    // Restore context state
+    ctx.restore();
+    
+    // Update favicon link
+    updateFaviconLink(canvas);
   }
 
   /**
@@ -68,11 +105,11 @@
       if (!faviconLink) {
         faviconLink = document.createElement('link');
         faviconLink.rel = 'icon';
+        faviconLink.type = 'image/png';
         document.head.appendChild(faviconLink);
       }
       
       faviconLink.href = dataUrl;
-      faviconLink.type = 'image/png';
     } catch (err) {
       console.warn('Could not update favicon:', err);
     }
@@ -82,6 +119,8 @@
    * Animation loop
    */
   function animate() {
+    if (!logoImage) return;
+    
     const canvas = createAnimatedFavicon();
     rotation = (rotation + rotationSpeed) % 360;
     drawFaviconFrame(canvas, rotation);
@@ -89,15 +128,22 @@
   }
 
   /**
+   * Initialize animation
+   */
+  function init() {
+    loadLogoImage().then(() => {
+      animate();
+    });
+  }
+
+  /**
    * Start animation when DOM is ready
    */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      animate();
-    });
+    document.addEventListener('DOMContentLoaded', init);
   } else {
     // DOM is already ready
-    animate();
+    init();
   }
 
   /**
