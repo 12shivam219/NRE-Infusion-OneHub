@@ -53,6 +53,37 @@ export const getUserName = async (userId: string): Promise<{ full_name: string; 
   }
 };
 
+export const getRequirementsCount = async (
+  userId?: string
+): Promise<{ success: boolean; count: number; error?: string }> => {
+  try {
+    let query = supabase
+      .from('requirements')
+      .select('*', { count: 'exact', head: true });
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching requirements count:', error.message);
+      }
+      return { success: false, count: 0, error: error.message };
+    }
+
+    return { success: true, count: count || 0 };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching requirements count:', errorMsg);
+    }
+    return { success: false, count: 0, error: 'Failed to fetch count' };
+  }
+};
+
 export const getRequirements = async (
   userId?: string
 ): Promise<{ success: boolean; requirements?: RequirementWithLogs[]; error?: string }> => {

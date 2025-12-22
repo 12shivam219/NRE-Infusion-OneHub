@@ -353,7 +353,7 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(2, 1fr)' },
                   gap: 2,
                 }}
               >
@@ -361,18 +361,6 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
                   title="Active Requirements"
                   value={counts.activeRequirements}
                   subtitle={`New: ${counts.newRequirements} | In Progress: ${counts.inProgressRequirements}`}
-                  icon={<TrendingUp className="w-6 h-6" />}
-                />
-                <StatCard
-                  title="Upcoming Interviews"
-                  value={counts.upcomingInterviews}
-                  subtitle={`Completed: ${counts.completedInterviews}`}
-                  icon={<TrendingUp className="w-6 h-6" />}
-                />
-                <StatCard
-                  title="Active Consultants"
-                  value={counts.activeConsultants}
-                  subtitle={`Recently Placed: ${counts.placedConsultants}`}
                   icon={<TrendingUp className="w-6 h-6" />}
                 />
                 <StatCard

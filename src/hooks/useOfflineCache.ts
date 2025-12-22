@@ -152,7 +152,7 @@ export function useOfflineCache() {
       window.removeEventListener('retry-sync', handleRetrySync as EventListener);
       window.removeEventListener('sync-queue-changed', handleQueueChanged as EventListener);
     };
-  }, [syncPendingItems]);
+  }, [isOnline, offlineStartTime, syncPendingItems]);
 
   // Listen for messages from the service worker (background sync trigger)
   useEffect(() => {

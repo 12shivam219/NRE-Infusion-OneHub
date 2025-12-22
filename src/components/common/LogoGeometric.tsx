@@ -8,20 +8,15 @@ interface LogoGeometricProps {
   animate?: boolean;
 }
 
-export const LogoGeometric = ({ 
-  variant = 'full', 
-  className = '', 
-  isDark = true,
-  showTagline = false,
-  animate = false
-}: LogoGeometricProps) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const goldColor = '#d4af37';
-  const goldLight = '#eab308';
-  const textColor = isDark ? '#ffffff' : '#0d1117';
+interface IconGeometricProps {
+  animate: boolean;
+  isHovered: boolean;
+  setIsHovered: (val: boolean) => void;
+  goldColor: string;
+  goldLight: string;
+}
 
-  const IconGeometric = () => (
+const IconGeometric = ({ animate, isHovered, setIsHovered, goldColor, goldLight }: IconGeometricProps) => (
     <svg
       viewBox="0 0 200 200"
       width={160}
@@ -93,10 +88,23 @@ export const LogoGeometric = ({
     </svg>
   );
 
+export const LogoGeometric = ({ 
+  variant = 'full', 
+  className = '', 
+  isDark = true,
+  showTagline = false,
+  animate = false
+}: LogoGeometricProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  const goldColor = '#d4af37';
+  const goldLight = '#eab308';
+  const textColor = isDark ? '#ffffff' : '#0d1117';
+
   if (variant === 'icon') {
     return (
       <div className={`flex items-center justify-center ${className}`}>
-        <IconGeometric />
+        <IconGeometric animate={animate} isHovered={isHovered} setIsHovered={setIsHovered} goldColor={goldColor} goldLight={goldLight} />
       </div>
     );
   }
@@ -152,7 +160,7 @@ export const LogoGeometric = ({
 
   return (
     <div className={`flex flex-col items-center gap-4 ${className}`} onMouseEnter={() => animate && setIsHovered(true)} onMouseLeave={() => animate && setIsHovered(false)}>
-      <IconGeometric />
+      <IconGeometric animate={animate} isHovered={isHovered} setIsHovered={setIsHovered} goldColor={goldColor} goldLight={goldLight} />
       <div className="text-center">
         <div className="font-bold text-2xl tracking-tight" style={{ color: goldColor }}>
           NRETech

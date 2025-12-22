@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { Command as CommandIcon, X as CloseIcon } from 'lucide-react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
@@ -15,6 +15,7 @@ import { SkipLinks } from './components/common/SkipLinks';
 import { CommandNavigation } from './components/navigation/CommandNavigation';
 import { ThemeSyncProvider, useThemeSync, resolveThemeKeyFromRoute } from './contexts/ThemeSyncContext';
 import { AdaptiveAtmosphereProvider } from './contexts/AdaptiveAtmosphereContext';
+import { usePrefersReducedMotion } from './hooks/usePrefersReducedMotion';
 import {
   LazyDashboard,
   LazyDocumentsPage,
@@ -32,23 +33,38 @@ const AdminRoute = ({ children, isAdmin }: { children: React.ReactNode; isAdmin:
   return children;
 };
 
+const RouteSuspenseFallback = ({ onStart, onStop }: { onStart: () => void; onStop: () => void }) => {
+  useEffect(() => {
+    onStart();
+    return () => {
+      onStop();
+    };
+  }, [onStart, onStop]);
+
+  return <LogoLoader fullScreen size="lg" showText label="Loading..." />;
+};
+
 const AppContent = () => {
-  const { user, isLoading, refreshUser, isAdmin, isMarketing } = useAuth();
+  const { user, isLoading, refreshUser, isAdmin } = useAuth();
   const { showToast } = useToast();
   const [authView, setAuthView] = useState<AuthView>('login');
   const [hasShownOfflineToast, setHasShownOfflineToast] = useState(false);
   const hasShownOfflineToastRef = useRef(false);
   const location = useLocation();
-  const [isCommandVisible, setCommandVisible] = useState(true);
+  const [isCommandVisible, setCommandVisible] = useState(false);
   const isInitializedRef = useRef(false);
+  const userLoggedInRef = useRef(false);
   const { setTheme, clearPreview, theme } = useThemeSync();
   const commandSectionRef = useRef<HTMLDivElement | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
   // Memoize theme properties to prevent unnecessary re-renders
   const { accentSoft, accentGlow, onAccent } = useMemo(() => ({
     accentSoft: theme.accentSoft,
     accentGlow: theme.accentGlow,
     onAccent: theme.onAccent,
   }), [theme.accentSoft, theme.accentGlow, theme.onAccent]);
+  const shouldReduceMotion = prefersReducedMotion || isRouteLoading;
 
   // Update ref when state changes
   useEffect(() => {
@@ -71,12 +87,13 @@ const AppContent = () => {
   }, [handleThemeUpdate]);
 
   // Hide command center when navigating to a different page
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isInitializedRef.current) {
       isInitializedRef.current = true;
       return;
     }
     // Only hide command when location actually changes
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCommandVisible(false);
     signalCommandInteraction();
   }, [location.pathname, location.search, signalCommandInteraction]);
@@ -91,6 +108,29 @@ const AppContent = () => {
   useEffect(() => {
     handleCommandVisibilityChange();
   }, [isCommandVisible, handleCommandVisibilityChange]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!root) return;
+    if (shouldReduceMotion) {
+      root.classList.add('reduce-motion');
+    } else {
+      root.classList.remove('reduce-motion');
+    }
+  }, [shouldReduceMotion]);
+
+  // Show command center when user logs in for the first time
+  useEffect(() => {
+    if (user && !userLoggedInRef.current) {
+      userLoggedInRef.current = true;
+      // Fix: Wrap in setTimeout to avoid synchronous setState warning
+      const timer = setTimeout(() => {
+        setCommandVisible(true);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
   // Listen for offline mode activation and show toast notification
   const handleOfflineActivation = useCallback(() => {
     if (!hasShownOfflineToastRef.current && user) {
@@ -112,6 +152,9 @@ const AppContent = () => {
       window.removeEventListener('offline-mode-activated', handleOfflineActivation);
     };
   }, [handleOfflineActivation]);
+
+  const handleRouteLoadingStart = useCallback(() => setIsRouteLoading(true), []);
+  const handleRouteLoadingStop = useCallback(() => setIsRouteLoading(false), []);
 
   if (isLoading) {
     return <LogoLoader fullScreen size="xl" showText label="Loading Application" />;
@@ -137,7 +180,7 @@ const AppContent = () => {
   return (
     <div className="relative min-h-screen overflow-hidden text-amber-50" style={{
       backgroundColor: 'var(--bg)',
-      transition: 'background-color 100ms linear'
+      transition: shouldReduceMotion ? undefined : 'background-color 100ms linear'
     }}>
       <SkipLinks />
 
@@ -154,7 +197,7 @@ const AppContent = () => {
           style={{
             background:
               'radial-gradient(circle at 18% 22%, var(--nre-ambient) 0%, transparent 58%), radial-gradient(circle at 78% 12%, var(--nre-ambient-secondary) 0%, transparent 60%)',
-            animation: 'nre-gradient-pan var(--nre-gradient-duration) linear infinite',
+            animation: shouldReduceMotion ? 'none' : 'nre-gradient-pan var(--nre-gradient-duration) linear infinite',
             mixBlendMode: 'screen',
           }}
         />
@@ -208,10 +251,18 @@ const AppContent = () => {
               className="flex-1 overflow-y-auto"
               style={{
                 backgroundColor: 'var(--surface)',
-                transition: 'background-color 100ms linear',
+                transition: shouldReduceMotion ? undefined : 'background-color 100ms linear',
+                marginTop: '72px',
               }}
             >
-              <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
+              <Suspense
+                fallback={
+                  <RouteSuspenseFallback
+                    onStart={handleRouteLoadingStart}
+                    onStop={handleRouteLoadingStop}
+                  />
+                }
+              >
                 <Routes>
                   <Route path="/dashboard" element={<LazyDashboard />} />
                   <Route path="/documents" element={<LazyDocumentsPage />} />
@@ -224,18 +275,10 @@ const AppContent = () => {
                       </AdminRoute>
                     }
                   />
-                  {/* Redirect root to default based on role */}
+                  {/* Redirect root to Dashboard for all authenticated users */}
                   <Route
                     path="/"
-                    element={
-                      isAdmin ? (
-                        <Navigate to="/admin" replace />
-                      ) : isMarketing ? (
-                        <Navigate to="/crm" replace />
-                      ) : (
-                        <Navigate to="/dashboard" replace />
-                      )
-                    }
+                    element={<Navigate to="/dashboard" replace />}
                   />
                   {/* Catch all - redirect to home */}
                   <Route path="*" element={<Navigate to="/" replace />} />
@@ -283,5 +326,5 @@ function App() {
     </AuthProvider>
   );
 }
-
+  
 export default App;

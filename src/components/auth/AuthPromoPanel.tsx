@@ -1,4 +1,4 @@
-import { ArrowRight, Award, ShieldCheck, Workflow, Sparkles } from 'lucide-react';
+import { Award, ShieldCheck, Workflow, Sparkles } from 'lucide-react';
 
 interface AuthPromoPanelProps {
   variant?: 'login' | 'register';
@@ -23,7 +23,10 @@ const features = [
 ];
 
 export const AuthPromoPanel = ({ variant = 'login' }: AuthPromoPanelProps) => {
-  const primaryCtaLabel = variant === 'login' ? 'Launch OneHub' : 'Create my OneHub account';
+  const heroCopy =
+    variant === 'login'
+      ? 'Centralize resumes, CRM, interviews, and outreach in a single intelligent workspace built for premium staffing teams.'
+      : 'Spin up your unified staffing command center with CRM, resume intelligence, and interview orchestration all working from day one.';
 
   return (
     <div className="relative min-h-full w-full overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#0f172a] to-[#05070a] text-white">
@@ -41,7 +44,7 @@ export const AuthPromoPanel = ({ variant = 'login' }: AuthPromoPanelProps) => {
             Your talent operations, perfectly in orbit.
           </h1>
           <p className="max-w-xl text-pretty text-[0.7rem] leading-snug text-white/80 sm:text-[0.75rem] md:text-[0.8125rem] md:leading-relaxed">
-            Centralize resumes, CRM, interviews, and outreach in a single intelligent workspace built for premium staffing teams.
+            {heroCopy}
           </p>
         </div>
 

@@ -32,13 +32,6 @@ import { useToast } from "../../contexts/ToastContext";
 import { useDocumentsInfinite } from "../../hooks/useDocumentsInfinite";
 import { lazy, Suspense } from "react";
 
-// Handle Named Export: We use .then() because DocumentEditor is exported as 'const', not 'default'
-// const DocumentEditor = lazy(() =>
-//   import("./DocumentEditor").then((module) => ({
-//     default: module.DocumentEditor,
-//   }))
-// );
-
 const editorPromise = () =>
   import("./DocumentEditor").then((module) => ({
     default: module.DocumentEditor,

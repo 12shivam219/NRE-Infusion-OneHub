@@ -1,6 +1,7 @@
-/// <reference path="../types/env.d.ts" />
-
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { Env } from "../types/env";
+
+declare const Deno: Env;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,7 +86,7 @@ const jsonResponse = (status: number, body: Record<string, unknown>) =>
     },
   });
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: { method: string; json: () => AuthLogPayload | PromiseLike<AuthLogPayload>; headers: Headers; }) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

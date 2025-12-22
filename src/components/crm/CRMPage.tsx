@@ -1,13 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { LayoutGrid, Briefcase, Calendar, Users } from 'lucide-react';
+import { Briefcase, Calendar, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { MarketingHubDashboard } from './MarketingHubDashboard';
 import { RequirementsManagement } from './RequirementsManagement';
 import { InterviewTracking } from './InterviewTracking';
 import { ConsultantProfiles } from './ConsultantProfiles';
@@ -18,12 +17,10 @@ import { BulkEmailComposer } from './BulkEmailComposer';
 
 type View = 'dashboard' | 'requirements' | 'interviews' | 'consultants';
 
-type QuickAddType = 'requirement' | 'interview' | 'consultant';
-
 export const CRMPage = () => {
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get('view') as View | null;
-  const [currentView, setCurrentView] = useState<View>(viewParam || 'dashboard');
+  const [currentView, setCurrentView] = useState<View>(viewParam || 'requirements');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showCreateInterview, setShowCreateInterview] = useState(false);
   const [selectedRequirementIdForInterview, setSelectedRequirementIdForInterview] = useState<string | undefined>();
@@ -31,12 +28,6 @@ export const CRMPage = () => {
   const [showBulkEmailComposer, setShowBulkEmailComposer] = useState(false);
 
   // Define all callbacks at top level (before any conditional rendering)
-  const handleDashboardQuickAdd = useCallback((type: QuickAddType) => {
-    if (type === 'requirement') setShowCreateForm(true);
-    else if (type === 'interview') setShowCreateInterview(true);
-    else if (type === 'consultant') setShowCreateConsultant(true);
-  }, []);
-
   const handleRequirementsQuickAdd = useCallback(() => setShowCreateForm(true), []);
 
   const handleCreateInterview = useCallback((requirementId: string) => {
@@ -58,9 +49,10 @@ export const CRMPage = () => {
   }, []);
 
   // Sync currentView with query parameter
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (viewParam && viewParam !== currentView) {
-      setCurrentView(viewParam);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setCurrentView(viewParam as typeof currentView);
     }
   }, [viewParam, currentView]);
 
@@ -84,7 +76,6 @@ export const CRMPage = () => {
   }, [currentView]);
 
   const navTabs: Array<{ id: View; label: string; icon: LucideIcon }> = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'requirements', label: 'Requirements', icon: Briefcase },
     { id: 'interviews', label: 'Interviews', icon: Calendar },
     { id: 'consultants', label: 'Consultants', icon: Users },
@@ -166,12 +157,6 @@ export const CRMPage = () => {
               }}
             >
               <ErrorBoundary>
-                {currentView === 'dashboard' ? (
-                    <MarketingHubDashboard
-                      onQuickAdd={handleDashboardQuickAdd}
-                    />
-                ) : null}
-
                 {currentView === 'requirements' ? (
                     <RequirementsManagement
                       onQuickAdd={handleRequirementsQuickAdd}

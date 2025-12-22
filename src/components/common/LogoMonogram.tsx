@@ -8,22 +8,17 @@ interface LogoMonogramProps {
   animate?: boolean;
 }
 
-export const LogoMonogram = ({ 
-  variant = 'full', 
-  className = '', 
-  isDark = true,
-  showTagline = false,
-  animate = false
-}: LogoMonogramProps) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const goldColor = '#d4af37';
-  const goldLight = '#eab308';
-  const darkAlt = '#1a1f27';
-  const textColor = isDark ? '#ffffff' : '#0d1117';
+interface IconMonogramProps {
+  animate: boolean;
+  isHovered: boolean;
+  setIsHovered: (val: boolean) => void;
+  goldColor: string;
+  goldLight: string;
+  darkAlt: string;
+}
 
-  // Icon: NT Monogram in shield/badge shape
-  const IconMonogram = () => (
+// Icon: NT Monogram in shield/badge shape
+const IconMonogram = ({ animate, isHovered, setIsHovered, goldColor, goldLight, darkAlt }: IconMonogramProps) => (
     <svg
       viewBox="0 0 200 200"
       width={160}
@@ -105,10 +100,24 @@ export const LogoMonogram = ({
     </svg>
   );
 
+export const LogoMonogram = ({ 
+  variant = 'full', 
+  className = '', 
+  isDark = true,
+  showTagline = false,
+  animate = false
+}: LogoMonogramProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+  
+  const goldColor = '#d4af37';
+  const goldLight = '#eab308';
+  const darkAlt = '#1a1f27';
+  const textColor = isDark ? '#ffffff' : '#0d1117';
+
   if (variant === 'icon') {
     return (
       <div className={`flex items-center justify-center ${className}`}>
-        <IconMonogram />
+        <IconMonogram animate={animate} isHovered={isHovered} setIsHovered={setIsHovered} goldColor={goldColor} goldLight={goldLight} darkAlt={darkAlt} />
       </div>
     );
   }
@@ -165,7 +174,7 @@ export const LogoMonogram = ({
   // Full variant (default)
   return (
     <div className={`flex flex-col items-center gap-4 ${className}`} onMouseEnter={() => animate && setIsHovered(true)} onMouseLeave={() => animate && setIsHovered(false)}>
-      <IconMonogram />
+      <IconMonogram animate={animate} isHovered={isHovered} setIsHovered={setIsHovered} goldColor={goldColor} goldLight={goldLight} darkAlt={darkAlt} />
       <div className="text-center">
         <div className="font-bold text-2xl tracking-tight" style={{ color: goldColor }}>
           NRETech

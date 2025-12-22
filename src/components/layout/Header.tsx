@@ -1,7 +1,6 @@
 import { useState, useCallback, memo } from 'react';
 import { Bell, Menu as MenuIcon, Mail as MailIcon, Moon, Sun, LogOut } from 'lucide-react';
 import SyncControls from '../common/SyncControls';
-import { CreateDropdown } from '../common/CreateDropdown';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -10,7 +9,6 @@ import { useThemeSync } from '../../contexts/ThemeSyncContext';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import IconButton from '@mui/material/IconButton';
-import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -51,7 +49,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
   const accentGlow = theme.accentGlow;
 
   const title = getPageTitle(pathname);
-  const isCRMPage = pathname === '/crm';
 
   const handleNotificationClick = useCallback((notificationId: string, alreadyRead: boolean) => {
     if (!alreadyRead) {
@@ -61,10 +58,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
 
   const handleBulkEmailOpen = useCallback(() => {
     window.dispatchEvent(new CustomEvent('open-bulk-email'));
-  }, []);
-
-  const handleToolsClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
-    window.dispatchEvent(new CustomEvent('open-requirement-tools', { detail: { target: e.currentTarget } }));
   }, []);
 
   const handleNotificationsOpen = useCallback((e: React.MouseEvent<HTMLElement>) => {
@@ -77,9 +70,11 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
 
   return (
     <AppBar
-      position="sticky"
+      position="fixed"
       elevation={0}
       sx={{
+        top: 0,
+        zIndex: 100,
         borderBottom: 1,
         borderColor: theme.headerBorder,
         backgroundImage: theme.headerBackground,
@@ -201,54 +196,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
         </Stack>
 
         <Stack direction="row" spacing={1.5} alignItems="center">
-          {/* CRM Toolbar - only show on /crm */}
-          {isCRMPage && (
-            <>
-              <Button
-                variant="outlined"
-                color="inherit"
-                onClick={handleToolsClick}
-                sx={{ 
-                  display: { xs: 'none', sm: 'inline-flex' },
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderColor: '#FFFFFF',
-                  color: '#FFFFFF',
-                  fontSize: '0.875rem',
-                  fontFamily: '"Inter", sans-serif',
-                  '&:hover': {
-                    borderColor: '#FFFFFF',
-                    backgroundColor: 'rgba(255,255,255,0.12)',
-                    boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
-                  },
-                }}
-              >
-                Tools
-              </Button>
-
-              {/* Create Dropdown Menu */}
-              <Box sx={{ display: { xs: 'flex', sm: 'inline-flex' } }}>
-                <CreateDropdown
-                  items={[
-                    {
-                      label: 'Create Requirement',
-                      onClick: () => window.dispatchEvent(new CustomEvent('open-requirement-form')),
-                    },
-                    {
-                      label: 'Create Interview',
-                      onClick: () => window.dispatchEvent(new CustomEvent('open-interview-form')),
-                    },
-                    {
-                      label: 'Create Consultant',
-                      onClick: () => window.dispatchEvent(new CustomEvent('open-consultant-form')),
-                    },
-                  ]}
-                />
-              </Box>
-
-              <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' }, borderColor: 'rgba(234, 179, 8, 0.1)' }} />
-            </>
-          )}
+          {/* CRM Toolbar removed */}
 
           <SyncControls />
 
@@ -338,19 +286,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
           >
             <LogOut className="w-5 h-5" />
           </IconButton>
-
-          <CreateDropdown
-            items={[
-              {
-                label: 'Create Task',
-                onClick: () => window.dispatchEvent(new CustomEvent('open-requirement-form')),
-              },
-              {
-                label: 'Bulk Email',
-                onClick: () => window.dispatchEvent(new CustomEvent('open-bulk-email')),
-              },
-            ]}
-          />
 
           <Menu
             anchorEl={notificationsAnchorEl}

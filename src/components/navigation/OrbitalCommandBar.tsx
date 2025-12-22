@@ -108,7 +108,7 @@ export const OrbitalCommandBar = ({ items, activeId, onNavigate, onPreview, onPr
               onFocus={() => onPreview(item)}
               onMouseLeave={onPreviewEnd}
               onBlur={onPreviewEnd}
-              className={`group absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#0d1117] text-white`}
+              className={`group absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:ring-offset-[#0d1117] text-white`}
               style={{
                 transform,
                 borderColor: isActive ? 'var(--nre-accent)' : 'rgba(255,255,255,0.08)',
@@ -127,14 +127,21 @@ export const OrbitalCommandBar = ({ items, activeId, onNavigate, onPreview, onPr
                 style={{ backgroundColor: 'var(--nre-accent-glow)' }}
               />
               <Icon
-                className={`relative h-6 w-6 transition-transform duration-300 ${
+                className={`relative h-4 w-4 transition-transform duration-300 ${
                   isActive ? 'scale-110' : 'group-hover:scale-110'
                 }`}
                 aria-hidden="true"
               />
               <span
-                className="pointer-events-none absolute -translate-x-1/2 select-none whitespace-nowrap rounded-full bg-black/80 px-3 py-1 text-xs tracking-[0.18em] text-white opacity-0 shadow-[0_8px_24px_rgba(0,0,0,0.45)] transition-all duration-300 group-hover:-top-16 group-hover:opacity-100 group-focus-visible:-top-16 group-focus-visible:opacity-100"
-                style={{ fontFamily: '"Poppins", sans-serif' }}
+                className="pointer-events-none absolute -translate-x-1/2 select-none whitespace-nowrap rounded-full text-white shadow-[0_8px_24px_rgba(0,0,0,0.45)] transition-all duration-300 -top-12 font-medium"
+                style={{
+                  fontFamily: '"Poppins", sans-serif',
+                  fontSize: '10px',
+                  padding: '0.3em 0.8em',
+                  letterSpacing: '0.05em',
+                  backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                  background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.7) 100%)',
+                }}
               >
                 {item.label.toUpperCase()}
               </span>

@@ -626,7 +626,7 @@ export const InterviewDetailModal = ({
                 color="error"
                 onClick={handleDeleteClick}
                 disabled={isDeleting}
-                startIcon={isDeleting ? <Loader className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
+                startIcon={isDeleting ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : <Trash2 className="w-4 h-4" />}
               >
                 Delete
               </Button>

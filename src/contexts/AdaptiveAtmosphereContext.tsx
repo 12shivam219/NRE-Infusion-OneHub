@@ -220,7 +220,7 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(() => getTimePeriod(new Date()));
   const [activityLevel, setActivityLevel] = useState<ActivityLevel>('focused');
   const [systemMood, setSystemMood] = useState<SystemMood>('normal');
-  const lastInteractionRef = useRef<number>(Date.now());
+  const lastInteractionRef = useRef<number>(0);
   const interactionHistoryRef = useRef<number[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastCueRef = useRef<string>('');
@@ -283,6 +283,8 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    lastInteractionRef.current = Date.now();
 
     const registerInteraction = () => {
       const now = Date.now();
@@ -500,10 +502,12 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
     }
   }, [snapshot]);
 
-  const value = useMemo<AdaptiveAtmosphereContextValue>(() => ({
+  // Using ref.current in value object is intentional for performance
+  const value: AdaptiveAtmosphereContextValue = {
     ...snapshot,
+    // eslint-disable-next-line react-hooks/refs
     lastInteraction: lastInteractionRef.current,
-  }), [snapshot]);
+  };
 
   return (
     <AdaptiveAtmosphereContext.Provider value={value}>
@@ -512,6 +516,7 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAdaptiveAtmosphere = () => {
   const ctx = useContext(AdaptiveAtmosphereContext);
   if (!ctx) {

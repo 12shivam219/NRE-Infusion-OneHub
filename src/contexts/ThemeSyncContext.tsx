@@ -320,6 +320,7 @@ export const ThemeSyncProvider = ({ children }: { children: ReactNode }) => {
   return <ThemeSyncContext.Provider value={value}>{children}</ThemeSyncContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useThemeSync = () => {
   const ctx = useContext(ThemeSyncContext);
   if (!ctx) {
@@ -328,6 +329,7 @@ export const useThemeSync = () => {
   return ctx;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const resolveThemeKeyFromRoute = (pathname: string, search: string): ThemeKey => {
   const cleanPath = pathname.split('?')[0];
 
@@ -363,4 +365,5 @@ export const resolveThemeKeyFromRoute = (pathname: string, search: string): Them
 };
 
 export type { ThemeProfile };
+// eslint-disable-next-line react-refresh/only-export-components
 export { THEME_PROFILES };

@@ -1,4 +1,4 @@
-import { StrictMode, memo } from 'react';
+import { StrictMode, memo, useEffect } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
@@ -21,9 +21,25 @@ setupGlobalErrorHandler();
 
 document.title = 'NRETech OneHub';
 
+// Function to remove initial loader (CSP-compliant)
+const hideInitialLoader = () => {
+  const loader = document.getElementById('initial-loader');
+  if (loader) {
+    loader.style.opacity = '0';
+    setTimeout(() => {
+      loader.style.display = 'none';
+    }, 300);
+  }
+};
+
 export const ThemedApp = memo(() => {
   const { themeMode } = useThemeMode();
   const theme = themeMode === 'dark' ? crmThemeDark : crmThemeLight;
+
+  // Hide initial loader when React app mounts
+  useEffect(() => {
+    hideInitialLoader();
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>

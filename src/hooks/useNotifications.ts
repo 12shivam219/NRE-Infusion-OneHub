@@ -8,39 +8,40 @@ type Notification = Database['public']['Tables']['notifications']['Row'];
 
 export const useNotifications = () => {
   const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
 
     setLoading(true);
-    const result = await getNotifications(user.id);
+    const result = await getNotifications(userId);
     if (result.success && result.notifications) {
       setNotifications(result.notifications);
     }
     setLoading(false);
-  }, [user]);
+  }, [userId]);
 
   const loadUnreadCount = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
 
-    const result = await getUnreadCount(user.id);
+    const result = await getUnreadCount(userId);
     if (result.success && result.count !== undefined) {
       setUnreadCount(result.count);
     }
-  }, [user]);
+  }, [userId]);
 
   const handleMarkAsRead = useCallback(async (notificationId: string) => {
-    if (!user) return;
+    if (!userId) return;
     
     await markAsRead(notificationId);
     
     // Batch both API calls
     const [notificationsResult, unreadResult] = await Promise.all([
-      getNotifications(user.id),
-      getUnreadCount(user.id),
+      getNotifications(userId),
+      getUnreadCount(userId),
     ]);
     
     // Single state update instead of multiple
@@ -50,16 +51,16 @@ export const useNotifications = () => {
     if (unreadResult.success && unreadResult.count !== undefined) {
       setUnreadCount(unreadResult.count);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   const handleMarkAllAsRead = useCallback(async () => {
-    if (!user) return;
-    await markAllAsRead(user.id);
+    if (!userId) return;
+    await markAllAsRead(userId);
     
     // Batch both API calls
     const [notificationsResult, unreadResult] = await Promise.all([
-      getNotifications(user.id),
-      getUnreadCount(user.id),
+      getNotifications(userId),
+      getUnreadCount(userId),
     ]);
     
     if (notificationsResult.success && notificationsResult.notifications) {
@@ -68,17 +69,17 @@ export const useNotifications = () => {
     if (unreadResult.success && unreadResult.count !== undefined) {
       setUnreadCount(unreadResult.count);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       let cancelled = false;
 
       const run = async () => {
         setLoading(true);
         const [notificationsResult, unreadResult] = await Promise.all([
-          getNotifications(user.id),
-          getUnreadCount(user.id),
+          getNotifications(userId),
+          getUnreadCount(userId),
         ]);
 
         if (cancelled) return;
@@ -95,14 +96,14 @@ export const useNotifications = () => {
       void run();
 
       const channel = supabase
-        .channel(`notifications:${user.id}`)
+        .channel(`notifications:${userId}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
             table: 'notifications',
-            filter: `user_id=eq.${user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           () => {
             void loadUnreadCount();
@@ -133,7 +134,7 @@ export const useNotifications = () => {
         supabase.removeChannel(channel);
       };
     }
-  }, [user, loadNotifications, loadUnreadCount]);
+  }, [userId, loadNotifications, loadUnreadCount]);
 
   return {
     notifications,

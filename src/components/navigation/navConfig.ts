@@ -1,11 +1,11 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
-  LineChart,
   Briefcase,
-  Users,
-  Bot,
   MessagesSquare,
+  Users,
+  FileText,
+  Bot,
 } from 'lucide-react';
 import type { ThemeKey } from '../../contexts/ThemeSyncContext';
 
@@ -28,15 +28,6 @@ export const NAV_ITEMS: NavigationItem[] = [
     icon: LayoutDashboard,
     roles: ['user', 'marketing', 'admin'],
     themeKey: 'dashboard',
-  },
-  {
-    id: 'crm',
-    label: 'CRM Command',
-    description: 'Campaign intelligence and outreach',
-    href: '/crm?view=dashboard',
-    icon: LineChart,
-    roles: ['user', 'marketing', 'admin'],
-    themeKey: 'crm',
   },
   {
     id: 'requirements',
@@ -66,8 +57,17 @@ export const NAV_ITEMS: NavigationItem[] = [
     themeKey: 'consultants',
   },
   {
+    id: 'documents',
+    label: 'Resume Editor',
+    description: 'Resume intelligence and editing',
+    href: '/documents',
+    icon: FileText,
+    roles: ['user', 'admin'],
+    themeKey: 'crm',
+  },
+  {
     id: 'automation',
-    label: 'AI Automation',
+    label: 'Admin',
     description: 'Systems intelligence and orchestration',
     href: '/admin',
     icon: Bot,

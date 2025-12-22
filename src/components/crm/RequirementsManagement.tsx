@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy } from 'react';
+
 import { Plus, Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
@@ -10,11 +11,9 @@ import { deleteRequirement, type RequirementWithLogs } from '../../lib/api/requi
 import type { Database, RequirementStatus } from '../../lib/database.types';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { ErrorAlert } from '../common/ErrorAlert';
-import { RequirementsReport } from './RequirementsReport';
-import { RequirementDetailModal } from './RequirementDetailModal';
 import { RequirementsTable } from './RequirementsTable';
-import { ConfirmDialog } from '../common/ConfirmDialog';
 import { BrandButton } from '../brand';
+
 import { useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
 import SearchIcon from '@mui/icons-material/Search';
@@ -44,6 +43,10 @@ import DialogActions from '@mui/material/DialogActions';
 import Popover from '@mui/material/Popover';
 import Portal from '@mui/material/Portal';
 import { alpha, styled } from '@mui/material/styles';
+
+const RequirementsReport = lazy(() => import('./RequirementsReport').then((m) => ({ default: m.RequirementsReport })));
+const RequirementDetailModal = lazy(() => import('./RequirementDetailModal').then((m) => ({ default: m.RequirementDetailModal })));
+const ConfirmDialog = lazy(() => import('../common/ConfirmDialog').then((m) => ({ default: m.ConfirmDialog })));
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 

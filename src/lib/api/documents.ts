@@ -90,6 +90,40 @@ export const uploadDocument = async (
 /**
  * Fetch all documents for a user with retry logic
  */
+export const getDocumentsCount = async (
+  userId: string
+): Promise<{ success: boolean; count: number; error?: string }> => {
+  try {
+    const { count, error } = await retryAsync(
+      async () =>
+        supabase
+          .from('documents')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId),
+      {
+        maxAttempts: 2,
+        initialDelayMs: 100,
+      }
+    );
+
+    if (error) {
+      const appError = handleApiError(error, {
+        component: 'getDocumentsCount',
+        action: 'fetch_count',
+        userId,
+      });
+      return { success: false, count: 0, error: appError.message };
+    }
+
+    return { success: true, count: count || 0 };
+  } catch (error) {
+    const appError = handleApiError(error, {
+      component: 'getDocumentsCount',
+    });
+    return { success: false, count: 0, error: appError.message };
+  }
+};
+
 export const getDocuments = async (
   userId: string
 ): Promise<{ success: boolean; documents?: Document[]; error?: string }> => {

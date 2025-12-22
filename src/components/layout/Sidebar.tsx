@@ -6,7 +6,6 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  BarChart3,
   Calendar,
   Users,
   Settings,
@@ -62,7 +61,6 @@ const MENU_GROUPS_TEMPLATE: Array<{ groupId: string; label: string; items: MenuI
         icon: Briefcase, 
         roles: ['user', 'marketing', 'admin'],
         children: [
-          { id: 'crm-dashboard', label: 'Dashboard', icon: BarChart3, path: '/crm?view=dashboard', roles: ['user', 'marketing', 'admin'] },
           { id: 'crm-requirements', label: 'Requirements', icon: FileText, path: '/crm?view=requirements', roles: ['user', 'marketing', 'admin'] },
           { id: 'crm-interviews', label: 'Interviews', icon: Calendar, path: '/crm?view=interviews', roles: ['user', 'marketing', 'admin'] },
           { id: 'crm-consultants', label: 'Consultants', icon: Users, path: '/crm?view=consultants', roles: ['user', 'marketing', 'admin'] },
@@ -87,7 +85,8 @@ const MENU_GROUPS_TEMPLATE: Array<{ groupId: string; label: string; items: MenuI
 ];
 
 export const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const userRole = user?.role as string | undefined;
   const location = useLocation();
   const desktopDrawerWidth = isOpen ? 256 : 80;
   const mobileDrawerWidth = 256;
@@ -104,12 +103,12 @@ export const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
 
   // Memoize filtered groups based on user role
   const menuGroups = useMemo(() => {
-    const userRole = user?.role as string;
+    if (!userRole) return MENU_GROUPS_TEMPLATE;
     return MENU_GROUPS_TEMPLATE.map(group => ({
       ...group,
       items: group.items.filter(item => item.roles.includes(userRole))
     }));
-  }, [user?.role]);
+  }, [userRole]);
 
   const preloadForPath = useCallback((path: string) => {
     if (path === '/dashboard') void preloadDashboard();
@@ -161,9 +160,9 @@ export const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
   }, [location.pathname, location.search]);
 
   const filterItemsByRole = useCallback((items: MenuItem[]): MenuItem[] => {
-    const userRole = user?.role as string;
+    if (!userRole) return items;
     return items.filter(item => item.roles.includes(userRole));
-  }, [user?.role]);
+  }, [userRole]);
 
   const getNavItemSx = useCallback((isActive: boolean, forCollapsed: boolean) => ({
     borderRadius: 2,

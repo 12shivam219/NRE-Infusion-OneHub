@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { NAV_ITEMS, type NavigationItem } from './navConfig';
 import { OrbitalCommandBar } from './OrbitalCommandBar';
 import { GlassCommandDock } from './GlassCommandDock';
 import { useThemeSync } from '../../contexts/ThemeSyncContext';
+import { preloadDashboard, preloadDocumentsPage, preloadCRMPage, preloadAdminPage } from '../../lib/lazyLoader';
 
 interface CommandNavigationProps {
   onNavigate?: () => void;
@@ -35,7 +36,7 @@ export const CommandNavigation = ({ onNavigate, forceHidden = false }: CommandNa
   const items = useMemo(() => {
     if (!user?.role) return NAV_ITEMS;
     return NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user.role));
-  }, [user?.role]);
+  }, [user]);
 
   const activeId = useMemo(() => {
     const { pathname, search } = location;
@@ -62,11 +63,40 @@ export const CommandNavigation = ({ onNavigate, forceHidden = false }: CommandNa
 
   const handlePreview = (item: NavigationItem) => {
     previewTheme(item.themeKey);
+    // Preload the component when user hovers
+    preloadComponent(item.id);
   };
+
+  const preloadComponent = useCallback((itemId: string) => {
+    if (itemId === 'dashboard') {
+      void preloadDashboard();
+    } else if (itemId === 'documents') {
+      void preloadDocumentsPage();
+    } else if (itemId === 'requirements' || itemId === 'interviews' || itemId === 'consultants') {
+      void preloadCRMPage();
+    } else if (itemId === 'automation') {
+      void preloadAdminPage();
+    }
+  }, []);
 
   const handlePreviewEnd = () => {
     clearPreview();
   };
+
+  // Preload all pages on component mount for faster navigation
+  useEffect(() => {
+    const preloadAllPages = async () => {
+      // Use Promise.all to preload all pages in parallel
+      await Promise.all([
+        preloadDashboard(),
+        preloadDocumentsPage(),
+        preloadCRMPage(),
+        preloadAdminPage(),
+      ]);
+    };
+
+    void preloadAllPages();
+  }, []);
 
   if (!items.length) return null;
 
