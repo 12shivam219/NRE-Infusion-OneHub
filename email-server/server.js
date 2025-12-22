@@ -217,20 +217,12 @@ app.post('/api/encrypt-password', authenticateRequest, async (req, res) => {
   }
 });
 
-// Decrypt password via server-side master key
-app.post('/api/decrypt-password', authenticateRequest, async (req, res) => {
-  try {
-    const { encrypted } = req.body || {};
-    if (!encrypted || typeof encrypted !== 'string') {
-      return res.status(400).json({ success: false, error: 'Missing encrypted in request body' });
-    }
-
-    const plainText = decryptPassword(encrypted);
-    return res.json({ success: true, plainText });
-  } catch (error) {
-    console.error('Decrypt API error:', error);
-    return res.status(500).json({ success: false, error: 'Decryption failed' });
-  }
+// Decrypt endpoint intentionally disabled - server should never return plaintext secrets
+app.post('/api/decrypt-password', authenticateRequest, (_req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: 'Decrypt endpoint is disabled for security. Perform decryption server-side only.',
+  });
 });
 
 // Send email endpoint (single email)

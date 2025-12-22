@@ -415,9 +415,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
     });
   }, [documentsToDisplay, documentBlobs]);
 
-  useEffect(() => {
-    pdfUrlsRef.current = pdfUrls;
-  }, [pdfUrls]);
+
 
   // Auto-save effect: Save document state periodically
   useEffect(() => {
@@ -492,10 +490,18 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
 
   // AGGRESSIVE MEMORY CLEANUP: clear resources on unmount (avoid setState in cleanup)
   useEffect(() => {
+    // Capture refs at effect initialization time to use in cleanup
+    const pdfUrls = pdfUrlsRef.current;
+    const instances = superdocInstances.current;
+    const editedDocs = editedDocsRef.current;
+    const lastAutoSave = lastAutoSaveRef.current;
+    const autoSaveTimer = autoSaveTimerRef.current;
+    const cleanupTimeout = cleanupTimeoutRef.current;
+
     return () => {
       console.log('🧹 DocumentEditor unmounting - aggressive cleanup starting...');
 
-      Object.values(pdfUrlsRef.current).forEach((url) => {
+      Object.values(pdfUrls).forEach((url) => {
         try {
           URL.revokeObjectURL(url);
         } catch (error) {
@@ -503,7 +509,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
         }
       });
 
-      superdocInstances.current.forEach((instance: SuperDoc | undefined, i: number) => {
+      instances.forEach((instance: SuperDoc | undefined, i: number) => {
         try {
           instance?.destroy?.();
           console.log(`Destroyed SuperDoc instance ${i}`);
@@ -511,21 +517,12 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
           console.error(`Error destroying SuperDoc instance ${i}:`, error);
         }
       });
-      superdocInstances.current = [];
-
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      const editedDocs = editedDocsRef.current;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      const lastAutoSave = lastAutoSaveRef.current;
-      const autoSaveTimer = autoSaveTimerRef.current;
-      const cleanupTimeout = cleanupTimeoutRef.current;
 
       editedDocs?.clear();
       lastAutoSave?.clear();
 
       if (autoSaveTimer) {
         clearInterval(autoSaveTimer);
-        autoSaveTimerRef.current = null;
       }
 
       if (cleanupTimeout) {

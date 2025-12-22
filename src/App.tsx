@@ -211,7 +211,7 @@ const AppContent = () => {
                 transition: 'background-color 100ms linear',
               }}
             >
-              <Suspense fallback={<div className="flex h-full items-center justify-center"><LogoLoader /></div>}>
+              <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
                 <Routes>
                   <Route path="/dashboard" element={<LazyDashboard />} />
                   <Route path="/documents" element={<LazyDocumentsPage />} />
@@ -228,7 +228,9 @@ const AppContent = () => {
                   <Route
                     path="/"
                     element={
-                      isMarketing || user?.role === 'user' ? (
+                      isAdmin ? (
+                        <Navigate to="/admin" replace />
+                      ) : isMarketing ? (
                         <Navigate to="/crm" replace />
                       ) : (
                         <Navigate to="/dashboard" replace />

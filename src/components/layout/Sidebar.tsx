@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   FileText,
   Briefcase,
-  LogOut,
   Shield,
   ChevronRight,
   ChevronLeft,
@@ -649,17 +648,6 @@ export const Sidebar = ({ isOpen, onToggle }: SidebarProps) => {
               >
                 <Settings className="w-4 h-4" />
                 <span>Settings</span>
-              </MenuItem>
-              <Divider sx={{ borderColor: 'grey.800' }} />
-              <MenuItem
-                onClick={() => {
-                  setProfileMenuAnchor(null);
-                  logout();
-                }}
-                sx={{ display: 'flex', alignItems: 'center', gap: 1.5, color: '#ff6b6b' }}
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
               </MenuItem>
             </Menu>
           </Box>

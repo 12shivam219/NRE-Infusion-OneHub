@@ -30,6 +30,33 @@ export const CRMPage = () => {
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
   const [showBulkEmailComposer, setShowBulkEmailComposer] = useState(false);
 
+  // Define all callbacks at top level (before any conditional rendering)
+  const handleDashboardQuickAdd = useCallback((type: QuickAddType) => {
+    if (type === 'requirement') setShowCreateForm(true);
+    else if (type === 'interview') setShowCreateInterview(true);
+    else if (type === 'consultant') setShowCreateConsultant(true);
+  }, []);
+
+  const handleRequirementsQuickAdd = useCallback(() => setShowCreateForm(true), []);
+
+  const handleCreateInterview = useCallback((requirementId: string) => {
+    setSelectedRequirementIdForInterview(requirementId);
+    setShowCreateInterview(true);
+  }, []);
+
+  const handleInterviewsQuickAdd = useCallback(() => setShowCreateInterview(true), []);
+
+  const handleConsultantsQuickAdd = useCallback(() => setShowCreateConsultant(true), []);
+
+  // Accessibility: close modals on navigation change
+  const closeAllModals = useCallback(() => {
+    setShowCreateForm(false);
+    setShowCreateInterview(false);
+    setShowCreateConsultant(false);
+    setShowBulkEmailComposer(false);
+    setSelectedRequirementIdForInterview(undefined);
+  }, []);
+
   // Sync currentView with query parameter
   useEffect(() => {
     if (viewParam && viewParam !== currentView) {
@@ -62,15 +89,6 @@ export const CRMPage = () => {
     { id: 'interviews', label: 'Interviews', icon: Calendar },
     { id: 'consultants', label: 'Consultants', icon: Users },
   ];
-
-  // Accessibility: close modals on navigation change
-  const closeAllModals = useCallback(() => {
-    setShowCreateForm(false);
-    setShowCreateInterview(false);
-    setShowCreateConsultant(false);
-    setShowBulkEmailComposer(false);
-    setSelectedRequirementIdForInterview(undefined);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,31 +168,24 @@ export const CRMPage = () => {
               <ErrorBoundary>
                 {currentView === 'dashboard' ? (
                     <MarketingHubDashboard
-                      onQuickAdd={useCallback((type: QuickAddType) => {
-                        if (type === 'requirement') setShowCreateForm(true);
-                        else if (type === 'interview') setShowCreateInterview(true);
-                        else if (type === 'consultant') setShowCreateConsultant(true);
-                      }, [])}
+                      onQuickAdd={handleDashboardQuickAdd}
                     />
                 ) : null}
 
                 {currentView === 'requirements' ? (
                     <RequirementsManagement
-                      onQuickAdd={useCallback(() => setShowCreateForm(true), [])}
-                      onCreateInterview={useCallback((requirementId: string) => {
-                        setSelectedRequirementIdForInterview(requirementId);
-                        setShowCreateInterview(true);
-                      }, [])}
+                      onQuickAdd={handleRequirementsQuickAdd}
+                      onCreateInterview={handleCreateInterview}
                       toolbarPortalTargetId="crm-requirements-actions"
                     />
                 ) : null}
 
                 {currentView === 'interviews' ? (
-                    <InterviewTracking onQuickAdd={useCallback(() => setShowCreateInterview(true), [])} />
+                    <InterviewTracking onQuickAdd={handleInterviewsQuickAdd} />
                 ) : null}
 
                 {currentView === 'consultants' ? (
-                    <ConsultantProfiles onQuickAdd={useCallback(() => setShowCreateConsultant(true), [])} />
+                    <ConsultantProfiles onQuickAdd={handleConsultantsQuickAdd} />
                 ) : null}
               </ErrorBoundary>
             </Box>

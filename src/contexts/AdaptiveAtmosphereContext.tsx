@@ -265,14 +265,20 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
     // This reduces CPU and re-renders significantly
     const now = new Date();
     const msUntilNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getMilliseconds();
-    const timeInterval = window.setTimeout(() => {
+
+    let hourlyIntervalId: number | null = null;
+
+    const timeoutId = window.setTimeout(() => {
       updateTimePeriod();
-      // Then set up for next hour
-      const hourlyInterval = window.setInterval(updateTimePeriod, 60 * 60 * 1000);
-      return () => window.clearInterval(hourlyInterval);
+      hourlyIntervalId = window.setInterval(updateTimePeriod, 60 * 60 * 1000);
     }, msUntilNextHour);
-    
-    return () => window.clearTimeout(timeInterval);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (hourlyIntervalId !== null) {
+        window.clearInterval(hourlyIntervalId);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -287,7 +293,8 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
     };
 
     const events: Array<keyof WindowEventMap> = ['pointermove', 'pointerdown', 'keydown', 'touchstart', 'wheel'];
-    events.forEach((name) => window.addEventListener(name, registerInteraction, { passive: true }));
+    const passiveOptions = { passive: true } as unknown as AddEventListenerOptions;
+    events.forEach((name) => window.addEventListener(name, registerInteraction, passiveOptions));
 
     const handleModuleChange = () => {
       const now = Date.now();
@@ -322,11 +329,11 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
       updateActivityOnDemand(); // ← Update immediately on user action
     };
 
-    events.forEach((name) => window.removeEventListener(name, registerInteraction, { passive: true }));
-    events.forEach((name) => window.addEventListener(name, wrappedRegisterInteraction, { passive: true }));
+    events.forEach((name) => window.removeEventListener(name, registerInteraction, passiveOptions));
+    events.forEach((name) => window.addEventListener(name, wrappedRegisterInteraction, passiveOptions));
 
     return () => {
-      events.forEach((name) => window.removeEventListener(name, wrappedRegisterInteraction, { passive: true }));
+      events.forEach((name) => window.removeEventListener(name, wrappedRegisterInteraction, passiveOptions));
       window.removeEventListener('adaptive-module-change', handleModuleChange as EventListener);
       window.removeEventListener('adaptive-command-interaction', handleCommandInteraction as EventListener);
     };
@@ -342,8 +349,10 @@ export const AdaptiveAtmosphereProvider = ({ children }: { children: ReactNode }
       window.setTimeout(() => setSystemMood((current) => (current === 'alert' ? 'normal' : current)), 4_000);
     };
 
+    const passiveSyncOptions = { passive: true } as unknown as AddEventListenerOptions;
+
     window.addEventListener('start-sync', handleSyncStart);
-    window.addEventListener('sync-queue-changed', handleSyncStart as EventListener);
+    window.addEventListener('sync-queue-changed', handleSyncStart as EventListener, passiveSyncOptions);
     window.addEventListener('sync-complete', handleSyncComplete);
     window.addEventListener('sync-error', handleSyncError);
 

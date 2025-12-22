@@ -80,20 +80,39 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
     setError('');
     setSuccess('');
 
-    if (password !== confirmPassword) {
+    // Trim inputs
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    const trimmedConfirmPassword = confirmPassword.trim();
+    const trimmedFullName = fullName.trim();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    // Validate full name
+    if (!trimmedFullName) {
+      setError('Full name is required');
+      return;
+    }
+
+    if (trimmedPassword !== trimmedConfirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
     // SECURITY: Enforce strong password
-    if (!isStrongPassword(password)) {
+    if (!isStrongPassword(trimmedPassword)) {
       setError('Password does not meet security requirements');
       return;
     }
 
     setLoading(true);
 
-    const result = await register(email, password, fullName);
+    const result = await register(trimmedEmail, trimmedPassword, trimmedFullName);
 
     if (result.success) {
       setSuccess('Registration successful! Your account is pending verification.');
@@ -116,30 +135,32 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
         <div className="absolute -left-4 -top-6 hidden h-20 w-20 rounded-full bg-emerald-100 md:block" aria-hidden="true" />
         <div className="absolute -right-6 -bottom-8 hidden h-24 w-24 rounded-full bg-emerald-200/80 md:block" aria-hidden="true" />
 
-        <div className="relative overflow-hidden rounded-3xl border border-slate-100 bg-white/95 backdrop-blur-sm shadow-xl px-8 py-10">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-xl mb-4 shadow-lg shadow-emerald-200/60">
-              <UserPlus className="w-8 h-8 text-white" />
+        <div className="relative w-full overflow-hidden rounded-2xl border border-slate-100 bg-white/95 backdrop-blur-sm shadow-xl px-3 py-4 sm:rounded-3xl sm:px-5 sm:py-5 md:px-6 md:py-6">
+          <div className="mb-4 space-y-2 text-center sm:mb-5 sm:space-y-2.5">
+            <div className="inline-flex items-center justify-center h-12 w-12 bg-green-600 rounded-lg shadow-lg shadow-emerald-200/60 sm:h-13 sm:w-13">
+              <UserPlus className="h-6 w-6 text-white sm:h-6.5 sm:w-6.5" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Create Account</h1>
-            <p className="text-slate-600 mt-2">Join NRETech OneHub</p>
+            <div className="space-y-0.5 sm:space-y-1">
+              <h1 className="text-[clamp(1.25rem,3.5vw,2rem)] font-bold text-slate-900 tracking-tight">Create Account</h1>
+              <p className="text-[0.75rem] text-slate-600 sm:text-[0.8125rem] md:text-sm">Join NRETech OneHub</p>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5 md:space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[0.75rem] text-red-700 sm:px-3 sm:py-2 sm:text-[0.8125rem]">
                 {error}
               </div>
             )}
 
             {success && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+              <div className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-[0.75rem] text-green-700 sm:px-3 sm:py-2 sm:text-[0.8125rem]">
                 {success}
               </div>
             )}
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-slate-700">
+            <div className="space-y-1 sm:space-y-1.5">
+              <label className="block text-[0.75rem] font-semibold text-slate-700 sm:text-[0.8125rem]">
                 Full Name
               </label>
               <input
@@ -147,13 +168,13 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
                 placeholder="John Doe"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-slate-700">
+            <div className="space-y-1 sm:space-y-1.5">
+              <label className="block text-[0.75rem] font-semibold text-slate-700 sm:text-[0.8125rem]">
                 Email
               </label>
               <input
@@ -161,13 +182,13 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
                 placeholder="your.email@example.com"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-slate-700">
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="block text-xs font-semibold text-slate-700 sm:text-sm">
                 Password
               </label>
               <input
@@ -177,15 +198,15 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                 required
                 minLength={12}
                 disabled={isCheckingPassword}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 disabled:opacity-50"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 shadow-sm transition sm:rounded-xl sm:px-4 sm:py-3 sm:text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200 disabled:opacity-50"
                 placeholder="••••••••••••"
               />
               {isCheckingPassword && (
-                <p className="mt-2 text-sm text-slate-500 animate-pulse">Checking password security...</p>
+                <p className="mt-1 text-xs text-slate-500 animate-pulse sm:text-sm">Checking password security...</p>
               )}
               {password && (
                 <div
-                  className={`mt-2 rounded-xl border p-3 text-sm ${
+                  className={`mt-2 rounded-lg border p-2 text-xs sm:rounded-xl sm:p-3 sm:text-sm ${
                     passwordIsStrong
                       ? 'border-green-200 bg-green-50 text-green-700'
                       : 'border-yellow-200 bg-yellow-50 text-yellow-700'
@@ -205,12 +226,12 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                   )}
                 </div>
               )}
-              {hibpMessage && <p className="mt-2 text-sm text-emerald-600 font-medium">{hibpMessage}</p>}
-              {hibpError && <p className="mt-2 text-sm text-slate-500">{hibpError}</p>}
+              {hibpMessage && <p className="mt-1 text-xs text-emerald-600 font-medium sm:text-sm">{hibpMessage}</p>}
+              {hibpError && <p className="mt-1 text-xs text-slate-500 sm:text-sm">{hibpError}</p>}
             </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-slate-700">
+            <div className="space-y-1 sm:space-y-1.5">
+              <label className="block text-[0.75rem] font-semibold text-slate-700 sm:text-[0.8125rem]">
                 Confirm Password
               </label>
               <input
@@ -219,7 +240,7 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 minLength={12}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
                 placeholder="••••••••••••"
               />
             </div>
@@ -227,14 +248,14 @@ export const RegisterForm = ({ onSwitchToLogin }: RegisterFormProps) => {
             <button
               type="submit"
               disabled={loading || !passwordIsStrong || !fullName || !email}
-              className="w-full rounded-xl bg-green-600 py-3 text-sm font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg bg-green-600 py-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:py-2 sm:text-[0.8125rem]"
               aria-busy={loading}
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-slate-600">
+          <div className="mt-2.5 text-center text-[0.75rem] text-slate-600 sm:mt-3.5 sm:text-[0.8125rem] md:text-xs">
             <span>Already have an account? </span>
             <button
               onClick={onSwitchToLogin}

@@ -7,14 +7,18 @@
 import CryptoJS from 'crypto-js';
 
 const EMAIL_SERVER_URL = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
-const EMAIL_SERVER_API_KEY = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
 
 async function callEmailServer(path: string, body: Record<string, unknown>) {
-  const url = `${EMAIL_SERVER_URL}${path}`;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (EMAIL_SERVER_API_KEY) {
-    headers['Authorization'] = `Bearer ${EMAIL_SERVER_API_KEY}`;
+  const apiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY;
+  if (!apiKey) {
+    throw new Error('Email server API key is not configured in this environment');
   }
+
+  const url = `${EMAIL_SERVER_URL}${path}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
 
   const res = await fetch(url, {
     method: 'POST',
@@ -42,20 +46,6 @@ export async function encryptData(plainText: string): Promise<string> {
     throw new Error(resp.error || 'Encryption failed');
   }
   return resp.encrypted;
-}
-
-/**
- * Decrypt sensitive data via email server (server-side key)
- */
-export async function decryptData(encryptedText: string): Promise<string> {
-  if (!encryptedText || typeof encryptedText !== 'string') {
-    throw new Error('encryptedText is required');
-  }
-  const resp = await callEmailServer('/api/decrypt-password', { encrypted: encryptedText });
-  if (!resp.success || typeof resp.plainText !== 'string') {
-    throw new Error(resp.error || 'Decryption failed');
-  }
-  return resp.plainText;
 }
 
 /**

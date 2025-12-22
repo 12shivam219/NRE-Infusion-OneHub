@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from 'react';
-import { Bell, Menu as MenuIcon, Mail as MailIcon, Moon, Sun } from 'lucide-react';
+import { Bell, Menu as MenuIcon, Mail as MailIcon, Moon, Sun, LogOut } from 'lucide-react';
 import SyncControls from '../common/SyncControls';
 import { CreateDropdown } from '../common/CreateDropdown';
 import { useLocation } from 'react-router-dom';
@@ -40,7 +40,7 @@ const getPageTitle = (pathname: string) => {
 };
 
 export const Header = memo(({ onMenuClick }: HeaderProps) => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead } = useNotifications();
   const { themeMode, toggleThemeMode } = useThemeMode();
   const { pathname } = useLocation();
@@ -319,6 +319,24 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
             }}
           >
             {themeMode === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </IconButton>
+
+          <IconButton
+            onClick={logout}
+            aria-label="Sign out"
+            sx={{
+              color: '#ff6b6b',
+              borderRadius: 2,
+              backgroundColor: 'rgba(255, 107, 107, 0.08)',
+              transition: 'all 320ms ease',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 107, 107, 0.16)',
+                boxShadow: '0 12px 32px rgba(255, 107, 107, 0.2)',
+              },
+            }}
+            title="Sign out"
+          >
+            <LogOut className="w-5 h-5" />
           </IconButton>
 
           <CreateDropdown

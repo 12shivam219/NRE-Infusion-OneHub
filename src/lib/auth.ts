@@ -91,13 +91,46 @@ export const register = async (
   fullName: string
 ): Promise<AuthResponse> => {
   try {
+    // Trim and validate inputs
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+    const trimmedFullName = fullName.trim();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return { success: false, error: 'Invalid email format' };
+    }
+
+    // Validate full name is not empty
+    if (!trimmedFullName) {
+      return { success: false, error: 'Full name is required' };
+    }
+
+    // Validate password meets minimum requirements
+    if (trimmedPassword.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters' };
+    }
+
+    // Validate password has mixed character types (recommended by Supabase)
+    const hasUpperCase = /[A-Z]/.test(trimmedPassword);
+    const hasLowerCase = /[a-z]/.test(trimmedPassword);
+    const hasNumbers = /\d/.test(trimmedPassword);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(trimmedPassword);
+
+    // At least 2 character types (common requirement)
+    const charTypeCount = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar].filter(Boolean).length;
+    if (charTypeCount < 2) {
+      return { success: false, error: 'Password must contain at least 2 different character types (letters, numbers, symbols)' };
+    }
+
     // Sign up with Supabase Auth (handles password hashing securely server-side)
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
+      email: trimmedEmail,
+      password: trimmedPassword,
       options: {
         data: {
-          full_name: fullName,
+          full_name: trimmedFullName,
         },
       },
     });
@@ -164,12 +197,32 @@ export const login = async (
   password: string
 ): Promise<AuthResponse> => {
   try {
+    // Trim and validate inputs
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return { success: false, error: 'Invalid email format' };
+    }
+
+    // Validate password is not empty
+    if (!trimmedPassword) {
+      return { success: false, error: 'Password is required' };
+    }
+
+    // Validate password meets minimum requirements (Supabase minimum is 6 characters)
+    if (trimmedPassword.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters' };
+    }
+
     const clientInfo = getClientInfo();
 
     // Authenticate with Supabase Auth (server-side password verification with bcrypt)
     const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+      email: trimmedEmail,
+      password: trimmedPassword,
     });
 
     if (signInError) {

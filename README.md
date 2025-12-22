@@ -108,18 +108,20 @@ npm install
 
 Copy the example environment file:
 
-\`\`\`bash
+```bash
 cp .env.example .env
-\`\`\`
+```
 
 Update the `.env` file with your Supabase credentials:
 
-\`\`\`env
+```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_GOOGLE_CLIENT_ID=your_google_client_id (optional)
 VITE_APP_URL=http://localhost:5173
-\`\`\`
+```
+
+> **Security note:** `VITE_`-prefixed variables are embedded in the browser bundle. Do **not** set `VITE_EMAIL_SERVER_API_KEY` (or any sensitive mail credentials) in production builds. Keep the email-server API key server-side only and supply it via backend environment variables.
 
 ### 4. Database Setup
 
@@ -150,31 +152,36 @@ The database schema and storage buckets have already been created via migrations
 
 After starting the application, register a new account. Then, manually update the user's role in Supabase:
 
-\`\`\`sql
+```sql
 UPDATE users
 SET role = 'admin', status = 'approved'
 WHERE email = 'your_email@example.com';
-\`\`\`
+```
 
 ### 6. Run the Development Server
 
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 The application will be available at `http://localhost:5173`
 
 ### 7. Build for Production
 
-\`\`\`bash
+```bash
 npm run build
-\`\`\`
+```
+
+### 9. Production Deployment Checklist
+
+- Ensure the separate email server is configured with `EMAIL_SERVER_API_KEY` (server-only). The frontend should **not** define `VITE_EMAIL_SERVER_API_KEY` in production `.env` files—leaving it unset prevents accidental bundling of the key.
+- Provide Supabase and other public configuration through `VITE_*` vars as usual, but keep secrets (service role keys, encryption master keys, API keys) in backend-only environment variables.
 
 ### 8. Preview Production Build
 
-\`\`\`bash
+```bash
 npm run preview
-\`\`\`
+```
 
 ## User Roles
 

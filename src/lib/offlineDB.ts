@@ -117,10 +117,13 @@ export interface ConflictRecord {
   id: string;
   entityType: string;
   entityId: string;
-  strategy: 'local' | 'remote' | 'merge';
+  strategy: 'local' | 'remote' | 'merge' | 'pending';
   timestamp: number;
   localVersion: Record<string, unknown>;
   remoteVersion: Record<string, unknown>;
+  userResolved?: boolean;
+  resolvedAt?: number;
+  selectedVersion?: 'local' | 'remote';
 }
 
 // Feature 10: Cache Analytics
@@ -512,6 +515,69 @@ export async function clearSyncedItems(): Promise<void> {
 }
 
 /**
+ * Get pending conflicts awaiting user resolution
+ */
+export async function getPendingConflicts(): Promise<ConflictRecord[]> {
+  try {
+    return await db.conflicts
+      .where('strategy')
+      .equals('pending')
+      .toArray();
+  } catch (error) {
+    console.error('Failed to get pending conflicts:', error);
+    return [];
+  }
+}
+
+/**
+ * Resolve a conflict by letting user choose which version to keep
+ * @param conflictId - The conflict ID
+ * @param selectedVersion - Which version to apply: 'local' or 'remote'
+ */
+export async function resolveConflict(conflictId: string, selectedVersion: 'local' | 'remote'): Promise<void> {
+  try {
+    const conflict = await db.conflicts.get(conflictId);
+    if (!conflict) {
+      throw new Error(`Conflict ${conflictId} not found`);
+    }
+
+    // Update the conflict record
+    await db.conflicts.update(conflictId, {
+      strategy: selectedVersion,
+      userResolved: true,
+      resolvedAt: Date.now(),
+      selectedVersion,
+    });
+
+    // Find the sync queue item for this conflict
+    const syncItem = await db.syncQueue
+      .where('entityId')
+      .equals(conflict.entityId)
+      .filter((item: SyncQueueItem) => item.operation === 'UPDATE')
+      .first();
+
+    if (syncItem) {
+      // Update the payload with the selected version
+      const updatedPayload = selectedVersion === 'local' 
+        ? conflict.localVersion 
+        : conflict.remoteVersion;
+
+      await db.syncQueue.update(syncItem.id, {
+        payload: updatedPayload,
+        lastError: undefined,
+        status: 'pending',
+      });
+
+      dispatchSyncQueueChanged();
+      console.log(`Conflict resolved for ${conflict.entityId}: ${selectedVersion} version selected`);
+    }
+  } catch (error) {
+    console.error('Failed to resolve conflict:', error);
+    throw error;
+  }
+}
+
+/**
  * Process pending sync queue items with exponential backoff on failures.
  * Attempts a limited batch and removes successfully-synced items from the queue.
  * Detects and handles conflicts (local vs remote changes).
@@ -552,22 +618,32 @@ export async function processSyncQueue(batchSize: number = 10): Promise<{ proces
 
             // If server was updated AFTER this operation was queued, conflict detected
             if (serverUpdateTime > localUpdateTime) {
-              // Conflict resolution: LOCAL WINS strategy (overwrite server with local)
-              console.warn(`[Conflict Detected] Local change for requirement ${item.entityId} - applying local version`);
+              // IMPROVED: Move conflict to "Conflict State" instead of auto-resolving
+              console.warn(`[Conflict Detected] Local change for requirement ${item.entityId} - moving to pending resolution`);
               
-              // Record conflict for manual review if needed
+              // Store conflict for user review
+              const conflictId = `${item.entityId}-${item.timestamp}`;
               await db.conflicts.put({
-                id: `${item.entityId}-${item.timestamp}`,
+                id: conflictId,
                 entityType: 'requirement',
                 entityId: item.entityId,
-                strategy: 'local',
+                strategy: 'pending',
                 timestamp: Date.now(),
                 localVersion: item.payload,
                 remoteVersion: serverData as Record<string, unknown>,
+                userResolved: false,
               });
 
               conflicts++;
-              // Continue with local version (overwrite)
+              
+              // Mark sync queue item as pending user resolution instead of failing
+              await db.syncQueue.update(item.id, {
+                status: 'pending',
+                lastError: 'Conflict detected - awaiting user resolution',
+              });
+              
+              dispatchSyncQueueChanged();
+              continue; // Skip the operation execution, wait for user resolution
             }
           }
         }
@@ -894,20 +970,6 @@ export async function getUnresolvedConflicts(): Promise<ConflictRecord[]> {
   } catch (error) {
     console.error('Failed to get conflicts:', error);
     return [];
-  }
-}
-
-/**
- * Resolve a conflict
- */
-export async function resolveConflict(
-  conflictId: string,
-  strategy: 'local' | 'remote' | 'merge'
-): Promise<void> {
-  try {
-    await db.conflicts.update(conflictId, { strategy });
-  } catch (error) {
-    console.error('Failed to resolve conflict:', error);
   }
 }
 
