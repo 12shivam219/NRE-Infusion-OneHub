@@ -53,7 +53,6 @@ const AppContent = () => {
   const location = useLocation();
   const [isCommandVisible, setCommandVisible] = useState(false);
   const isInitializedRef = useRef(false);
-  const userLoggedInRef = useRef(false);
   const { setTheme, clearPreview, theme } = useThemeSync();
   const commandSectionRef = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -119,17 +118,6 @@ const AppContent = () => {
     }
   }, [shouldReduceMotion]);
 
-  // Show command center when user logs in for the first time
-  useEffect(() => {
-    if (user && !userLoggedInRef.current) {
-      userLoggedInRef.current = true;
-      // Fix: Wrap in setTimeout to avoid synchronous setState warning
-      const timer = setTimeout(() => {
-        setCommandVisible(true);
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [user]);
 
   // Listen for offline mode activation and show toast notification
   const handleOfflineActivation = useCallback(() => {

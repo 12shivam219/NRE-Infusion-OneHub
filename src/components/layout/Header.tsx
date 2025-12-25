@@ -1,6 +1,6 @@
 import { useState, useCallback, memo } from 'react';
 import { Bell, Menu as MenuIcon, Mail as MailIcon, Moon, Sun, LogOut } from 'lucide-react';
-import SyncControls from '../common/SyncControls';
+import SyncStatusBadge from '../common/SyncStatusBadge';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -92,37 +92,50 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
           transition: 'padding 300ms ease, min-height 300ms ease',
         }}
       >
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
-          {onMenuClick ? (
-            <IconButton
-              onClick={onMenuClick}
-              aria-label="Toggle menu"
-              sx={{
-                display: { xs: 'inline-flex', md: 'none' },
-                color: 'rgba(255,255,255,0.82)',
-                borderRadius: 2,
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                transition: 'all 320ms ease',
-                '&:hover': {
-                  color: accent,
-                  backgroundColor: accentSoft,
-                  boxShadow: `0 16px 36px ${accentGlow}`,
-                },
-              }}
-            >
-              <MenuIcon className="w-6 h-6" />
-            </IconButton>
-          ) : null}
-
+        {/* Container with max-width for centered layout */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            width: '100%',
+            maxWidth: '1440px',
+            margin: '0 auto',
+            gap: { xs: 1, sm: 2, md: 3 },
+            alignItems: 'center',
+          }}
+        >
+          {/* LEFT SECTION: Branding */}
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: { xs: 1.5, sm: 2.5 },
+              gap: { xs: 1.5, sm: 2 },
               minWidth: 0,
-              flex: 1,
+              flexShrink: 0,
             }}
           >
+            {onMenuClick ? (
+              <IconButton
+                onClick={onMenuClick}
+                aria-label="Toggle menu"
+                sx={{
+                  display: { xs: 'inline-flex', md: 'none' },
+                  color: 'rgba(255,255,255,0.82)',
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  transition: 'all 320ms ease',
+                  '&:hover': {
+                    color: accent,
+                    backgroundColor: accentSoft,
+                    boxShadow: `0 16px 36px ${accentGlow}`,
+                  },
+                }}
+              >
+                <MenuIcon className="w-6 h-6" />
+              </IconButton>
+            ) : null}
+
+            {/* Logo - Icon on mobile, Horizontal on desktop */}
             <Box
               sx={{
                 display: { xs: 'flex', sm: 'none' },
@@ -149,148 +162,225 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
               />
             </Box>
 
-            <Box sx={{ minWidth: 0 }}>
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                fontWeight: 700,
-                lineHeight: 1.1,
-                fontFamily: '"Poppins", sans-serif',
-                letterSpacing: '-0.015em',
-                color: accent,
-                fontSize: { xs: '1.125rem', sm: '1.25rem' },
-                textShadow: `0 0 18px ${accentGlow}`,
-                position: 'relative',
-                transition: 'color 320ms ease, text-shadow 320ms ease',
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  left: 0,
-                  bottom: -6,
-                  width: '28%',
-                  height: '2px',
-                  borderRadius: '999px',
-                  background: `linear-gradient(90deg, ${accent}, transparent)`
-                }
-              }} 
-              noWrap
-            >
-              {title}
-            </Typography>
-            {user && (
-              <Typography 
-                variant="caption" 
-                noWrap 
+            {/* Vertical Divider */}
+            <Divider
+              orientation="vertical"
+              sx={{
+                display: { xs: 'none', sm: 'block' },
+                height: 28,
+                alignSelf: 'center',
+                borderColor: 'rgba(255, 255, 255, 0.12)',
+              }}
+            />
+
+            {/* Page Title */}
+            <Box sx={{ minWidth: 0, flexShrink: 0 }}>
+              <Typography
+                variant="h6"
                 sx={{
-                  color: 'rgba(255, 255, 255, 0.72)',
-                  fontSize: '0.75rem',
-                  fontFamily: '"Inter", sans-serif',
-                  transition: 'color 320ms ease',
+                  fontWeight: 700,
+                  lineHeight: 1.1,
+                  fontFamily: '"Poppins", sans-serif',
+                  letterSpacing: '-0.015em',
+                  color: accent,
+                  fontSize: { xs: '1.125rem', sm: '1.25rem' },
+                  textShadow: `0 0 18px ${accentGlow}`,
+                  position: 'relative',
+                  transition: 'color 320ms ease, text-shadow 320ms ease',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    left: 0,
+                    bottom: -6,
+                    width: '28%',
+                    height: '2px',
+                    borderRadius: '999px',
+                    background: `linear-gradient(90deg, ${accent}, transparent)`
+                  }
                 }}
+                noWrap
               >
-                Signed in as <Box component="strong" sx={{ color: accent, fontWeight: 600, transition: 'color 320ms ease' }}>{user.full_name}</Box>
+                {title}
               </Typography>
-            )}
             </Box>
           </Box>
-        </Stack>
 
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          {/* CRM Toolbar removed */}
-
-          <SyncControls />
-
-          <IconButton
-            onClick={handleNotificationsOpen}
-            aria-label="Notifications"
+          {/* CENTER SECTION: Spacer */}
+          <Box
             sx={{
-              color: '#FFFFFF',
-              borderRadius: 2,
-              backgroundColor: 'rgba(255,255,255,0.08)',
-              transition: 'all 320ms ease',
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.16)',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-              },
+              flex: 1,
+              minWidth: 0,
+              display: { xs: 'none', md: 'block' },
+            }}
+          />
+
+          {/* RIGHT SECTION: Controls & User Info */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+              gap: { xs: 1, sm: 1.5 },
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              flexShrink: 0,
             }}
           >
-            <Badge
-              color="warning"
-              badgeContent={unreadCount > 9 ? '9+' : unreadCount}
-              invisible={unreadCount === 0}
+            {/* Group A: Sync Status Badge */}
+            <SyncStatusBadge />
+
+            {/* Group B: Actions (Bell, Bulk Email) */}
+            <Box
               sx={{
-                '& .MuiBadge-badge': {
-                  backgroundColor: '#FFFFFF',
-                  color: '#11161F',
-                  fontWeight: 700,
-                },
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
               }}
             >
-              <Bell className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
-            </Badge>
-          </IconButton>
+              <IconButton
+                onClick={handleNotificationsOpen}
+                aria-label="Notifications"
+                sx={{
+                  color: '#FFFFFF',
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  transition: 'all 320ms ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.16)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                  },
+                }}
+              >
+                <Badge
+                  color="warning"
+                  badgeContent={unreadCount > 9 ? '9+' : unreadCount}
+                  invisible={unreadCount === 0}
+                  sx={{
+                    '& .MuiBadge-badge': {
+                      backgroundColor: '#FFFFFF',
+                      color: '#11161F',
+                      fontWeight: 700,
+                    },
+                  }}
+                >
+                  <Bell className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
+                </Badge>
+              </IconButton>
 
-          <IconButton
-            onClick={handleBulkEmailOpen}
-            aria-label="Open bulk email composer"
-            sx={{
-              color: '#FFFFFF',
-              borderRadius: 2,
-              backgroundColor: 'rgba(255,255,255,0.08)',
-              transition: 'all 320ms ease',
-              px: { xs: 2.5, sm: 3 },
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.16)',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-              },
-              gap: 1,
-            }}
-          >
-            <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, fontWeight: 600, fontSize: '0.875rem' }}>
-              Bulk Email
+              <IconButton
+                onClick={handleBulkEmailOpen}
+                aria-label="Open bulk email composer"
+                sx={{
+                  color: '#FFFFFF',
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  transition: 'all 320ms ease',
+                  px: { xs: 2.5, sm: 3 },
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.16)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                  },
+                  gap: 1,
+                }}
+              >
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, fontWeight: 600, fontSize: '0.875rem' }}>
+                  Bulk Email
+                </Box>
+                <MailIcon className="h-5 w-5" />
+              </IconButton>
             </Box>
-            <MailIcon className="h-5 w-5" />
-          </IconButton>
 
-          <IconButton
-            onClick={toggleThemeMode}
-            aria-label="Toggle theme"
-            sx={{
-              color: '#FFFFFF',
-              borderRadius: 2,
-              backgroundColor: 'rgba(255,255,255,0.08)',
-              transition: 'all 320ms ease',
-              '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.16)',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-              },
-            }}
-          >
-            {themeMode === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </IconButton>
+            {/* Group C: User & Settings (Theme Toggle, User Info, Logout) */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                paddingLeft: 1.5,
+                borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
+              }}
+            >
+              <IconButton
+                onClick={toggleThemeMode}
+                aria-label="Toggle theme"
+                sx={{
+                  color: '#FFFFFF',
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  transition: 'all 320ms ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.16)',
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                  },
+                }}
+              >
+                {themeMode === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </IconButton>
 
-          <IconButton
-            onClick={logout}
-            aria-label="Sign out"
-            sx={{
-              color: '#ff6b6b',
-              borderRadius: 2,
-              backgroundColor: 'rgba(255, 107, 107, 0.08)',
-              transition: 'all 320ms ease',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 107, 107, 0.16)',
-                boxShadow: '0 12px 32px rgba(255, 107, 107, 0.2)',
-              },
-            }}
-            title="Sign out"
-          >
-            <LogOut className="w-5 h-5" />
-          </IconButton>
+              {/* User Info - Hidden on mobile, shown on tablet+ */}
+              {user && (
+                <Box
+                  sx={{
+                    display: { xs: 'none', sm: 'flex' },
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    minWidth: 0,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    noWrap
+                    sx={{
+                      color: 'rgba(255, 255, 255, 0.72)',
+                      fontSize: '0.7rem',
+                      fontFamily: '"Inter", sans-serif',
+                      transition: 'color 320ms ease',
+                    }}
+                  >
+                    Signed in as
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    noWrap
+                    sx={{
+                      color: accent,
+                      fontWeight: 600,
+                      fontSize: '0.75rem',
+                      fontFamily: '"Poppins", sans-serif',
+                      transition: 'color 320ms ease',
+                      textShadow: `0 0 12px ${accentGlow}`,
+                    }}
+                  >
+                    {user.full_name}
+                  </Typography>
+                </Box>
+              )}
+
+              <IconButton
+                onClick={logout}
+                aria-label="Sign out"
+                sx={{
+                  color: '#ff6b6b',
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255, 107, 107, 0.08)',
+                  transition: 'all 320ms ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 107, 107, 0.16)',
+                    boxShadow: '0 12px 32px rgba(255, 107, 107, 0.2)',
+                  },
+                }}
+                title="Sign out"
+              >
+                <LogOut className="w-5 h-5" />
+              </IconButton>
+            </Box>
+          </Box>
+        </Box>
 
           <Menu
             anchorEl={notificationsAnchorEl}
             open={Boolean(notificationsAnchorEl)}
             onClose={handleNotificationsClose}
+            disableScrollLock={true}
             PaperProps={{
               sx: {
                 width: 360,
@@ -400,7 +490,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
               ))
             )}
           </Menu>
-        </Stack>
       </Toolbar>
     </AppBar>
   );

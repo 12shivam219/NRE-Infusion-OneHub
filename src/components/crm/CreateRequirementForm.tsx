@@ -318,7 +318,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
       <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
+        <Typography sx={{ fontWeight: 800 }}>
           Create New Requirement
         </Typography>
         <IconButton

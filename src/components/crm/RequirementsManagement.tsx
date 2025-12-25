@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo, lazy } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, lazy, useRef } from 'react';
 
 import { Plus, Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
@@ -19,13 +19,13 @@ import { processSyncQueue } from '../../lib/offlineDB';
 import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
 import Button from '@mui/material/Button';
-import ClickAwayListener from '@mui/material/ClickAwayListener';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
@@ -247,76 +247,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
 
   const toolbar = (
     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-      <Box
-        sx={{
-          flex: { xs: 1, sm: isSearchOpen ? 1 : 'unset' },
-          minWidth: { xs: '100%', sm: isSearchOpen ? 280 : 'unset' },
-        }}
-      >
-        <ClickAwayListener
-          onClickAway={() => {
-            if (!searchTerm) {
-              setIsSearchOpen(false);
-            }
-          }}
-        >
-          <Box>
-            {!isSearchOpen ? (
-              <CollapsedSearchButton
-                onClick={() => setIsSearchOpen(true)}
-                aria-label="Open search"
-                title="Search"
-              >
-                <SearchIcon fontSize="small" />
-              </CollapsedSearchButton>
-            ) : (
-              <Search sx={{ maxWidth: { xs: '100%', sm: 560 } }}>
-                <SearchIconWrapper>
-                  <SearchIcon fontSize="small" />
-                </SearchIconWrapper>
-                <StyledInputBase
-                  inputRef={searchInputRef}
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    handleDebouncedSearch(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }
-                    if (e.key === 'Escape' && !searchTerm) {
-                      setIsSearchOpen(false);
-                    }
-                  }}
-                  placeholder="Search..."
-                  inputProps={{
-                    'aria-label': 'Search requirements',
-                  }}
-                />
-
-                <SearchClearWrapper>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      if (searchTerm) {
-                        setSearchTerm('');
-                        setDebouncedValue('');
-                      }
-                      setIsSearchOpen(false);
-                    }}
-                    aria-label={searchTerm ? 'Clear search' : 'Close search'}
-                    title={searchTerm ? 'Clear search' : 'Close search'}
-                  >
-                    <X className="w-5 h-5" />
-                  </IconButton>
-                </SearchClearWrapper>
-              </Search>
-            )}
-          </Box>
-        </ClickAwayListener>
-      </Box>
+      <Box sx={{ flex: { xs: 1, sm: 'unset' } }} />
       <Button
         variant="outlined"
         color="inherit"
@@ -336,6 +267,77 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
         Create Requirement
       </BrandButton>
     </Stack>
+  );
+
+  const tableSearch = (
+    <ClickAwayListener
+      onClickAway={() => {
+        if (!searchTerm) setIsSearchOpen(false);
+      }}
+    >
+      <Box>
+        {!isSearchOpen ? (
+          <CollapsedSearchButton
+            onClick={() => {
+              setIsSearchOpen(true);
+              // focus after opening
+              setTimeout(() => searchInputRef.current?.focus(), 0);
+            }}
+            aria-label="Open search"
+            title="Search"
+          >
+            <SearchIcon fontSize="small" />
+          </CollapsedSearchButton>
+        ) : (
+          <Search role="search" aria-label="Search requirements" sx={{ maxWidth: { xs: '100%', sm: 520 }, width: '100%' }}>
+            <SearchIconWrapper>
+              <SearchIcon fontSize="small" />
+            </SearchIconWrapper>
+            <StyledInputBase
+              inputRef={searchInputRef}
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                handleDebouncedSearch(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+                if (e.key === 'Escape') {
+                  if (searchTerm) {
+                    setSearchTerm('');
+                    setDebouncedValue('');
+                  }
+                  searchInputRef.current?.blur();
+                }
+              }}
+              placeholder="Search..."
+              inputProps={{
+                'aria-label': 'Search requirements',
+              }}
+            />
+
+            <SearchClearWrapper>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  if (searchTerm) {
+                    setSearchTerm('');
+                    setDebouncedValue('');
+                  }
+                }}
+                aria-label={searchTerm ? 'Clear search' : 'Close search'}
+                title={searchTerm ? 'Clear search' : 'Close search'}
+              >
+                <X className="w-5 h-5" />
+              </IconButton>
+            </SearchClearWrapper>
+          </Search>
+        )}
+      </Box>
+    </ClickAwayListener>
   );
 
   useEffect(() => {
@@ -1085,6 +1087,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
           onCreateInterview={onCreateInterview}
           onDelete={handleDeleteClick}
           statusColors={statusColors}
+          headerSearch={tableSearch}
           isAdmin={isAdmin}
           serverSortField={sortBy === 'date' ? 'created_at' : sortBy}
           serverSortOrder={sortOrder}

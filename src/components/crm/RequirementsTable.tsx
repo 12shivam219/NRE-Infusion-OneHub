@@ -34,6 +34,7 @@ interface RequirementsTableProps {
   hasNextPage: boolean;
   isFetchingPage: boolean;
   onPageChange: (page: number) => void;
+  headerSearch?: JSX.Element | null;
 }
 
 const statusColorMap: Record<RequirementStatus, { bg: string; text: string; border: string; dot: string }> = {
@@ -248,6 +249,7 @@ export const RequirementsTable = memo(({
   hasNextPage,
   isFetchingPage,
   onPageChange,
+  headerSearch,
 }: RequirementsTableProps) => {
   // State for table functionality
   const sortField: SortField = 'created_at';
@@ -338,7 +340,14 @@ export const RequirementsTable = memo(({
       }}
     >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-[color:var(--gold)] border-opacity-10 bg-[color:var(--darkbg-surface)]">
-        <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">Results</h3>
+        <div className="flex items-center w-full gap-3 relative">
+          <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">Results</h3>
+          <div className="flex-1 mt-2 sm:mt-0 relative">
+            <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
+              {headerSearch ?? null}
+            </div>
+          </div>
+        </div>
         <div className="flex items-center space-x-2 mt-2 sm:mt-0">
           <span className="text-xs font-body text-[color:var(--text-secondary)]">Page: {page + 1}</span>
           <span className="text-xs font-body text-[color:var(--text-secondary)]">|</span>
