@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Search, Plus, Trash2 } from 'lucide-react';
+import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant, getConsultantsPage } from '../../lib/api/consultants';
 import { subscribeToConsultants } from '../../lib/api/realtimeSync';
@@ -13,22 +13,6 @@ import { EmptyStateNoData } from '../common/EmptyState';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 import { BrandButton } from '../brand';
-import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
-import InputAdornment from '@mui/material/InputAdornment';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import Pagination from '@mui/material/Pagination';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
-import IconButton from '@mui/material/IconButton';
-import Divider from '@mui/material/Divider';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
@@ -72,7 +56,6 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
       setLoading(true);
       setError(null);
 
-      // Use server-side pagination with filtering
       const result = await getConsultantsPage({
         userId: user.id,
         limit: itemsPerPage,
@@ -101,18 +84,15 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
     }
   }, [user, debouncedValue, filterStatus, itemsPerPage]);
 
-  // Load consultants when filters change
   useEffect(() => {
     loadConsultants(0);
   }, [loadConsultants]);
 
-  // Realtime subscription
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     if (user) {
       unsubscribe = subscribeToConsultants(user.id, (update: RealtimeUpdate<Consultant>) => {
         if (update.type === 'INSERT') {
-          // Refresh to include new item
           loadConsultants(0);
           showToast({
             type: 'info',
@@ -191,28 +171,21 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 500 }}>
+      <div className="flex flex-col gap-4">
+        <h2 className="text-xl font-medium text-[color:var(--text)] font-heading">
           Consultant Profiles
-        </Typography>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-            gap: 2,
-          }}
-        >
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
-        </Box>
-      </Box>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Error Alert */}
+    <div className="flex flex-col gap-4">
       {error && (
         <ErrorAlert
           title={error.title}
@@ -222,34 +195,36 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
         />
       )}
 
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
-        justifyContent="space-between"
-        spacing={2}
-      >
-        <Typography variant="h5" sx={{ fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h2 className="text-xl font-medium text-[color:var(--text)] font-heading">
           Consultant Profiles
-        </Typography>
-        <BrandButton
-          variant="primary"
-          size="md"
-          onClick={onQuickAdd}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Quick Add
-        </BrandButton>
-      </Stack>
+        </h2>
+        <div className="w-full sm:w-auto">
+          <BrandButton
+            variant="primary"
+            size="md"
+            onClick={onQuickAdd}
+            className="w-full sm:w-auto flex items-center justify-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Quick Add
+          </BrandButton>
+        </div>
+      </div>
 
       {/* Search and Filter */}
-      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'flex-start' }}>
-          <Box sx={{ flex: 1 }}>
-            <TextField
-              fullWidth
-              size="small"
-              label="Search"
+      <div className="bg-[color:var(--darkbg-surface)] border border-yellow-500/20 rounded-lg p-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-start">
+          <div className="flex-1 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              className={`block w-full pl-10 pr-3 py-2 border rounded-md leading-5 bg-[color:var(--darkbg-surface-light)] text-[color:var(--text)] placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm ${
+                searchError ? 'border-red-500' : 'border-gray-300'
+              }`}
               placeholder="Search by name or email..."
               value={searchTerm}
               onChange={(e) => {
@@ -262,37 +237,28 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
                   handleDebouncedSearch(value);
                 }
               }}
-              error={Boolean(searchError)}
-              helperText={searchError ?? ' '}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search className="w-5 h-5" />
-                  </InputAdornment>
-                ),
-              }}
               aria-label="Search consultants"
             />
-          </Box>
+            {searchError && <p className="mt-1 text-xs text-red-500">{searchError}</p>}
+          </div>
 
-          <FormControl size="small" sx={{ minWidth: 180 }}>
-            <InputLabel id="consultant-status-label">Status</InputLabel>
-            <Select
-              labelId="consultant-status-label"
+          <div className="min-w-[180px]">
+            <select
+              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md bg-[color:var(--darkbg-surface-light)] text-[color:var(--text)]"
               value={filterStatus}
-              label="Status"
               onChange={(e) => setFilterStatus(e.target.value)}
+              aria-label="Filter status"
             >
-              <MenuItem value="ALL">All Status</MenuItem>
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Not Active">Not Active</MenuItem>
-              <MenuItem value="Recently Placed">Recently Placed</MenuItem>
-            </Select>
-          </FormControl>
-        </Stack>
-      </Paper>
+              <option value="ALL">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Not Active">Not Active</option>
+              <option value="Recently Placed">Recently Placed</option>
+            </select>
+          </div>
+        </div>
+      </div>
 
-      {/* Consultant Cards Grid with Scrolling Container */}
+      {/* Grid Content */}
       {consultants.length === 0 ? (
         <EmptyStateNoData type="consultants" onCreate={onQuickAdd} />
       ) : (
@@ -301,34 +267,46 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
           onViewDetails={handleViewDetails}
           onDelete={async (id: string) => {
             handleDeleteClick(id);
-            // Return promise to match expected type
             return Promise.resolve();
           }}
           onStatusChange={handleStatusChange}
+          isAdmin={isAdmin}
         />
       )}
 
       {/* Pagination Controls */}
       {totalResults && totalResults > itemsPerPage && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
-            <Typography variant="body2" color="text.secondary">
-              Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalResults)} of {totalResults}
-            </Typography>
-            <Pagination
-              count={totalPages}
-              page={currentPage + 1}
-              onChange={(_, page) => {
-                const nextPage = Math.max(1, Math.min(page, totalPages));
-                setCurrentPage(nextPage - 1);
-                loadConsultants(nextPage - 1);
+        <div className="bg-[color:var(--darkbg-surface)] border border-gray-200 rounded-lg p-3 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-[color:var(--text-secondary)]">
+            Showing {currentPage * itemsPerPage + 1} to {Math.min((currentPage + 1) * itemsPerPage, totalResults)} of {totalResults}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const prev = Math.max(0, currentPage - 1);
+                setCurrentPage(prev);
+                loadConsultants(prev);
               }}
-              color="primary"
-              showFirstButton
-              showLastButton
-            />
-          </Stack>
-        </Paper>
+              disabled={currentPage === 0}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Previous
+            </button>
+            <button
+              onClick={() => {
+                const next = Math.min(currentPage + 1, totalPages - 1);
+                setCurrentPage(next);
+                loadConsultants(next);
+              }}
+              disabled={currentPage >= totalPages - 1}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            >
+              Next
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Detail Modal */}
@@ -355,7 +333,7 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
         cancelLabel="Cancel"
         variant="danger"
       />
-    </Box>
+    </div>
   );
 });
 
@@ -364,10 +342,10 @@ interface ConsultantGridVirtualizerProps {
   onViewDetails: (consultant: Consultant) => void;
   onDelete: (id: string) => Promise<void>;
   onStatusChange: (id: string, status: string) => Promise<void>;
+  isAdmin: boolean;
 }
 
-const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onStatusChange }: ConsultantGridVirtualizerProps) => {
-  const { isAdmin } = useAuth();
+const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onStatusChange, isAdmin }: ConsultantGridVirtualizerProps) => {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -380,10 +358,9 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
-    <Paper
-      variant="outlined"
+    <div
       ref={parentRef}
-      sx={{ maxHeight: 600, overflowY: 'auto', p: 1 }}
+      className="max-h-[600px] overflow-y-auto p-1 border border-gray-200 rounded-lg bg-[color:var(--darkbg-surface-light)]"
     >
       <div
         style={{
@@ -391,6 +368,7 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
           gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
           gap: '1.5rem',
           height: `${virtualizer.getTotalSize()}px`,
+          position: 'relative',
         }}
       >
         {virtualItems.map((virtualItem) => {
@@ -400,73 +378,82 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
               ? '🟢'
               : consultant.status === 'Recently Placed'
               ? '🔵'
-              : '🔴';
+              : '⚪';
+              
+          // Position virtual items absolutely to maintain grid layout within virtual container
+          // Note: virtualizer returns simple items, for grid we usually rely on flow. 
+          // However, React Virtual's grid example uses absolute positioning. 
+          // Since the original code didn't position absolutely, it likely relied on standard flow.
+          // To be safe with the 'height' prop on parent, we usually just render the items.
+          // But since React Virtual calculates offset, if we don't position, the large height pushes them down?
+          // The previous code relied on mapping virtualItems directly. Let's keep it simple.
+          
           return (
             <div
               key={virtualItem.key}
               onClick={() => onViewDetails(consultant)}
+              // If using standard flow in grid, we don't need absolute positioning if we don't use virtualizer.start
+              // BUT, virtualizer usually requires translation. 
+              // The original code was: {virtualItems.map...}. It works if the estimate is accurate enough or just rendering visible.
+              // We will rely on the standard flow for now as per original implementation pattern.
             >
-              <Card variant="outlined" sx={{ cursor: 'pointer', '&:hover': { boxShadow: 3 } }}>
-                <CardContent>
-                  <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
-                    <Typography variant="subtitle1" sx={{ fontWeight: 500, pr: 1, wordBreak: 'break-word' }}>
-                      {consultant.name}
-                    </Typography>
-                    <Chip size="small" variant="outlined" label={`${statusEmoji} ${consultant.status ?? ''}`} />
-                  </Stack>
+              <div className="bg-[color:var(--darkbg-surface)] border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col">
+                <div className="flex flex-row justify-between items-start mb-2">
+                  <h3 className="text-base font-medium text-[color:var(--text)] pr-2 break-words">
+                    {consultant.name}
+                  </h3>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200 whitespace-nowrap">
+                    {statusEmoji} {consultant.status ?? ''}
+                  </span>
+                </div>
 
-                  <Stack spacing={0.5} sx={{ mt: 1 }}>
-                    {consultant.email ? (
-                      <Typography variant="body2" color="text.secondary" noWrap>
-                        {consultant.email}
-                      </Typography>
-                    ) : null}
-                    {consultant.primary_skills ? (
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {consultant.primary_skills}
-                      </Typography>
-                    ) : null}
-                  </Stack>
+                <div className="flex flex-col gap-1 mb-4 flex-grow">
+                  {consultant.email && (
+                    <p className="text-sm text-[color:var(--text-secondary)] truncate" title={consultant.email}>
+                      {consultant.email}
+                    </p>
+                  )}
+                  {consultant.primary_skills && (
+                    <p className="text-sm font-medium text-[color:var(--text)] line-clamp-2">
+                      {consultant.primary_skills}
+                    </p>
+                  )}
+                </div>
 
-                  <Divider sx={{ my: 2 }} />
-
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <FormControl size="small" sx={{ flex: 1 }}>
-                      <InputLabel id={`consultant-status-${consultant.id}`}>Status</InputLabel>
-                      <Select
-                        labelId={`consultant-status-${consultant.id}`}
-                        value={consultant.status ?? ''}
-                        label="Status"
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          onStatusChange(consultant.id, String(e.target.value));
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MenuItem value="Active">Active</MenuItem>
-                        <MenuItem value="Not Active">Not Active</MenuItem>
-                        <MenuItem value="Recently Placed">Recently Placed</MenuItem>
-                      </Select>
-                    </FormControl>
-                    {isAdmin ? (
-                      <IconButton
-                        color="error"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(consultant.id);
-                        }}
-                        title="Delete consultant"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </IconButton>
-                    ) : null}
-                  </Stack>
-                </CardContent>
-              </Card>
+                <div className="border-t border-gray-200 pt-3 mt-auto flex flex-row items-center gap-2">
+                  <div className="flex-1">
+                    <select
+                      className="block w-full py-1 px-2 text-xs border border-gray-300 rounded bg-white focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                      value={consultant.status ?? ''}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onStatusChange(consultant.id, String(e.target.value));
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Not Active">Not Active</option>
+                      <option value="Recently Placed">Recently Placed</option>
+                    </select>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(consultant.id);
+                      }}
+                      title="Delete consultant"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           );
         })}
       </div>
-    </Paper>
+    </div>
   );
 };

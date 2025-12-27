@@ -337,20 +337,45 @@ async function getCampaignRecord(id) {
 }
 
 // Background worker function - processes emails asynchronously and persists status to Supabase
-async function processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts) {
+async function processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts, recipientAccountMap = {}) {
   // mark started
   console.log(`[processBulkEmails] Starting campaign ${campaignId} with ${emails.length} emails`);
   console.log(`[processBulkEmails] Using ${accounts.length} email account(s):`, accounts.map(a => a.email).join(', '));
   await updateCampaignRecord(campaignId, { status: 'processing', started_at: new Date().toISOString() });
 
+  // Normalize recipient->account map keys and account emails for case-insensitive lookup
+  const normalizedRecipientMap = {};
+  for (const [k, v] of Object.entries(recipientAccountMap || {})) {
+    if (typeof k === 'string' && k.trim()) {
+      normalizedRecipientMap[k.toLowerCase()] = (v || '').toLowerCase();
+    }
+  }
+
+  // Map account email -> account object for quick lookup
+  const accountEmailMap = new Map();
+  for (const acc of accounts) {
+    if (acc && acc.email) accountEmailMap.set(acc.email.toLowerCase(), acc);
+  }
+
   for (let i = 0; i < emails.length; i++) {
     const recipient = emails[i];
+    const recipientEmail = typeof recipient === 'string' ? recipient : (recipient.email || '').toString();
 
-    // Distribute emails across selected accounts (round-robin)
-    // If only 1 account selected, use it for all emails
-    // If multiple accounts selected, rotate through them
-    const accountIndex = accounts.length > 1 ? i % accounts.length : 0;
-    const account = accounts[accountIndex];
+    // If recipient is explicitly assigned to an account, use that account
+    const mappedAccountEmail = normalizedRecipientMap[recipientEmail.toLowerCase()];
+    let account;
+    if (mappedAccountEmail && accountEmailMap.has(mappedAccountEmail)) {
+      account = accountEmailMap.get(mappedAccountEmail);
+      if (NODE_ENV === 'development') {
+        console.log(`[processBulkEmails] Recipient ${recipientEmail} assigned to ${mappedAccountEmail}`);
+      }
+    } else {
+      // Distribute emails across selected accounts (round-robin)
+      // If only 1 account selected, use it for all emails
+      // If multiple accounts selected, rotate through them
+      const accountIndex = accounts.length > 1 ? i % accounts.length : 0;
+      account = accounts[accountIndex];
+    }
 
     try {
       const sanitizedBody = sanitizeHtml(body, SANITIZE_OPTIONS);
@@ -483,7 +508,7 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
 // Bulk send emails with rotation - returns immediately with 202 Accepted
 app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req, res) => {
   try {
-    const { emails, subject, body, rotationConfig, selectedAccountIds = [] } = req.body;
+    const { emails, subject, body, rotationConfig, selectedAccountEmails = [], selectedAccountIds = [], recipientAccountMap = {} } = req.body;
 
     // SECURITY: Validate inputs
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
@@ -523,10 +548,21 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
       });
     }
 
-    // Filter accounts based on selectedAccountIds if provided
-    const selectedAccounts = selectedAccountIds.length > 0
-      ? allAccounts.filter(acc => selectedAccountIds.includes(acc.id))
-      : allAccounts;
+    // Filter accounts based on selectedAccountEmails or selectedAccountIds
+    // First try selectedAccountEmails (new format), fall back to selectedAccountIds for backwards compatibility
+    let selectedAccounts = allAccounts;
+    
+    if (selectedAccountEmails.length > 0) {
+      // Filter by email addresses (new approach - more reliable)
+      selectedAccounts = allAccounts.filter(acc => 
+        selectedAccountEmails.some(email => 
+          email.toLowerCase() === acc.email.toLowerCase()
+        )
+      );
+    } else if (selectedAccountIds.length > 0) {
+      // Fall back to filtering by IDs if present (legacy support)
+      selectedAccounts = allAccounts.filter(acc => selectedAccountIds.includes(acc.id));
+    }
 
     if (selectedAccounts.length === 0) {
       return res.status(400).json({
@@ -536,7 +572,7 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
     }
 
     console.log(`[/api/send-bulk-emails] Using ${selectedAccounts.length} selected account(s) out of ${allAccounts.length} available`);
-    selectedAccounts.forEach(acc => console.log(`  - ${acc.email} (id: ${acc.id})`));
+    selectedAccounts.forEach(acc => console.log(`  - ${acc.email} (index: ${acc.index})`));
 
     // Generate unique campaign ID
     const campaignId = generateCampaignId();
@@ -576,7 +612,7 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
     });
 
     // Process emails in background (no await - fire and forget)
-    processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, selectedAccounts).catch(
+    processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, selectedAccounts, recipientAccountMap).catch(
       error => console.error(`Error processing campaign ${campaignId}:`, error)
     );
   } catch (error) {

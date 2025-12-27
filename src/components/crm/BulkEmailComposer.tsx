@@ -3,6 +3,7 @@ import { Send, Mail as MailIcon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { LogoLoader } from '../common/LogoLoader';
+import { parseEmailList, deduplicateEmails } from '../../lib/emailParser';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -97,16 +98,10 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
   }, []);
 
   const parseRecipients = (text: string) => {
-    const lines = text.trim().split('\n');
-    const parsed = lines.map((line) => {
-      const [email, ...nameParts] = line.split(',').map((s) => s.trim());
-      return {
-        email: email,
-        name: nameParts.length > 0 ? nameParts.join(',') : undefined,
-      };
-    }).filter((r) => r.email && r.email.includes('@'));
-
-    return parsed;
+    // Use robust email parser that handles various formats
+    const parsedEmails = parseEmailList(text);
+    // Deduplicate by email address (case-insensitive)
+    return deduplicateEmails(parsedEmails);
   };
 
   const handleParseRecipients = () => {

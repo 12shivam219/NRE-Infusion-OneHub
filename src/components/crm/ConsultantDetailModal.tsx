@@ -179,10 +179,8 @@ export const ConsultantDetailModal = ({
       maxWidth="md"
       scroll="paper"
     >
-      <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          {isEditing ? 'Edit Consultant' : 'Consultant Details'}
-        </Typography>
+      <DialogTitle sx={{ pr: 7, fontWeight: 800 }}>
+        {isEditing ? 'Edit Consultant' : 'Consultant Details'}
         <IconButton
           onClick={() => {
             setIsEditing(false);

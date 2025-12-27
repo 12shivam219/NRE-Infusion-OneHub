@@ -17,6 +17,15 @@ export const BULK_EMAIL_CONFIG = {
   BATCH_SIZE: 5,           // Max recipients per batch
   BATCH_DELAY_MS: 100,     // Delay between batches to prevent overload
   MAX_RECIPIENTS: 1000,    // Max recipients per campaign
+  SMART_BATCHING: {
+    INITIAL_RATE: 5,       // Start with 5 emails/sec
+    MIN_RATE: 5,           // Minimum rate (fallback on error)
+    MAX_RATE: 20,          // Maximum rate (20 emails/sec)
+    RAMP_UP_THRESHOLD: 10, // Number of successful batches before ramping up
+    SCALE_FACTOR: 1.5,     // Multiply rate by this factor on success
+    BACKOFF_FACTOR: 0.5,   // Multiply rate by this on error
+    SUCCESS_WINDOW: 5,     // Track last N batch results
+  },
 } as const;
 
 interface BulkEmailCampaign {
@@ -52,6 +61,73 @@ interface EmailRecipient {
   name?: string;
 }
 
+/**
+ * Smart batching utility for dynamic rate adjustment
+ * Starts at 5 emails/sec and ramps up to 20/sec based on success rate
+ */
+class SmartBatcher {
+  private currentRate: number;
+  private successWindow: boolean[] = [];
+  private successCount: number = 0;
+
+  constructor(initialRate: number = BULK_EMAIL_CONFIG.SMART_BATCHING.INITIAL_RATE) {
+    this.currentRate = initialRate;
+  }
+
+  /**
+   * Calculate delay (in ms) based on current rate
+   * rate=5 means 5 emails/sec, so delay between emails is 200ms
+   * rate=20 means 20 emails/sec, so delay is 50ms
+   */
+  getDelay(): number {
+    return Math.max(50, 1000 / this.currentRate);
+  }
+
+  /**
+   * Record a batch result and adjust rate if needed
+   */
+  recordBatchResult(success: boolean): void {
+    this.successWindow.push(success);
+    if (this.successWindow.length > BULK_EMAIL_CONFIG.SMART_BATCHING.SUCCESS_WINDOW) {
+      this.successWindow.shift();
+    }
+
+    // Count successes in the window
+    this.successCount = this.successWindow.filter(Boolean).length;
+
+    // Ramp up if all recent batches succeeded
+    if (
+      this.successCount >= BULK_EMAIL_CONFIG.SMART_BATCHING.SUCCESS_WINDOW &&
+      this.currentRate < BULK_EMAIL_CONFIG.SMART_BATCHING.MAX_RATE
+    ) {
+      const newRate = Math.min(
+        BULK_EMAIL_CONFIG.SMART_BATCHING.MAX_RATE,
+        Math.ceil(this.currentRate * BULK_EMAIL_CONFIG.SMART_BATCHING.SCALE_FACTOR)
+      );
+      if (newRate > this.currentRate) {
+        console.log(`[SmartBatcher] Ramping up from ${this.currentRate} to ${newRate} emails/sec`);
+        this.currentRate = newRate;
+      }
+    }
+
+    // Back off if there were failures
+    if (!success && this.currentRate > BULK_EMAIL_CONFIG.SMART_BATCHING.MIN_RATE) {
+      const newRate = Math.max(
+        BULK_EMAIL_CONFIG.SMART_BATCHING.MIN_RATE,
+        Math.ceil(this.currentRate * BULK_EMAIL_CONFIG.SMART_BATCHING.BACKOFF_FACTOR)
+      );
+      if (newRate < this.currentRate) {
+        console.log(`[SmartBatcher] Backing off from ${this.currentRate} to ${newRate} emails/sec`);
+        this.currentRate = newRate;
+      }
+    }
+  }
+
+  getCurrentRate(): number {
+    return this.currentRate;
+  }
+}
+
 interface CreateCampaignPayload {
   userId: string;
   subject: string;
@@ -61,6 +137,7 @@ interface CreateCampaignPayload {
   emailsPerAccount?: number;
   requirementId?: string;
   selectedAccountIds?: string[];
+  recipientAccountMap?: Record<string, string>; // Maps recipient email -> account ID
 }
 
 /**
@@ -79,6 +156,7 @@ export const createBulkEmailCampaign = async (
       emailsPerAccount = 5,
       requirementId,
       selectedAccountIds = [],
+      recipientAccountMap = {},
     } = payload;
 
     if (!subject || !body || recipients.length === 0) {
@@ -141,6 +219,7 @@ export const createBulkEmailCampaign = async (
       campaign_id: campaign.id,
       recipient_email: recipient.email,
       recipient_name: recipient.name || null,
+      account_id: recipientAccountMap[recipient.email] || null, // Assign account if mapped
       status: 'pending',
     }));
 
@@ -397,6 +476,42 @@ export const sendBulkEmailCampaign = async (
       name: r.recipient_name,
     }));
 
+    // Get the email addresses for the selected accounts
+    // We need to fetch the account details from Supabase to get email addresses
+    let selectedAccountEmails: string[] = [];
+    const accountIdToEmailMap: Record<string, string> = {};
+    
+    if (campaign.selected_account_ids && campaign.selected_account_ids.length > 0) {
+      const { data: accountsData, error: accountsError } = await supabase
+        .from('email_accounts')
+        .select('id, email_address')
+        .in('id', campaign.selected_account_ids);
+
+      if (!accountsError && accountsData) {
+        selectedAccountEmails = accountsData.map(acc => acc.email_address);
+        // Create a map of account ID -> email for recipient mapping
+        accountsData.forEach(acc => {
+          accountIdToEmailMap[acc.id] = acc.email_address;
+        });
+      }
+    }
+
+    // Get recipient-account mappings from campaign_recipients
+    const { data: recipientMappings } = await supabase
+      .from('campaign_recipients')
+      .select('recipient_email, account_id')
+      .eq('campaign_id', campaignId);
+
+    // Build recipient-email mapping for the server
+    const recipientAccountEmailMap: Record<string, string> = {};
+    if (recipientMappings) {
+      recipientMappings.forEach(mapping => {
+        if (mapping.account_id && accountIdToEmailMap[mapping.account_id]) {
+          recipientAccountEmailMap[mapping.recipient_email] = accountIdToEmailMap[mapping.account_id];
+        }
+      });
+    }
+
     // Call bulk send endpoint
     const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
     const emailApiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
@@ -414,7 +529,8 @@ export const sendBulkEmailCampaign = async (
         rotationConfig: campaign.rotation_enabled
           ? { emailsPerAccount: campaign.emails_per_account }
           : null,
-        selectedAccountIds: campaign.selected_account_ids || [],
+        selectedAccountEmails: selectedAccountEmails,
+        recipientAccountMap: recipientAccountEmailMap, // Send recipient-account mappings
       }),
     });
 
@@ -491,26 +607,41 @@ export const sendBulkEmailCampaign = async (
       detailBatches.push(result.details.slice(i, i + BULK_EMAIL_CONFIG.BATCH_SIZE));
     }
 
-    for (const batch of detailBatches) {
-      await Promise.all(
-        batch.map((detail: { status: string; messageId?: string; error?: string; email?: string }) => {
-          const status = detail.status === 'sent' ? 'sent' : 'failed';
-          return supabase
-            .from('campaign_recipients')
-            .update({
-              status,
-              message_id: detail.messageId || null,
-              error_message: detail.error || null,
-              sent_at: status === 'sent' ? new Date().toISOString() : null,
-            })
-            .eq('campaign_id', campaignId)
-            .eq('recipient_email', detail.email);
-        })
-      );
-      
-      // Delay between batches
-      if (detailBatches.indexOf(batch) < detailBatches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, BULK_EMAIL_CONFIG.BATCH_DELAY_MS));
+    // Use smart batching for dynamic rate adjustment
+    const batcher = new SmartBatcher();
+    
+    for (let batchIndex = 0; batchIndex < detailBatches.length; batchIndex++) {
+      const batch = detailBatches[batchIndex];
+      let batchSuccess = true;
+
+      try {
+        await Promise.all(
+          batch.map((detail: { status: string; messageId?: string; error?: string; email?: string }) => {
+            const status = detail.status === 'sent' ? 'sent' : 'failed';
+            return supabase
+              .from('campaign_recipients')
+              .update({
+                status,
+                message_id: detail.messageId || null,
+                error_message: detail.error || null,
+                sent_at: status === 'sent' ? new Date().toISOString() : null,
+              })
+              .eq('campaign_id', campaignId)
+              .eq('recipient_email', detail.email);
+          })
+        );
+      } catch (error) {
+        batchSuccess = false;
+        console.error(`[sendBulkEmailCampaign] Batch ${batchIndex} failed:`, error);
+      }
+
+      // Record result and adjust rate
+      batcher.recordBatchResult(batchSuccess);
+
+      // Apply dynamic delay before next batch
+      if (batchIndex < detailBatches.length - 1) {
+        const delay = batcher.getDelay();
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 

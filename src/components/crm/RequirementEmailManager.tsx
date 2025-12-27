@@ -5,6 +5,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { supabase } from '../../lib/supabase';
 import { getEmailAccounts } from '../../lib/api/emailAccounts';
 import { createBulkEmailCampaign, sendBulkEmailCampaign, pollCampaignStatus } from '../../lib/api/bulkEmailCampaigns';
+import { parseEmailList, deduplicateEmails } from '../../lib/emailParser';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -59,9 +60,10 @@ export const RequirementEmailManager = ({
 
   // Bulk email states
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
-  const [bulkEmailStep, setBulkEmailStep] = useState<'recipients' | 'accounts' | 'compose' | 'review' | 'sending'>('recipients');
+  const [bulkEmailStep, setBulkEmailStep] = useState<'recipients' | 'accounts' | 'assignment' | 'compose' | 'review' | 'sending'>('recipients');
   const [accounts, setAccounts] = useState<EmailAccountRow[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [recipientAccountMap, setRecipientAccountMap] = useState<Record<string, string>>({}); // Maps recipient email -> account ID
   const [recipientsText, setRecipientsText] = useState('');
   const [recipients, setRecipients] = useState<Array<{ email: string; name?: string }>>([]);
   const [subject, setSubject] = useState('');
@@ -164,18 +166,10 @@ export const RequirementEmailManager = ({
 
   // Parse recipients
   const parseRecipients = (text: string) => {
-    // Split by newlines and semicolons
-    const lines = text.trim().split(/[\n;]+/);
-    return lines
-      .map((line) => {
-        const trimmedLine = line.trim();
-        const [email, ...nameParts] = trimmedLine.split(',').map((s) => s.trim());
-        return {
-          email,
-          name: nameParts.length > 0 ? nameParts.join(',') : undefined,
-        };
-      })
-      .filter((r) => r.email && r.email.includes('@'));
+    // Use robust email parser that handles various formats
+    const parsedEmails = parseEmailList(text);
+    // Deduplicate by email address (case-insensitive)
+    return deduplicateEmails(parsedEmails);
   };
 
   const handleParseRecipients = () => {
@@ -199,6 +193,43 @@ export const RequirementEmailManager = ({
     );
   };
 
+  const handleAssignRecipientToAccount = (recipientEmail: string, accountId: string) => {
+    setRecipientAccountMap(prev => ({
+      ...prev,
+      [recipientEmail]: accountId,
+    }));
+  };
+
+  const handleRemoveRecipientAssignment = (recipientEmail: string) => {
+    setRecipientAccountMap(prev => {
+      const newMap = { ...prev };
+      delete newMap[recipientEmail];
+      return newMap;
+    });
+  };
+
+  const handleAutoAssignRecipients = () => {
+    // Auto-assign recipients to accounts in round-robin fashion
+    if (selectedAccountIds.length === 0) {
+      showToast({
+        type: 'warning',
+        message: 'Please select at least one email account first',
+      });
+      return;
+    }
+
+    const newMap: Record<string, string> = {};
+    recipients.forEach((recipient, index) => {
+      const accountId = selectedAccountIds[index % selectedAccountIds.length];
+      newMap[recipient.email] = accountId;
+    });
+    setRecipientAccountMap(newMap);
+    showToast({
+      type: 'success',
+      message: `Auto-assigned ${recipients.length} recipients to ${selectedAccountIds.length} account(s)`,
+    });
+  };
+
   const handleProceedToCompose = () => {
     if (selectedAccountIds.length === 0) {
       showToast({
@@ -207,7 +238,8 @@ export const RequirementEmailManager = ({
       });
       return;
     }
-    setBulkEmailStep('compose');
+    // Move to assignment step instead of compose
+    setBulkEmailStep('assignment');
   };
 
   const handleCreateCampaign = async () => {
@@ -230,6 +262,7 @@ export const RequirementEmailManager = ({
       emailsPerAccount: 1,
       requirementId,
       selectedAccountIds,
+      recipientAccountMap, // Pass the recipient-account mappings
     });
 
     if (result.success && result.campaign) {
@@ -325,6 +358,7 @@ export const RequirementEmailManager = ({
     setRecipientsText('');
     setRecipients([]);
     setSelectedAccountIds([]);
+    setRecipientAccountMap({});
     setSubject('');
     setBody('');
     setSendingProgress(null);
@@ -589,7 +623,101 @@ export const RequirementEmailManager = ({
               </Stack>
             )}
 
-            {/* Step 3: Compose */}
+            {/* Step 3: Assign Recipients to Accounts */}
+            {bulkEmailStep === 'assignment' && (
+              <Stack spacing={2}>
+                <Box>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2">
+                      Assign Recipients to Email Accounts
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={handleAutoAssignRecipients}
+                    >
+                      Auto-Assign (Round-robin)
+                    </Button>
+                  </Stack>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                    Select which email account will send to each recipient. Unassigned recipients will use the first available account.
+                  </Typography>
+
+                  <Stack spacing={1.5} sx={{ maxHeight: 400, overflowY: 'auto' }}>
+                    {recipients.map((recipient) => (
+                      <Paper
+                        key={recipient.email}
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          bgcolor: recipientAccountMap[recipient.email] ? 'rgba(33, 150, 243, 0.05)' : 'transparent',
+                        }}
+                      >
+                        <Stack direction="row" spacing={2} alignItems="center">
+                          <Stack sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: 'break-all' }}>
+                              {recipient.email}
+                            </Typography>
+                            {recipient.name && (
+                              <Typography variant="caption" color="text.secondary">
+                                {recipient.name}
+                              </Typography>
+                            )}
+                          </Stack>
+                          <Stack direction="row" spacing={1} sx={{ minWidth: 'auto' }}>
+                            <select
+                              value={recipientAccountMap[recipient.email] || ''}
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleAssignRecipientToAccount(recipient.email, e.target.value);
+                                } else {
+                                  handleRemoveRecipientAssignment(recipient.email);
+                                }
+                              }}
+                              style={{
+                                padding: '8px 12px',
+                                borderRadius: '4px',
+                                border: '1px solid #ddd',
+                                fontFamily: 'inherit',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <option value="">Select account...</option>
+                              {accounts
+                                .filter(acc => selectedAccountIds.includes(acc.id))
+                                .map(acc => (
+                                  <option key={acc.id} value={acc.id}>
+                                    {acc.email_address}
+                                  </option>
+                                ))}
+                            </select>
+                            {recipientAccountMap[recipient.email] && (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  px: 1,
+                                  py: 0.5,
+                                  borderRadius: 1,
+                                  bgcolor: 'rgba(34,197,94,0.1)',
+                                  color: 'rgb(34,197,94)',
+                                  fontWeight: 600,
+                                  minWidth: 'fit-content',
+                                }}
+                              >
+                                ✓ Assigned
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
+              </Stack>
+            )}
+
+            {/* Step 4: Compose */}
             {bulkEmailStep === 'compose' && (
               <Stack spacing={2}>
                 <Box>
@@ -765,9 +893,19 @@ export const RequirementEmailManager = ({
             </>
           )}
 
-          {bulkEmailStep === 'compose' && (
+          {bulkEmailStep === 'assignment' && (
             <>
               <Button onClick={() => setBulkEmailStep('accounts')}>Back</Button>
+              <Button onClick={closeBulkEmailModal}>Cancel</Button>
+              <Button variant="contained" onClick={() => setBulkEmailStep('compose')}>
+                Continue to Compose
+              </Button>
+            </>
+          )}
+
+          {bulkEmailStep === 'compose' && (
+            <>
+              <Button onClick={() => setBulkEmailStep('assignment')}>Back</Button>
               <Button onClick={closeBulkEmailModal}>Cancel</Button>
               <Button variant="contained" onClick={handleCreateCampaign} disabled={bulkLoading || !subject || !body}>
                 Review

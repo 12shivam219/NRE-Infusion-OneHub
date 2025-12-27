@@ -311,10 +311,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId }: Creat
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
-      <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-          Schedule Interview
-        </Typography>
+      <DialogTitle sx={{ pr: 7, fontWeight: 500 }}>
+        Schedule Interview
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
           <X className="w-5 h-5" />
         </IconButton>

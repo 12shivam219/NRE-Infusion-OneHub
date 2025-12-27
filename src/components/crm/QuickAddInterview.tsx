@@ -68,10 +68,8 @@ export const QuickAddInterview = ({ onClose, onSubmit }: QuickAddInterviewProps)
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          Schedule Interview
-        </Typography>
+      <DialogTitle sx={{ pr: 7, fontWeight: 800 }}>
+        Schedule Interview
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
           <X className="w-5 h-5" />
         </IconButton>

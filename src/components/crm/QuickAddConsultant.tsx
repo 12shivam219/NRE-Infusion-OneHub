@@ -68,10 +68,8 @@ export const QuickAddConsultant = ({ onClose, onSubmit }: QuickAddConsultantProp
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-          Add to Team
-        </Typography>
+      <DialogTitle sx={{ pr: 7, fontWeight: 500 }}>
+        Add to Team
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
           <X className="w-5 h-5" />
         </IconButton>

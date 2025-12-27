@@ -303,10 +303,8 @@ export const CreateConsultantForm = ({ onClose, onSuccess }: CreateConsultantFor
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
-      <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 500 }}>
-          Add New Consultant
-        </Typography>
+      <DialogTitle sx={{ pr: 7, fontWeight: 500 }}>
+        Add New Consultant
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
           <X className="w-6 h-6" />
         </IconButton>
