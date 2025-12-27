@@ -14,20 +14,22 @@ RETURNS TABLE(id text, status text, total integer, sent integer, failed integer,
 BEGIN
   UPDATE public.bulk_email_campaign_status
   SET
+    status = 'processing',
     sent = COALESCE(sent,0) + COALESCE(p_sent,0),
     failed = COALESCE(failed,0) + COALESCE(p_failed,0),
     processed = GREATEST(COALESCE(processed,0), COALESCE(p_processed,0)),
     progress = GREATEST(COALESCE(progress,0), COALESCE(p_progress,0)),
-    details = COALESCE(details,'[]'::jsonb) || COALESCE(p_event, '[]'::jsonb)
+    details = COALESCE(details,'[]'::jsonb) || COALESCE(p_event, '[]'::jsonb),
+    started_at = COALESCE(started_at, now())
   WHERE id = p_id
   RETURNING id, status, total, sent, failed, processed, progress, details, created_at, started_at, completed_at
   INTO id, status, total, sent, failed, processed, progress, details, created_at, started_at, completed_at;
 
   IF NOT FOUND THEN
     -- If record doesn't exist, create it
-    INSERT INTO public.bulk_email_campaign_status(id, status, total, sent, failed, processed, progress, details, created_at)
+    INSERT INTO public.bulk_email_campaign_status(id, status, total, sent, failed, processed, progress, details, created_at, started_at)
     VALUES (p_id, 'processing', 0, COALESCE(p_sent,0), COALESCE(p_failed,0), COALESCE(p_processed,0), COALESCE(p_progress,0),
-            COALESCE(p_event, '[]'::jsonb), now())
+            COALESCE(p_event, '[]'::jsonb), now(), now())
     RETURNING id, status, total, sent, failed, processed, progress, details, created_at, started_at, completed_at
     INTO id, status, total, sent, failed, processed, progress, details, created_at, started_at, completed_at;
   END IF;

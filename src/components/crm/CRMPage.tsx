@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { Briefcase, Calendar, Users } from 'lucide-react';
@@ -7,13 +7,15 @@ import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { RequirementsManagement } from './RequirementsManagement';
-import { InterviewTracking } from './InterviewTracking';
-import { ConsultantProfiles } from './ConsultantProfiles';
-import { CreateRequirementForm } from './CreateRequirementForm';
-import { CreateInterviewForm } from './CreateInterviewForm';
-import { CreateConsultantForm } from './CreateConsultantForm';
-import { BulkEmailComposer } from './BulkEmailComposer';
+import { LogoLoader } from '../common/LogoLoader';
+
+// Lazy load CRM sub-components to reduce initial load time
+const RequirementsManagement = lazy(() => import('./RequirementsManagement').then(m => ({ default: m.RequirementsManagement })));
+const InterviewTracking = lazy(() => import('./InterviewTracking').then(m => ({ default: m.InterviewTracking })));
+const ConsultantProfiles = lazy(() => import('./ConsultantProfiles').then(m => ({ default: m.ConsultantProfiles })));
+const CreateRequirementForm = lazy(() => import('./CreateRequirementForm').then(m => ({ default: m.CreateRequirementForm })));
+const CreateInterviewForm = lazy(() => import('./CreateInterviewForm').then(m => ({ default: m.CreateInterviewForm })));
+const CreateConsultantForm = lazy(() => import('./CreateConsultantForm').then(m => ({ default: m.CreateConsultantForm })));
 
 type View = 'dashboard' | 'requirements' | 'interviews' | 'consultants';
 
@@ -25,7 +27,6 @@ export const CRMPage = () => {
   const [showCreateInterview, setShowCreateInterview] = useState(false);
   const [selectedRequirementIdForInterview, setSelectedRequirementIdForInterview] = useState<string | undefined>();
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
-  const [showBulkEmailComposer, setShowBulkEmailComposer] = useState(false);
 
   // Define all callbacks at top level (before any conditional rendering)
   const handleRequirementsQuickAdd = useCallback(() => setShowCreateForm(true), []);
@@ -38,15 +39,6 @@ export const CRMPage = () => {
   const handleInterviewsQuickAdd = useCallback(() => setShowCreateInterview(true), []);
 
   const handleConsultantsQuickAdd = useCallback(() => setShowCreateConsultant(true), []);
-
-  // Accessibility: close modals on navigation change
-  const closeAllModals = useCallback(() => {
-    setShowCreateForm(false);
-    setShowCreateInterview(false);
-    setShowCreateConsultant(false);
-    setShowBulkEmailComposer(false);
-    setSelectedRequirementIdForInterview(undefined);
-  }, []);
 
   // Sync currentView with query parameter
   useLayoutEffect(() => {
@@ -87,7 +79,11 @@ export const CRMPage = () => {
     const run = async () => {
       await Promise.resolve();
       if (cancelled) return;
-      closeAllModals();
+      // Close form modals on view change, but NOT bulk email composer (it's global)
+      setShowCreateForm(false);
+      setShowCreateInterview(false);
+      setShowCreateConsultant(false);
+      setSelectedRequirementIdForInterview(undefined);
     };
 
     void run();
@@ -95,14 +91,7 @@ export const CRMPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentView, closeAllModals]);
-
-  // Listen for global event to open bulk email composer (header trigger)
-  useEffect(() => {
-    const handler = () => setShowBulkEmailComposer(true);
-    window.addEventListener('open-bulk-email', handler as EventListener);
-    return () => window.removeEventListener('open-bulk-email', handler as EventListener);
-  }, []);
+  }, [currentView]);
 
   // Error boundary wrapper
   return (
@@ -158,60 +147,66 @@ export const CRMPage = () => {
             >
               <ErrorBoundary>
                 {currentView === 'requirements' ? (
+                  <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
                     <RequirementsManagement
                       onQuickAdd={handleRequirementsQuickAdd}
                       onCreateInterview={handleCreateInterview}
                       toolbarPortalTargetId="crm-requirements-actions"
                     />
+                  </Suspense>
                 ) : null}
 
                 {currentView === 'interviews' ? (
+                  <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
                     <InterviewTracking onQuickAdd={handleInterviewsQuickAdd} />
+                  </Suspense>
                 ) : null}
 
                 {currentView === 'consultants' ? (
+                  <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
                     <ConsultantProfiles onQuickAdd={handleConsultantsQuickAdd} />
+                  </Suspense>
                 ) : null}
               </ErrorBoundary>
             </Box>
           </Box>
 
           {showCreateForm && (
-            <CreateRequirementForm
-              onClose={() => setShowCreateForm(false)}
-              onSuccess={() => {
-                setShowCreateForm(false);
-              }}
-            />
+            <Suspense fallback={null}>
+              <CreateRequirementForm
+                onClose={() => setShowCreateForm(false)}
+                onSuccess={() => {
+                  setShowCreateForm(false);
+                }}
+              />
+            </Suspense>
           )}
 
           {showCreateInterview && (
-            <CreateInterviewForm
-              requirementId={selectedRequirementIdForInterview}
-              onClose={() => {
-                setShowCreateInterview(false);
-                setSelectedRequirementIdForInterview(undefined);
-              }}
-              onSuccess={() => {
-                setShowCreateInterview(false);
-                setSelectedRequirementIdForInterview(undefined);
-              }}
-            />
+            <Suspense fallback={null}>
+              <CreateInterviewForm
+                requirementId={selectedRequirementIdForInterview}
+                onClose={() => {
+                  setShowCreateInterview(false);
+                  setSelectedRequirementIdForInterview(undefined);
+                }}
+                onSuccess={() => {
+                  setShowCreateInterview(false);
+                  setSelectedRequirementIdForInterview(undefined);
+                }}
+              />
+            </Suspense>
           )}
 
           {showCreateConsultant && (
-            <CreateConsultantForm
-              onClose={() => setShowCreateConsultant(false)}
-              onSuccess={() => {
-                setShowCreateConsultant(false);
-              }}
-            />
-          )}
-
-          {showBulkEmailComposer && (
-            <BulkEmailComposer
-              onClose={() => setShowBulkEmailComposer(false)}
-            />
+            <Suspense fallback={null}>
+              <CreateConsultantForm
+                onClose={() => setShowCreateConsultant(false)}
+                onSuccess={() => {
+                  setShowCreateConsultant(false);
+                }}
+              />
+            </Suspense>
           )}
       </Box>
     </ScopedCssBaseline>

@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from 'react';
-import { Bell, Menu as MenuIcon, Mail as MailIcon, Moon, Sun, LogOut } from 'lucide-react';
+import { Bell, Menu as MenuIcon, Moon, Sun, LogOut } from 'lucide-react';
 import SyncStatusBadge from '../common/SyncStatusBadge';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -55,10 +55,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
       void markAsRead(notificationId);
     }
   }, [markAsRead]);
-
-  const handleBulkEmailOpen = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('open-bulk-email'));
-  }, []);
 
   const handleNotificationsOpen = useCallback((e: React.MouseEvent<HTMLElement>) => {
     setNotificationsAnchorEl(e.currentTarget);
@@ -228,7 +224,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
             {/* Group A: Sync Status Badge */}
             <SyncStatusBadge />
 
-            {/* Group B: Actions (Bell, Bulk Email) */}
+            {/* Group B: Actions (Notifications) */}
             <Box
               sx={{
                 display: 'flex',
@@ -264,28 +260,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 >
                   <Bell className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
                 </Badge>
-              </IconButton>
-
-              <IconButton
-                onClick={handleBulkEmailOpen}
-                aria-label="Open bulk email composer"
-                sx={{
-                  color: '#FFFFFF',
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.08)',
-                  transition: 'all 320ms ease',
-                  px: { xs: 2.5, sm: 3 },
-                  '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.16)',
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
-                  },
-                  gap: 1,
-                }}
-              >
-                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, fontWeight: 600, fontSize: '0.875rem' }}>
-                  Bulk Email
-                </Box>
-                <MailIcon className="h-5 w-5" />
               </IconButton>
             </Box>
 

@@ -247,6 +247,7 @@ export interface Database {
           requirement_number: number;
           title: string;
           company: string | null;
+          end_client: string | null;
           description: string | null;
           location: string | null;
           status: RequirementStatus;
@@ -276,6 +277,7 @@ export interface Database {
           requirement_number?: number;
           title: string;
           company?: string | null;
+          end_client?: string | null;
           description?: string | null;
           location?: string | null;
           status?: RequirementStatus;
@@ -305,6 +307,7 @@ export interface Database {
           requirement_number?: number;
           title?: string;
           company?: string | null;
+          end_client?: string | null;
           description?: string | null;
           location?: string | null;
           status?: RequirementStatus;

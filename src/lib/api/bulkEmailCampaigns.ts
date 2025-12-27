@@ -31,6 +31,7 @@ interface BulkEmailCampaign {
   status: 'draft' | 'in_progress' | 'completed' | 'failed';
   created_at: string;
   updated_at: string;
+  selected_account_ids?: string[] | null;
 }
 
 interface CampaignRecipient {
@@ -59,6 +60,7 @@ interface CreateCampaignPayload {
   rotationEnabled: boolean;
   emailsPerAccount?: number;
   requirementId?: string;
+  selectedAccountIds?: string[];
 }
 
 /**
@@ -76,6 +78,7 @@ export const createBulkEmailCampaign = async (
       rotationEnabled,
       emailsPerAccount = 5,
       requirementId,
+      selectedAccountIds = [],
     } = payload;
 
     if (!subject || !body || recipients.length === 0) {
@@ -99,6 +102,7 @@ export const createBulkEmailCampaign = async (
             rotation_enabled: rotationEnabled,
             emails_per_account: emailsPerAccount,
             status: 'draft',
+            selected_account_ids: selectedAccountIds.length > 0 ? selectedAccountIds : null,
           })
           .select()
           .single(),
@@ -231,6 +235,123 @@ export const getCampaignDetails = async (
 };
 
 /**
+ * Poll campaign status until completion (for real-time progress)
+ */
+export const pollCampaignStatus = async (
+  campaignId: string,
+  onProgressUpdate?: (status: {
+    total: number;
+    sent: number;
+    failed: number;
+    processed: number;
+    progress: number;
+    status: string;
+  }) => void
+): Promise<{
+  success: boolean;
+  result?: {
+    total: number;
+    sent: number;
+    failed: number;
+    processed: number;
+    progress: number;
+    status: string;
+  };
+  error?: string;
+}> => {
+  try {
+    let isComplete = false;
+    let attempts = 0;
+    const maxAttempts = 300; // 5 minutes max (300 * 1s)
+
+    console.log(`[pollCampaignStatus] Starting poll for campaign ${campaignId}`);
+    
+    // Debug: Check all records in bulk_email_campaign_status on first attempt
+    const { data: allRecords } = await supabase
+      .from('bulk_email_campaign_status')
+      .select('id')
+      .limit(5);
+    console.log(`[pollCampaignStatus] Available records in table:`, allRecords?.map(r => r.id) || []);
+
+    while (!isComplete && attempts < maxAttempts) {
+      const { data, error } = await supabase
+        .from('bulk_email_campaign_status')
+        .select('id, status, total, sent, failed, processed, progress')
+        .eq('id', campaignId);
+
+      if (error) {
+        logger.error('Error polling campaign status', {
+          component: 'pollCampaignStatus',
+          campaignId,
+          error: error.message,
+          errorCode: error.code,
+        });
+        console.error(`[pollCampaignStatus] Error on attempt ${attempts + 1}:`, error);
+        // Continue polling instead of returning error
+        await new Promise(resolve => setTimeout(resolve, 500));
+        attempts++;
+        continue;
+      }
+
+      if (data && Array.isArray(data) && data.length > 0) {
+        const statusRecord = data[0];
+        
+        console.log(`[pollCampaignStatus] Attempt ${attempts + 1}: status=${statusRecord.status}, sent=${statusRecord.sent}, failed=${statusRecord.failed}, progress=${statusRecord.progress}%`);
+        
+        onProgressUpdate?.({
+          total: statusRecord.total || 0,
+          sent: statusRecord.sent || 0,
+          failed: statusRecord.failed || 0,
+          processed: statusRecord.processed || 0,
+          progress: statusRecord.progress || 0,
+          status: statusRecord.status || 'queued',
+        });
+
+        // Check if campaign is complete
+        if (statusRecord.status === 'completed' || statusRecord.status === 'failed') {
+          console.log(`[pollCampaignStatus] Campaign ${statusRecord.status} after ${attempts + 1} attempts`);
+          isComplete = true;
+          return {
+            success: true,
+            result: {
+              total: statusRecord.total || 0,
+              sent: statusRecord.sent || 0,
+              failed: statusRecord.failed || 0,
+              processed: statusRecord.processed || 0,
+              progress: statusRecord.progress || 0,
+              status: statusRecord.status || 'completed',
+            },
+          };
+        }
+      } else {
+        console.log(`[pollCampaignStatus] Attempt ${attempts + 1}: No data returned (data=${data}, isArray=${Array.isArray(data)}, length=${data?.length})`);
+      }
+
+      // Wait before next poll (start fast, then slow down)
+      const delay = attempts < 10 ? 500 : 1000; // 500ms for first 10 attempts, then 1s
+      await new Promise(resolve => setTimeout(resolve, delay));
+      attempts++;
+    }
+
+    if (attempts >= maxAttempts) {
+      console.warn(`[pollCampaignStatus] Timeout: max attempts (${maxAttempts}) exceeded`);
+      return {
+        success: false,
+        error: 'Campaign processing timeout (5 minutes exceeded)',
+      };
+    }
+
+    console.warn(`[pollCampaignStatus] Incomplete: polling exited without completion`);
+    return { success: false, error: 'Campaign polling incomplete' };
+  } catch (error) {
+    const appError = handleApiError(error, {
+      component: 'pollCampaignStatus',
+    });
+    return { success: false, error: appError.message };
+  }
+};
+
+/**
  * Send bulk email campaign
  */
 export const sendBulkEmailCampaign = async (
@@ -247,6 +368,7 @@ export const sendBulkEmailCampaign = async (
       fromAccount: string;
     }>;
   };
+  emailServerCampaignId?: string;
   error?: string;
 }> => {
   try {
@@ -277,11 +399,13 @@ export const sendBulkEmailCampaign = async (
 
     // Call bulk send endpoint
     const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
+    const emailApiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
     
     const response = await fetch(`${emailServerUrl}/api/send-bulk-emails`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(emailApiKey && { 'Authorization': `Bearer ${emailApiKey}` }),
       },
       body: JSON.stringify({
         emails: recipientEmails,
@@ -290,6 +414,7 @@ export const sendBulkEmailCampaign = async (
         rotationConfig: campaign.rotation_enabled
           ? { emailsPerAccount: campaign.emails_per_account }
           : null,
+        selectedAccountIds: campaign.selected_account_ids || [],
       }),
     });
 
@@ -302,7 +427,55 @@ export const sendBulkEmailCampaign = async (
       };
     }
 
-    // Update campaign status
+    // Email server returns 202 Accepted - campaign queued for background processing
+    // We need to poll for the status instead of expecting immediate results
+    if (response.status === 202 || !result.details) {
+      // Get the campaignId from the email server response (different ID system)
+      const emailServerCampaignId = result.campaignId;
+      
+      console.log(`[sendBulkEmailCampaign] Frontend campaignId: ${campaignId}`);
+      console.log(`[sendBulkEmailCampaign] Email server campaignId: ${emailServerCampaignId}`);
+      
+      // Campaign is queued, update status to 'queued' instead of 'completed'
+      await supabase
+        .from('bulk_email_campaigns')
+        .update({
+          status: 'queued',
+          started_at: new Date().toISOString(),
+        })
+        .eq('id', campaignId);
+
+      logger.info('Bulk email campaign queued for processing', {
+        component: 'sendBulkEmailCampaign',
+        resource: campaignId,
+        emailServerCampaignId,
+        total: result.total,
+      });
+
+      // Return success with the EMAIL SERVER campaign ID for polling
+      // This is critical - polling must use the email server's campaign ID, not the frontend's
+      return {
+        success: true,
+        result: {
+          total: result.total || recipientEmails.length,
+          sent: 0,
+          failed: 0,
+          details: [],
+        },
+        // Add the email server campaign ID so polling uses the correct ID
+        emailServerCampaignId,
+      };
+    }
+
+    // If we do get details (synchronous processing), update campaign
+    if (!result.details || !Array.isArray(result.details)) {
+      return {
+        success: false,
+        error: 'Invalid response from email server: missing details',
+      };
+    }
+
+    // Update campaign status with final results
     await supabase
       .from('bulk_email_campaigns')
       .update({

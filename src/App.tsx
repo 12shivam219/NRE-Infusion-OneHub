@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy } from 'react';
 import { Command as CommandIcon, X as CloseIcon } from 'lucide-react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
@@ -6,7 +6,6 @@ import { useAuth } from './hooks/useAuth';
 import { useToast } from './contexts/ToastContext';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
-import { Header } from './components/layout/Header';
 import { LogoLoader } from './components/common/LogoLoader';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { SyncErrorHandler } from './components/common/SyncErrorHandler';
@@ -22,6 +21,9 @@ import {
   LazyCRMPage,
   LazyAdminPage,
 } from './lib/lazyLoader';
+
+// Lazy load Header to reduce initial bundle size
+const LazyHeader = lazy(() => import('./components/layout/Header').then(m => ({ default: m.Header })));
 
 type AuthView = 'login' | 'register';
 
@@ -201,7 +203,9 @@ const AppContent = () => {
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
-        <Header />
+        <Suspense fallback={<div style={{ height: '72px' }} />}>
+          <LazyHeader />
+        </Suspense>
 
         <div className="relative flex flex-1 flex-col">
           {isCommandVisible ? (

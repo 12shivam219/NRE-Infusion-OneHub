@@ -301,12 +301,22 @@ function generateCampaignId() {
 
 // DB-backed helpers (Supabase)
 async function createCampaignRecord(campaign) {
-  if (!supabase) return null;
-  const { data, error } = await supabase.from('bulk_email_campaign_status').insert(campaign).select().single();
-  if (error) {
-    console.error('Supabase insert error:', error.message || error);
+  if (!supabase) {
+    console.warn('❌ Supabase not configured - cannot create campaign record');
     return null;
   }
+  
+  console.log(`[createCampaignRecord] Creating record for campaign: ${campaign.id}`);
+  console.log(`[createCampaignRecord] Record data:`, JSON.stringify(campaign, null, 2));
+  
+  const { data, error } = await supabase.from('bulk_email_campaign_status').insert(campaign).select().single();
+  if (error) {
+    console.error('❌ Supabase insert error:', error.message || error);
+    console.error('❌ Full error object:', JSON.stringify(error, null, 2));
+    console.error('❌ Campaign record that failed to insert:', campaign);
+    return null;
+  }
+  console.log(`✅ Campaign record created: ${campaign.id}`);
   return data;
 }
 
@@ -329,19 +339,17 @@ async function getCampaignRecord(id) {
 // Background worker function - processes emails asynchronously and persists status to Supabase
 async function processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts) {
   // mark started
+  console.log(`[processBulkEmails] Starting campaign ${campaignId} with ${emails.length} emails`);
+  console.log(`[processBulkEmails] Using ${accounts.length} email account(s):`, accounts.map(a => a.email).join(', '));
   await updateCampaignRecord(campaignId, { status: 'processing', started_at: new Date().toISOString() });
 
   for (let i = 0; i < emails.length; i++) {
     const recipient = emails[i];
 
-    // Determine which account to use based on rotation
-    let accountIndex = 0;
-    if (rotationConfig && rotationConfig.emailsPerAccount) {
-      accountIndex = Math.floor(i / rotationConfig.emailsPerAccount) % accounts.length;
-    } else {
-      accountIndex = i % accounts.length;
-    }
-
+    // Distribute emails across selected accounts (round-robin)
+    // If only 1 account selected, use it for all emails
+    // If multiple accounts selected, rotate through them
+    const accountIndex = accounts.length > 1 ? i % accounts.length : 0;
     const account = accounts[accountIndex];
 
     try {
@@ -380,6 +388,10 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
 
         if (rpcError) {
           console.error('RPC append_campaign_event error:', rpcError.message || rpcError);
+        } else {
+          if (NODE_ENV === 'development') {
+            console.log(`[processBulkEmails] Email ${i + 1}/${emails.length} sent successfully. Progress: ${p_progress}%`);
+          }
         }
       } else {
         // Fallback to read-modify-write if Supabase is not configured
@@ -406,7 +418,8 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
       }
 
       if (i < emails.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Reduced delay for faster sending (200ms instead of 2000ms)
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     } catch (error) {
       console.error(`Failed to send email to ${typeof recipient === 'string' ? recipient : recipient.email}:`, error.message);
@@ -453,9 +466,15 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
     }
   }
 
+  console.log(`[processBulkEmails] Completing campaign ${campaignId}`);
+  
   if (supabase) {
     const { data, error } = await supabase.from('bulk_email_campaign_status').update({ status: 'completed', completed_at: new Date().toISOString(), progress: 100 }).eq('id', campaignId).select().single();
-    if (error) console.error('Failed to mark campaign completed:', error.message || error);
+    if (error) {
+      console.error('Failed to mark campaign completed:', error.message || error);
+    } else {
+      console.log(`[processBulkEmails] Campaign ${campaignId} marked as completed`);
+    }
   } else {
     await updateCampaignRecord(campaignId, { status: 'completed', completed_at: new Date().toISOString(), progress: 100 });
   }
@@ -464,7 +483,7 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
 // Bulk send emails with rotation - returns immediately with 202 Accepted
 app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req, res) => {
   try {
-    const { emails, subject, body, rotationConfig } = req.body;
+    const { emails, subject, body, rotationConfig, selectedAccountIds = [] } = req.body;
 
     // SECURITY: Validate inputs
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
@@ -496,13 +515,28 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
     }
 
     // Get available accounts
-    const accounts = Array.from(emailAccounts.values());
-    if (accounts.length === 0) {
+    const allAccounts = Array.from(emailAccounts.values());
+    if (allAccounts.length === 0) {
       return res.status(500).json({
         success: false,
         error: 'No email accounts configured',
       });
     }
+
+    // Filter accounts based on selectedAccountIds if provided
+    const selectedAccounts = selectedAccountIds.length > 0
+      ? allAccounts.filter(acc => selectedAccountIds.includes(acc.id))
+      : allAccounts;
+
+    if (selectedAccounts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid email accounts selected',
+      });
+    }
+
+    console.log(`[/api/send-bulk-emails] Using ${selectedAccounts.length} selected account(s) out of ${allAccounts.length} available`);
+    selectedAccounts.forEach(acc => console.log(`  - ${acc.email} (id: ${acc.id})`));
 
     // Generate unique campaign ID
     const campaignId = generateCampaignId();
@@ -525,7 +559,10 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
     if (supabase) {
       const created = await createCampaignRecord(initialRecord);
       if (!created) {
-        console.warn('Failed to persist campaign initial record to Supabase');
+        console.warn('⚠️  Failed to persist campaign initial record to Supabase');
+        console.warn('Campaign will not have status updates visible in UI');
+      } else {
+        console.log(`✅ Campaign ${campaignId} ready for polling`);
       }
     }
 
@@ -539,7 +576,7 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
     });
 
     // Process emails in background (no await - fire and forget)
-    processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts).catch(
+    processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, selectedAccounts).catch(
       error => console.error(`Error processing campaign ${campaignId}:`, error)
     );
   } catch (error) {

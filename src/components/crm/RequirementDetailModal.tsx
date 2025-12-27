@@ -5,7 +5,7 @@ import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { updateRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
-import { EmailThreading } from './EmailThreading';
+import { RequirementEmailManager } from './RequirementEmailManager';
 import { LogoLoader } from '../common/LogoLoader';
 import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
@@ -552,12 +552,11 @@ export const RequirementDetailModal = ({
           {/* Emails Tab */}
           {activeTab === 'emails' && (
             <Box sx={{ p: { xs: 2, sm: 4 } }}>
-              <Paper variant="outlined" sx={{ p: 3 }}>
-                <EmailThreading
-                  requirementId={requirement.id}
-                  onClose={() => setActiveTab('details')}
-                />
-              </Paper>
+              <RequirementEmailManager
+                requirementId={requirement.id}
+                requirementTitle={requirement.title}
+                vendorEmail={requirement.vendor_email}
+              />
             </Box>
           )}
           </Box>

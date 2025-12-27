@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import {
   LayoutDashboard,
   UserCheck,
@@ -40,10 +40,12 @@ import {
 import type { Database, UserRole, UserStatus, ErrorStatus } from '../../lib/database.types';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
-import { EmailAccountsSettings } from './EmailAccountsSettings';
-import { SyncDashboard } from './SyncDashboard';
-import { OfflineCacheSettings } from './OfflineCacheSettings';
 import { ConfirmDialog } from '../common/ConfirmDialog';
+
+// Lazy load admin sub-components to reduce initial load time
+const EmailAccountsSettings = lazy(() => import('./EmailAccountsSettings').then(m => ({ default: m.EmailAccountsSettings })));
+const SyncDashboard = lazy(() => import('./SyncDashboard').then(m => ({ default: m.SyncDashboard })));
+const OfflineCacheSettings = lazy(() => import('./OfflineCacheSettings').then(m => ({ default: m.OfflineCacheSettings })));
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -1539,15 +1541,21 @@ export const AdminPage = () => {
           )}
 
           {activeTab === 'email-accounts' && (
-            <EmailAccountsSettings />
+            <Suspense fallback={<div className="p-8 text-center">Loading email settings...</div>}>
+              <EmailAccountsSettings />
+            </Suspense>
           )}
 
           {activeTab === 'offline-sync' && (
-            <SyncDashboard />
+            <Suspense fallback={<div className="p-8 text-center">Loading sync dashboard...</div>}>
+              <SyncDashboard />
+            </Suspense>
           )}
 
           {activeTab === 'cache-settings' && (
-            <OfflineCacheSettings />
+            <Suspense fallback={<div className="p-8 text-center">Loading cache settings...</div>}>
+              <OfflineCacheSettings />
+            </Suspense>
           )}
         </div>
       </nav>

@@ -249,24 +249,10 @@ export const createRequirement = async (
   userId?: string
 ): Promise<{ success: boolean; requirement?: Requirement; error?: string }> => {
   try {
-    // Get the highest requirement number to calculate the next one
-    const { data: existingReqs, error: fetchError } = await supabase
-      .from('requirements')
-      .select('requirement_number')
-      .order('requirement_number', { ascending: false })
-      .limit(1);
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      return { success: false, error: 'Failed to generate requirement number' };
-    }
-
-    const nextNumber = (existingReqs && existingReqs.length > 0)
-      ? (existingReqs[0].requirement_number || 0) + 1
-      : 1;
-
+    // Don't set requirement_number - let the database handle it via trigger or default
+    // This avoids race conditions and duplicate key violations
     const dataToInsert = {
       ...requirement,
-      requirement_number: nextNumber,
       created_by: userId || null,
       updated_by: userId || null,
     };

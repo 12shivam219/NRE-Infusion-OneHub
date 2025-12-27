@@ -1,23 +1,34 @@
-import { StrictMode, memo, useEffect } from 'react';
+import { StrictMode, memo, useEffect, useState } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider, type Theme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { setupGlobalErrorHandler } from './lib/errorReporting';
-import { initSentry } from './lib/sentry';
 import { ToastProvider } from './contexts/ToastContext';
 import { ThemeModeProvider } from './contexts/ThemeModeProvider';
 import { useThemeMode } from './hooks/useThemeMode';
-import { crmThemeDark, crmThemeLight } from './lib/mui/crmTheme';
 import './index.css';
 
-// Initialize Sentry FIRST for error tracking
-initSentry();
+// Defer heavy initialization to not block initial render
+// These are executed in requestIdleCallback to avoid blocking the main thread
+const deferInitialization = () => {
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(() => {
+      import('./lib/sentry').then(({ initSentry }) => initSentry());
+      import('./lib/errorReporting').then(({ setupGlobalErrorHandler }) => setupGlobalErrorHandler());
+    });
+  } else {
+    // Fallback for browsers without requestIdleCallback
+    setTimeout(() => {
+      import('./lib/sentry').then(({ initSentry }) => initSentry());
+      import('./lib/errorReporting').then(({ setupGlobalErrorHandler }) => setupGlobalErrorHandler());
+    }, 100);
+  }
+};
 
-// Setup global error handlers
-setupGlobalErrorHandler();
+// Start deferred initialization after first render
+deferInitialization();
 
 document.title = 'NRETech OneHub';
 
@@ -32,14 +43,34 @@ const hideInitialLoader = () => {
   }
 };
 
+// Lazy load theme creation to defer theme object instantiation
+const cachedThemes: { dark?: Theme; light?: Theme } = {};
+
+const getTheme = async (mode: 'dark' | 'light'): Promise<Theme> => {
+  if (cachedThemes[mode]) return cachedThemes[mode];
+  
+  const { crmThemeDark, crmThemeLight } = await import('./lib/mui/crmTheme');
+  const theme = mode === 'dark' ? crmThemeDark : crmThemeLight;
+  cachedThemes[mode] = theme;
+  return theme;
+};
+
 export const ThemedApp = memo(() => {
   const { themeMode } = useThemeMode();
-  const theme = themeMode === 'dark' ? crmThemeDark : crmThemeLight;
+  const [theme, setTheme] = useState<Theme | null>(null);
+
+  useEffect(() => {
+    getTheme(themeMode === 'dark' ? 'dark' : 'light').then(setTheme);
+  }, [themeMode]);
 
   // Hide initial loader when React app mounts
   useEffect(() => {
     hideInitialLoader();
   }, []);
+
+  if (!theme) {
+    return null; // Don't render until theme is loaded
+  }
 
   return (
     <ThemeProvider theme={theme}>

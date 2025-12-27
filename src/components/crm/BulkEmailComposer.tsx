@@ -213,7 +213,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
 
   return (
     <Dialog
-      open
+      open={true}
       onClose={() => onClose?.()}
       fullWidth
       maxWidth="md"

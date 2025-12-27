@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo, memo, lazy, useRef } from 'react';
-
 import { Plus, Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
@@ -13,7 +12,8 @@ import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/real
 import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsTable } from './RequirementsTable';
 import { BrandButton } from '../brand';
-
+import { JDParserDialog } from './JDParserDialog';
+import { BatchJDParserDialog } from './BatchJDParserDialog';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
 import SearchIcon from '@mui/icons-material/Search';
@@ -42,6 +42,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import Popover from '@mui/material/Popover';
 import Portal from '@mui/material/Portal';
+import Tooltip from '@mui/material/Tooltip';
 import { alpha, styled } from '@mui/material/styles';
 
 const RequirementsReport = lazy(() => import('./RequirementsReport').then((m) => ({ default: m.RequirementsReport })));
@@ -138,7 +139,6 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }));
 
-
 export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
@@ -159,6 +159,9 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [requirementToDelete, setRequirementToDelete] = useState<Requirement | null>(null);
+  const [showJDParser, setShowJDParser] = useState(false);
+  const [showBatchJDParser, setShowBatchJDParser] = useState(false);
+
   // Sync queue UI state
   const { pendingItems, updateItemStatus, clearSynced, pendingCount } = useSyncQueue();
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
@@ -169,13 +172,14 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
     window.addEventListener('open-sync-queue', openHandler);
     return () => window.removeEventListener('open-sync-queue', openHandler);
   }, []);
+
   // Advanced filtering state
   const [minRate, setMinRate] = useState(savedFilters?.minRate || '');
   const [maxRate, setMaxRate] = useState(savedFilters?.maxRate || '');
   const [remoteFilter, setRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>((savedFilters?.remoteFilter as 'ALL' | 'REMOTE' | 'ONSITE') || 'ALL');
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ 
-    from: savedFilters?.dateRangeFrom || '', 
-    to: savedFilters?.dateRangeTo || '' 
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({
+    from: savedFilters?.dateRangeFrom || '',
+    to: savedFilters?.dateRangeTo || ''
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [rowsPerPage, setRowsPerPage] = useState<number>(100);
@@ -215,9 +219,9 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
   const loading = requirementsSWR.isLoading;
   const error = !isErrorDismissed && requirementsSWR.error
     ? {
-        title: 'Failed to load requirements',
-        message: requirementsSWR.error instanceof Error ? requirementsSWR.error.message : String(requirementsSWR.error),
-      }
+      title: 'Failed to load requirements',
+      message: requirementsSWR.error instanceof Error ? requirementsSWR.error.message : String(requirementsSWR.error),
+    }
     : null;
 
   useEffect(() => {
@@ -362,7 +366,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
   // Save filters only on debounced search changes - cleanup timeout properly
   useEffect(() => {
     if (!isLoaded) return;
-    
+
     const timeoutId = setTimeout(() => {
       updateFilters({
         searchTerm: debouncedValue,
@@ -393,7 +397,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
     if (!rate) return true;
     const rateNum = parseFloat(rate.replace(/[^0-9.-]/g, ''));
     if (isNaN(rateNum)) return true;
-    
+
     if (minRate && parseFloat(minRate) > rateNum) return false;
     if (maxRate && parseFloat(maxRate) < rateNum) return false;
     return true;
@@ -402,21 +406,21 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
   // Helper to check if date is in range - with validation
   const isDateInRange = useCallback((createdAt: string): boolean => {
     if (!dateRange.from && !dateRange.to) return true;
-    
+
     try {
       const created = new Date(createdAt).getTime();
       if (isNaN(created)) return true; // Skip invalid dates
-      
+
       if (dateRange.from) {
         const fromDate = new Date(dateRange.from).getTime();
         if (!isNaN(fromDate) && fromDate > created) return false;
       }
-      
+
       if (dateRange.to) {
         const toDate = new Date(dateRange.to).getTime();
         if (!isNaN(toDate) && toDate < created) return false;
       }
-      
+
       return true;
     } catch {
       return true; // Skip if there's an error
@@ -427,7 +431,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
   const matchesRemoteFilter = useCallback((remote: string | null): boolean => {
     if (remoteFilter === 'ALL') return true;
     if (!remote) return true;
-    
+
     const isRemote = remote.toLowerCase().includes('remote') || remote.toLowerCase().includes('yes');
     return remoteFilter === 'REMOTE' ? isRemote : !isRemote;
   }, [remoteFilter]);
@@ -565,7 +569,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
       return;
     }
     // Handle both Requirement object and string ID
-    const requirement = typeof requirementOrId === 'string' 
+    const requirement = typeof requirementOrId === 'string'
       ? requirements.find(r => r.id === requirementOrId)
       : requirementOrId;
     if (requirement) {
@@ -589,10 +593,10 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
         setSelectedRequirement(null);
         setShowDeleteConfirm(false);
         setRequirementToDelete(null);
-        showToast({ 
-          type: 'info', 
-          title: 'Queued for Sync', 
-          message: 'Requirement will be deleted when you come back online' 
+        showToast({
+          type: 'info',
+          title: 'Queued for Sync',
+          message: 'Requirement will be deleted when you come back online'
         });
         // Reload to show updated list
         setPage(0);
@@ -642,7 +646,6 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
 
     return filtered;
   }, [requirements, isRateInRange, isDateInRange, matchesRemoteFilter]);
-
 
   // Handle sort changes for server-side sorting
   const handleSortChange = useCallback((field: 'title' | 'company' | 'status' | 'created_at' | 'rate', order: 'asc' | 'desc') => {
@@ -702,6 +705,9 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
         onClose={() => setToolsAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        disableAutoFocus
+        disableEnforceFocus
+        disableScrollLock
         slotProps={{
           paper: {
             sx: {
@@ -709,6 +715,9 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
               width: { xs: 'calc(100vw - 32px)', sm: 460 },
               maxWidth: 'calc(100vw - 32px)',
             },
+          },
+          backdrop: {
+            sx: { backgroundColor: 'transparent' },
           },
         }}
       >
@@ -721,6 +730,28 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
               <X className="w-4 h-4" />
             </IconButton>
           </Stack>
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => {
+              setShowJDParser(true);
+              setToolsAnchorEl(null);
+            }}
+          >
+            JD Parser
+          </Button>
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => {
+              setShowBatchJDParser(true);
+              setToolsAnchorEl(null);
+            }}
+          >
+            Batch JD Parser
+          </Button>
 
           <Button
             variant="outlined"
@@ -920,51 +951,51 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
         </Paper>
       ) : null}
 
-        {/* Search and Filter */}
-        <Stack spacing={2}>
-          {/* Active Filters Summary */}
-          {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
-            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                  Active filters:
+      {/* Search and Filter */}
+      <Stack spacing={2}>
+        {/* Active Filters Summary */}
+        {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
+          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                Active filters:
+              </Typography>
+              {debouncedValue ? <Chip size="small" label={`Search: "${debouncedValue}"`} /> : null}
+              {filterStatus !== 'ALL' ? <Chip size="small" label={`Status: ${filterStatus}`} /> : null}
+              {minRate ? <Chip size="small" label={`Min: $${minRate}`} /> : null}
+              {maxRate ? <Chip size="small" label={`Max: $${maxRate}`} /> : null}
+              {remoteFilter !== 'ALL' ? <Chip size="small" label={remoteFilter} /> : null}
+              {dateRange.from ? <Chip size="small" label={`From: ${dateRange.from}`} /> : null}
+              {dateRange.to ? <Chip size="small" label={`To: ${dateRange.to}`} /> : null}
+              <Box sx={{ flexGrow: 1 }} />
+              {filteredRequirements.length > 0 ? (
+                <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.primary' }}>
+                  {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
                 </Typography>
-                {debouncedValue ? <Chip size="small" label={`Search: "${debouncedValue}"`} /> : null}
-                {filterStatus !== 'ALL' ? <Chip size="small" label={`Status: ${filterStatus}`} /> : null}
-                {minRate ? <Chip size="small" label={`Min: $${minRate}`} /> : null}
-                {maxRate ? <Chip size="small" label={`Max: $${maxRate}`} /> : null}
-                {remoteFilter !== 'ALL' ? <Chip size="small" label={remoteFilter} /> : null}
-                {dateRange.from ? <Chip size="small" label={`From: ${dateRange.from}`} /> : null}
-                {dateRange.to ? <Chip size="small" label={`To: ${dateRange.to}`} /> : null}
-                <Box sx={{ flexGrow: 1 }} />
-                {filteredRequirements.length > 0 ? (
-                  <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                    {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
-                  </Typography>
-                ) : null}
-                <Button
-                  variant="text"
-                  color="error"
-                  size="small"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setDebouncedValue('');
-                    setFilterStatus('ALL');
-                    setMinRate('');
-                    setMaxRate('');
-                    setRemoteFilter('ALL');
-                    setDateRange({ from: '', to: '' });
-                    clearFilters();
-                    setShowAdvancedFilters(false);
-                  }}
-                  title="Clear all filters and reset search"
-                >
-                  ✕ Clear All
-                </Button>
-              </Stack>
-            </Paper>
-          ) : null}
-        </Stack>
+              ) : null}
+              <Button
+                variant="text"
+                color="error"
+                size="small"
+                onClick={() => {
+                  setSearchTerm('');
+                  setDebouncedValue('');
+                  setFilterStatus('ALL');
+                  setMinRate('');
+                  setMaxRate('');
+                  setRemoteFilter('ALL');
+                  setDateRange({ from: '', to: '' });
+                  clearFilters();
+                  setShowAdvancedFilters(false);
+                }}
+                title="Clear all filters and reset search"
+              >
+                ✕ Clear All
+              </Button>
+            </Stack>
+          </Paper>
+        ) : null}
+      </Stack>
 
       {/* Sync Queue Panel (collapsible) */}
       {showSyncPanel ? (
@@ -974,7 +1005,9 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
               Offline Sync Queue
             </Typography>
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-              <Chip size="small" label={`Pending: ${pendingCount}`} />
+              <Tooltip title={`${pendingCount} operations waiting to sync. Click 'Process Queue' to sync when online.`} arrow>
+                <Chip size="small" label={`Pending: ${pendingCount}`} />
+              </Tooltip>
               <Button
                 variant="contained"
                 color="primary"
@@ -1095,7 +1128,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
           page={page}
           hasNextPage={hasNextPage}
           isFetchingPage={isFetchingPage}
-          onPageChange={setPage} badge={''} label={''}        />
+          onPageChange={setPage} badge={''} label={''} />
       </div>
 
 
@@ -1150,6 +1183,16 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
           </DialogActions>
         </Dialog>
       )}
+
+      <JDParserDialog
+        open={showJDParser}
+        onClose={() => setShowJDParser(false)}
+      />
+
+      <BatchJDParserDialog
+        open={showBatchJDParser}
+        onClose={() => setShowBatchJDParser(false)}
+      />
 
       {/* Detail Modal */}
       <RequirementDetailModal
