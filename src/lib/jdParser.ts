@@ -54,7 +54,7 @@ export async function parseJD(text: string): Promise<JdExtractionResult> {
 
     // --- STEP 2: Check Database Cache ---
     // FIX: Use .maybeSingle() instead of .single() to avoid 406 error on cache miss
-    const { data: cachedData, error: cacheError } = await supabase
+    const { data: cachedData } = await supabase
       .from('jd_parsing_cache')
       .select('parsed_data')
       .eq('content_hash', contentHash)

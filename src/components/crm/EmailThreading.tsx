@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { LogoLoader } from '../common/LogoLoader';
+import { RichTextEditor, SignatureManager, TemplateManager, DraftManager, AdvancedOptions, type EmailSignature, type EmailTemplate, type EmailDraft, type AdvancedEmailOptions } from '../email';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -62,6 +63,14 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
   const [replying, setReplying] = useState(false);
+
+  // New email features
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [signatures, setSignatures] = useState<EmailSignature[]>([]);
+  const [drafts, setDrafts] = useState<EmailDraft[]>([]);
+  const [advancedOptions, setAdvancedOptions] = useState<AdvancedEmailOptions>({
+    priority: 'normal',
+  });
 
   // Load email threads
   const loadThreads = useCallback(async () => {
@@ -303,15 +312,64 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
               fullWidth
               inputProps={{ 'aria-label': 'Recipient email' }}
             />
-            <TextField
-              label="Message"
+
+            {/* Templates */}
+            <TemplateManager
+              templates={templates}
+              onTemplatesChange={setTemplates}
+              onTemplateSelect={(template) => {
+                setComposeData((prev) => ({
+                  ...prev,
+                  subject: template.subject,
+                  body: template.body,
+                }));
+              }}
+            />
+
+            {/* Signatures */}
+            <SignatureManager
+              signatures={signatures}
+              onSignaturesChange={setSignatures}
+              onSignatureSelect={(sig) => {
+                setComposeData((prev) => ({
+                  ...prev,
+                  body: prev.body + '\n\n' + sig.content,
+                }));
+              }}
+            />
+
+            {/* Rich Text Editor */}
+            <RichTextEditor
               value={composeData.body}
-              onChange={(e) => setComposeData((prev) => ({ ...prev, body: e.target.value }))}
-              size="small"
-              fullWidth
-              multiline
-              rows={4}
-              inputProps={{ 'aria-label': 'Email body' }}
+              onChange={(body) => setComposeData((prev) => ({ ...prev, body }))}
+              placeholder="Type your message..."
+              minRows={4}
+              showFormatting={true}
+            />
+
+            {/* Drafts */}
+            <DraftManager
+              drafts={drafts}
+              currentDraft={{
+                subject: composeData.subject,
+                body: composeData.body,
+                to: [composeData.toEmail],
+              }}
+              onDraftsChange={setDrafts}
+              onDraftSelect={(draft) => {
+                setComposeData({
+                  subject: draft.subject,
+                  toEmail: draft.to[0] || '',
+                  body: draft.body,
+                });
+              }}
+              autoSaveEnabled={true}
+            />
+
+            {/* Advanced Options */}
+            <AdvancedOptions
+              options={advancedOptions}
+              onOptionsChange={setAdvancedOptions}
             />
 
             <Stack direction="row" spacing={1}>
@@ -399,17 +457,32 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
                       {replyingTo === thread.thread_id ? (
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(212,175,55,0.08)' }}>
                           <Stack spacing={2}>
-                            <TextField
-                              label="Reply"
-                              placeholder="Type your reply..."
+                            {/* Rich Text Editor for Reply */}
+                            <RichTextEditor
                               value={replyBody}
-                              onChange={(e) => setReplyBody(e.target.value)}
-                              size="small"
-                              fullWidth
-                              multiline
-                              rows={3}
-                              inputProps={{ 'aria-label': 'Reply text' }}
+                              onChange={setReplyBody}
+                              placeholder="Type your reply..."
+                              minRows={3}
+                              showFormatting={true}
                             />
+
+                            {/* Signature in Reply */}
+                            {signatures.length > 0 && (
+                              <Paper sx={{ p: 1, bgcolor: 'rgba(234,179,8,0.05)' }}>
+                                <Button
+                                  size="small"
+                                  onClick={() => {
+                                    const defaultSig = signatures.find(s => s.isDefault) || signatures[0];
+                                    if (defaultSig) {
+                                      setReplyBody(replyBody + '\n\n' + defaultSig.content);
+                                    }
+                                  }}
+                                >
+                                  Add Signature
+                                </Button>
+                              </Paper>
+                            )}
+
                             <Stack direction="row" spacing={1}>
                               <Button
                                 variant="contained"

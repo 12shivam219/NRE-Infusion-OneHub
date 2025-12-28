@@ -10,7 +10,6 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 import CheckIcon from '@mui/icons-material/Check';
 import type { SelectChangeEvent } from '@mui/material/Select';
 

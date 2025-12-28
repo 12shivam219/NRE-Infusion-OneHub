@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mail, Send, Plus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
@@ -6,6 +6,23 @@ import { supabase } from '../../lib/supabase';
 import { getEmailAccounts } from '../../lib/api/emailAccounts';
 import { createBulkEmailCampaign, sendBulkEmailCampaign, pollCampaignStatus } from '../../lib/api/bulkEmailCampaigns';
 import { parseEmailList, deduplicateEmails } from '../../lib/emailParser';
+import { syncCampaignToRequirementEmails, getRequirementEmailsPaginated } from '../../lib/api/requirementEmails';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  RichTextEditor,
+  TemplateManager,
+  SignatureManager,
+  DraftManager,
+  ScheduleSend,
+  AdvancedOptions,
+  AttachmentManager,
+  type EmailTemplate,
+  type EmailSignature,
+  type EmailDraft,
+  type Attachment,
+  type AdvancedEmailOptions,
+  type ScheduleOptions,
+} from '../email';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -17,6 +34,7 @@ import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
 import TextField from '@mui/material/TextField';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 import { LogoLoader } from '../common/LogoLoader';
 
 interface RequirementEmailManagerProps {
@@ -69,6 +87,19 @@ export const RequirementEmailManager = ({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // New email features
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [signatures, setSignatures] = useState<EmailSignature[]>([]);
+  const [drafts, setDrafts] = useState<EmailDraft[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [scheduleOptions, setScheduleOptions] = useState<ScheduleOptions>({ enabled: false });
+  const [advancedOptions, setAdvancedOptions] = useState<AdvancedEmailOptions>({
+    priority: 'normal',
+    retryFailed: true,
+    maxRetries: 3,
+  });
+
   const [sendingProgress, setSendingProgress] = useState<{
     total: number;
     sent: number;
@@ -77,35 +108,50 @@ export const RequirementEmailManager = ({
     progress: number;
     status: string;
   } | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalEmails, setTotalEmails] = useState(0);
+  const [hasMoreEmails, setHasMoreEmails] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentCampaignId, setCurrentCampaignId] = useState<string | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  // Load emails for this requirement
+  const EMAIL_PAGE_SIZE = 50;
+
+  // Load emails for this requirement (with pagination)
   useEffect(() => {
     const loadEmails = async () => {
       try {
         setEmailsLoading(true);
-        const { data, error } = await supabase
-          .from('requirement_emails')
-          .select('*')
-          .eq('requirement_id', requirementId)
-          .order('sent_date', { ascending: false });
-
-        if (error) throw error;
-        setEmails(data || []);
+        const result = await getRequirementEmailsPaginated(requirementId, currentPage, EMAIL_PAGE_SIZE);
+        
+        if (currentPage === 0) {
+          setEmails(result.emails);
+        } else {
+          // Append to existing emails for infinite scroll
+          setEmails(prev => [...prev, ...result.emails]);
+        }
+        
+        setTotalEmails(result.total);
+        setHasMoreEmails(result.hasMore);
       } catch (err) {
         console.error('Error loading emails:', err);
-        showToast({
-          type: 'error',
-          message: 'Failed to load emails',
-        });
+        if (currentPage === 0) {
+          showToast({
+            type: 'error',
+            message: 'Failed to load emails',
+          });
+        }
       } finally {
         setEmailsLoading(false);
+        setIsLoadingMore(false);
       }
     };
 
     loadEmails();
 
-    // Subscribe to real-time updates
+    // Subscribe to real-time updates with debouncing
+    // Only reload when subscription message arrives, debounced by 500ms
     const subscription = supabase
       .channel(`requirement_emails_${requirementId}`)
       .on(
@@ -117,15 +163,26 @@ export const RequirementEmailManager = ({
           filter: `requirement_id=eq.${requirementId}`,
         },
         () => {
-          loadEmails();
+          // Debounce real-time updates - batch multiple updates within 500ms
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+          }
+          
+          debounceTimerRef.current = setTimeout(() => {
+            // Only refresh current page, not entire list
+            setCurrentPage(0); // Reset to first page on new emails
+          }, 500);
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       subscription.unsubscribe();
     };
-  }, [requirementId, showToast]);
+  }, [requirementId, currentPage, showToast]);
 
   // Load email accounts
   useEffect(() => {
@@ -171,6 +228,14 @@ export const RequirementEmailManager = ({
     // Deduplicate by email address (case-insensitive)
     return deduplicateEmails(parsedEmails);
   };
+
+  // Load more emails for infinite scroll
+  const handleLoadMoreEmails = useCallback(() => {
+    if (hasMoreEmails && !isLoadingMore && !emailsLoading) {
+      setIsLoadingMore(true);
+      setCurrentPage(prev => prev + 1);
+    }
+  }, [hasMoreEmails, isLoadingMore, emailsLoading]);
 
   const handleParseRecipients = () => {
     const parsed = parseRecipients(recipientsText);
@@ -324,6 +389,41 @@ export const RequirementEmailManager = ({
             type: finalStatus.failed === 0 ? 'success' : 'warning',
             message: `Campaign complete: ${finalStatus.sent} sent, ${finalStatus.failed} failed`,
           });
+
+          // Sync campaign recipients to requirement_emails table for email history
+          console.log(`[handleSendCampaign] Syncing campaign ${currentCampaignId} to requirement emails...`);
+          // Pass the email server campaign ID so we fetch the correct status details
+          const syncResult = await syncCampaignToRequirementEmails(currentCampaignId, user!.id, emailServerCampaignId);
+          if (syncResult.success) {
+            console.log(`[handleSendCampaign] Synced ${syncResult.count} emails to requirement history`);
+            
+            // Immediately refresh email history to show new emails
+            try {
+              const { data: newEmails, error: emailError } = await supabase
+                .from('requirement_emails')
+                .select('*')
+                .eq('requirement_id', requirementId)
+                .order('sent_date', { ascending: false });
+              
+              if (!emailError && newEmails) {
+                setEmails(newEmails);
+                console.log(`[handleSendCampaign] Email history refreshed with ${newEmails.length} total emails`);
+              }
+            } catch (err) {
+              console.error('Error refreshing email history:', err);
+            }
+            
+            showToast({
+              type: 'success',
+              message: `✅ Campaign complete & email history updated: ${syncResult.count} emails added`,
+            });
+          } else {
+            console.warn(`[handleSendCampaign] Sync failed: ${syncResult.error}`);
+            showToast({
+              type: 'warning',
+              message: `Note: Email history may not have updated (${syncResult.error})`,
+            });
+          }
         } else {
           showToast({
             type: 'warning',
@@ -366,21 +466,7 @@ export const RequirementEmailManager = ({
     setShowMultipleEmailsHint(false);
   };
 
-  const getStatusIcon = (status: string) => {
-    const iconClass = 'w-4 h-4';
-    switch (status) {
-      case 'sent':
-        return <span className={`${iconClass} text-green-500`}>✓</span>;
-      case 'failed':
-        return <span className={`${iconClass} text-red-500`}>✕</span>;
-      case 'pending':
-        return <span className={`${iconClass} text-yellow-500`}>⏳</span>;
-      default:
-        return <span className={`${iconClass} text-gray-500`}>📧</span>;
-    }
-  };
-
-  if (emailsLoading) {
+  if (emailsLoading && emails.length === 0) {
     return <LogoLoader size="md" showText label="Loading emails..." />;
   }
 
@@ -406,9 +492,13 @@ export const RequirementEmailManager = ({
         </Button>
       </Stack>
 
-      {/* Email History */}
-      <Box sx={{ flex: 1, overflowY: 'auto' }}>
-        {emails.length === 0 ? (
+      {/* Email History with Virtual Scrolling (optimized for 5K+ emails) */}
+      <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {emailsLoading && emails.length === 0 ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+            <LogoLoader size="md" showText label="Loading emails..." />
+          </Box>
+        ) : emails.length === 0 ? (
           <Paper
             variant="outlined"
             sx={{
@@ -424,69 +514,19 @@ export const RequirementEmailManager = ({
             </Typography>
           </Paper>
         ) : (
-          <Stack spacing={1.5}>
-            {emails.map((email) => (
-              <Paper
-                key={email.id}
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  '&:hover': { boxShadow: 1, borderColor: 'primary.light' },
-                }}
-                onClick={() => setExpandedEmailId(expandedEmailId === email.id ? null : email.id)}
-              >
-                <Stack direction="row" spacing={2} alignItems="flex-start">
-                  {getStatusIcon(email.status)}
-                  <Stack sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {email.recipient_email}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {email.subject}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(email.sent_date).toLocaleString()}
-                    </Typography>
-                  </Stack>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      px: 1,
-                      py: 0.5,
-                      borderRadius: 1,
-                      bgcolor:
-                        email.status === 'sent'
-                          ? 'rgba(34,197,94,0.1)'
-                          : email.status === 'failed'
-                            ? 'rgba(239,68,68,0.1)'
-                            : 'rgba(234,179,8,0.1)',
-                      color:
-                        email.status === 'sent'
-                          ? 'rgb(34,197,94)'
-                          : email.status === 'failed'
-                            ? 'rgb(239,68,68)'
-                            : 'rgb(234,179,8)',
-                      fontWeight: 600,
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {email.status}
-                  </Typography>
-                </Stack>
-
-                {/* Expanded Details */}
-                {expandedEmailId === email.id && email.body_preview && (
-                  <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-                    <Typography variant="caption" component="div" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {email.body_preview}
-                    </Typography>
-                  </Box>
-                )}
-              </Paper>
-            ))}
-          </Stack>
+          <>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
+              Showing {emails.length} of {totalEmails} emails
+            </Typography>
+            <Box ref={parentRef} sx={{ flex: 1, overflow: 'auto', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <VirtualEmailList emails={emails} expandedEmailId={expandedEmailId} setExpandedEmailId={setExpandedEmailId} parentRef={parentRef} onNearBottom={handleLoadMoreEmails} />
+            </Box>
+            {isLoadingMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            )}
+          </>
         )}
       </Box>
 
@@ -742,15 +782,60 @@ export const RequirementEmailManager = ({
                   size="small"
                 />
 
-                <TextField
-                  fullWidth
-                  label="Body"
-                  multiline
-                  rows={6}
+                {/* Templates */}
+                <TemplateManager
+                  templates={templates}
+                  onTemplatesChange={setTemplates}
+                  onTemplateSelect={(template) => {
+                    setSubject(template.subject);
+                    setBody(template.body);
+                  }}
+                />
+
+                {/* Signatures */}
+                <SignatureManager
+                  signatures={signatures}
+                  onSignaturesChange={setSignatures}
+                  onSignatureSelect={(sig) => setBody(body + '\n\n' + sig.content)}
+                />
+
+                {/* Rich Text Editor */}
+                <RichTextEditor
                   value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Email message"
-                  size="small"
+                  onChange={setBody}
+                  placeholder="Email message (supports formatting, mail merge variables like {{name}}, {{company}})"
+                  minRows={6}
+                  showFormatting={true}
+                />
+
+                {/* Attachments */}
+                <AttachmentManager
+                  attachments={attachments}
+                  onAttachmentsChange={setAttachments}
+                  maxFileSize={25}
+                  maxTotalSize={100}
+                />
+
+                {/* Drafts */}
+                <DraftManager
+                  drafts={drafts}
+                  currentDraft={{ subject, body, to: recipients.map(r => r.email) }}
+                  onDraftsChange={setDrafts}
+                  autoSaveEnabled={true}
+                  autoSaveInterval={30000}
+                  onDraftSelect={(draft) => {
+                    setSubject(draft.subject);
+                    setBody(draft.body);
+                  }}
+                />
+
+                {/* Schedule Send */}
+                <ScheduleSend onScheduleChange={setScheduleOptions} />
+
+                {/* Advanced Options */}
+                <AdvancedOptions
+                  options={advancedOptions}
+                  onOptionsChange={setAdvancedOptions}
                 />
               </Stack>
             )}
@@ -774,6 +859,21 @@ export const RequirementEmailManager = ({
                   <Typography variant="body2" color="text.secondary">
                     Email Account(s): {selectedAccountIds.length > 0 ? `${selectedAccountIds.length} account${selectedAccountIds.length > 1 ? 's' : ''}` : 'None'}
                   </Typography>
+                  {attachments.length > 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                      Attachments: {attachments.length} file(s)
+                    </Typography>
+                  )}
+                  {scheduleOptions.enabled && scheduleOptions.sendAt && (
+                    <Typography variant="body2" color="text.secondary">
+                      ⏱ Scheduled: {new Date(scheduleOptions.sendAt).toLocaleString()}
+                    </Typography>
+                  )}
+                  {advancedOptions.priority && advancedOptions.priority !== 'normal' && (
+                    <Typography variant="body2" color="text.secondary">
+                      Priority: <strong>{advancedOptions.priority}</strong>
+                    </Typography>
+                  )}
                   {selectedAccountIds.length > 1 && (
                     <Typography variant="caption" color="info.main" sx={{ fontWeight: 500, mt: 1 }}>
                       💡 Each of the {selectedAccountIds.length} selected accounts will send to all {recipients.length} recipients
@@ -933,3 +1033,124 @@ export const RequirementEmailManager = ({
     </Box>
   );
 };
+
+/**
+ * Virtual Email List Component
+ * Uses @tanstack/react-virtual for efficient rendering of 5K+ emails
+ * Only renders visible items in the DOM
+ */
+interface VirtualEmailListProps {
+  emails: RequirementEmail[];
+  expandedEmailId: string | null;
+  setExpandedEmailId: (id: string | null) => void;
+  parentRef: React.RefObject<HTMLDivElement>;
+  onNearBottom: () => void;
+}
+
+const VirtualEmailList = ({ 
+  emails, 
+  expandedEmailId, 
+  setExpandedEmailId, 
+  parentRef,
+  onNearBottom 
+}: VirtualEmailListProps) => {
+  const virtualizer = useVirtualizer({
+    count: emails.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 120,
+    overscan: 5,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+
+  // Detect when user scrolls near bottom and load more
+  useEffect(() => {
+    if (virtualItems.length > 0) {
+      const lastItem = virtualItems[virtualItems.length - 1];
+      if (lastItem.index >= emails.length - 5) {
+        onNearBottom();
+      }
+    }
+  }, [virtualItems, emails.length, onNearBottom]);
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: totalSize }}>
+      {virtualItems.map((virtualItem) => {
+        const email = emails[virtualItem.index];
+        return (
+          <div
+            key={virtualItem.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            <Paper
+              variant="outlined"
+              sx={{
+                m: 1.5,
+                mb: 0.75,
+                p: 2,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': { boxShadow: 1, borderColor: 'primary.light' },
+              }}
+              onClick={() => setExpandedEmailId(expandedEmailId === email.id ? null : email.id)}
+            >
+              <Stack direction="row" spacing={2} alignItems="flex-start">
+                <Box sx={{ flexShrink: 0 }}>
+                  {email.status === 'sent' && <span style={{ color: 'rgb(34,197,94)' }}>✓</span>}
+                  {email.status === 'failed' && <span style={{ color: 'rgb(239,68,68)' }}>✕</span>}
+                  {email.status === 'pending' && <span style={{ color: 'rgb(234,179,8)' }}>⏳</span>}
+                  {!['sent', 'failed', 'pending'].includes(email.status) && <Mail className="w-4 h-4" />}
+                </Box>
+                <Stack sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {email.recipient_email}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {email.subject}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {new Date(email.sent_date).toLocaleString()}
+                  </Typography>
+                </Stack>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    bgcolor:
+                      email.status === 'sent'
+                        ? 'rgba(34,197,94,0.1)'
+                        : email.status === 'failed'
+                          ? 'rgba(239,68,68,0.1)'
+                          : 'rgba(234,179,8,0.1)',
+                    color:
+                      email.status === 'sent'
+                        ? 'rgb(34,197,94)'
+                        : email.status === 'failed'
+                          ? 'rgb(239,68,68)'
+                          : 'rgb(234,179,8)',
+                    fontWeight: 600,
+                    textTransform: 'capitalize',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {email.status}
+                </Typography>
+              </Stack>
+            </Paper>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default RequirementEmailManager;

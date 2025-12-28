@@ -406,8 +406,9 @@ export const pollCampaignStatus = async (
         console.log(`[pollCampaignStatus] Attempt ${attempts + 1}: No data returned (data=${data}, isArray=${Array.isArray(data)}, length=${data?.length})`);
       }
 
-      // Wait before next poll (start fast, then slow down)
-      const delay = attempts < 10 ? 500 : 1000; // 500ms for first 10 attempts, then 1s
+      // Wait before next poll (aggressive polling for immediate UI updates)
+      // 100ms for first 30 attempts (3s fast window), then 300ms
+      const delay = attempts < 30 ? 100 : 300;
       await new Promise(resolve => setTimeout(resolve, delay));
       attempts++;
     }

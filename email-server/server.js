@@ -339,6 +339,7 @@ async function getCampaignRecord(id) {
 // Background worker function - processes emails asynchronously and persists status to Supabase
 async function processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts, recipientAccountMap = {}) {
   // mark started
+  const startTime = Date.now();
   console.log(`[processBulkEmails] Starting campaign ${campaignId} with ${emails.length} emails`);
   console.log(`[processBulkEmails] Using ${accounts.length} email account(s):`, accounts.map(a => a.email).join(', '));
   await updateCampaignRecord(campaignId, { status: 'processing', started_at: new Date().toISOString() });
@@ -443,8 +444,8 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
       }
 
       if (i < emails.length - 1) {
-        // Reduced delay for faster sending (200ms instead of 2000ms)
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Ultra-fast delay for instant sending (50ms instead of 200ms)
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
     } catch (error) {
       console.error(`Failed to send email to ${typeof recipient === 'string' ? recipient : recipient.email}:`, error.message);
@@ -498,7 +499,8 @@ async function processBulkEmailsInBackground(campaignId, emails, subject, body, 
     if (error) {
       console.error('Failed to mark campaign completed:', error.message || error);
     } else {
-      console.log(`[processBulkEmails] Campaign ${campaignId} marked as completed`);
+      const totalTime = Date.now() - startTime;
+      console.log(`[processBulkEmails] Campaign ${campaignId} marked as completed in ${totalTime}ms (${Math.round(totalTime / emails.length)}ms per email)`);
     }
   } else {
     await updateCampaignRecord(campaignId, { status: 'completed', completed_at: new Date().toISOString(), progress: 100 });
