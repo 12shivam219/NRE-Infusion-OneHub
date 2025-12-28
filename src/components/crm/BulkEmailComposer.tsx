@@ -104,19 +104,74 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
     return deduplicateEmails(parsedEmails);
   };
 
+  // Validate email format with detailed feedback
+  const validateEmail = (email: string): { valid: boolean; error?: string } => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!email.trim()) {
+      return { valid: false, error: 'Email address cannot be empty' };
+    }
+    
+    if (email.includes(' ') && !email.includes(',')) {
+      return { valid: false, error: 'Space in email address' };
+    }
+    
+    if (!email.includes('@')) {
+      return { valid: false, error: 'Missing @ symbol' };
+    }
+    
+    const parts = email.split('@');
+    if (!parts[0] || !parts[0].trim()) {
+      return { valid: false, error: 'Missing local part (before @)' };
+    }
+    
+    const domain = parts[1];
+    if (!domain || !domain.trim()) {
+      return { valid: false, error: 'Missing domain name' };
+    }
+    
+    if (!domain.includes('.')) {
+      return { valid: false, error: 'Domain missing TLD (.com, .org, etc.)' };
+    }
+    
+    if (!emailRegex.test(email)) {
+      return { valid: false, error: 'Invalid email format' };
+    }
+    
+    return { valid: true };
+  };
+
   const handleParseRecipients = () => {
     const parsed = parseRecipients(recipientsText);
 
     if (parsed.length === 0) {
       showToast({
         type: 'error',
-        message: 'No valid email addresses found',
+        message: 'No valid email addresses found. Check format: email@example.com or email@example.com,Name',
+      });
+      return;
+    }
+
+    // Validate all emails
+    const invalidEmails = parsed.filter(r => !validateEmail(r.email).valid);
+    if (invalidEmails.length > 0) {
+      const errors = invalidEmails.map(r => {
+        const validation = validateEmail(r.email);
+        return `${r.email}: ${validation.error}`;
+      });
+      showToast({
+        type: 'error',
+        message: `Invalid email(s) found:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...and ${errors.length - 3} more` : ''}`,
       });
       return;
     }
 
     setRecipients(parsed);
     setStep('compose');
+    showToast({
+      type: 'success',
+      message: `✓ ${parsed.length} valid recipient${parsed.length !== 1 ? 's' : ''} added`,
+    });
   };
 
   const handleCreateCampaign = async () => {
@@ -259,108 +314,309 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
           <Box>
             {/* Step 1: Recipients */}
             {step === 'recipients' && (
-              <Stack spacing={2}>
-                <TextField
-                  label="Enter Recipients"
-                  multiline
-                  minRows={8}
-                  value={recipientsText}
-                  onChange={(e) => setRecipientsText(e.target.value)}
-                  placeholder="Email addresses (one per line or comma-separated):\njohn@example.com,John Doe\njane@example.com,Jane Smith"
-                  fullWidth
-                />
-                <Typography variant="caption" color="text.secondary">
-                  Format: email@example.com or email@example.com,Name
-                </Typography>
+              <Stack spacing={2.5}>
+                {/* Guidance Section */}
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(59,130,246,0.05)', borderColor: 'rgba(59,130,246,0.2)' }}>
+                  <Stack spacing={1}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                      📝 Supported Formats
+                    </Typography>
+                    <Stack component="ul" sx={{ pl: 2.5, m: 0, spacing: 0.5 }}>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        <code>john@example.com</code>
+                      </Typography>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        <code>john@example.com, John Doe</code>
+                      </Typography>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        Comma-separated: <code>john@example.com, jane@example.com</code>
+                      </Typography>
+                      <Typography component="li" variant="body2" color="text.secondary">
+                        One per line or mixed formats
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                </Paper>
+
+                {/* Input Field */}
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Recipient Email Addresses
+                  </Typography>
+                  <TextField
+                    multiline
+                    minRows={10}
+                    maxRows={15}
+                    value={recipientsText}
+                    onChange={(e) => setRecipientsText(e.target.value)}
+                    placeholder={`Examples:\njohn@example.com\njane@example.com, Jane Smith\nbob@company.com, Bob Johnson\n\nOr paste from spreadsheet...`}
+                    fullWidth
+                    variant="outlined"
+                    helperText={
+                      recipientsText.trim().length > 0
+                        ? `Found ${parseRecipients(recipientsText).length} valid email${parseRecipients(recipientsText).length !== 1 ? 's' : ''}`
+                        : 'Paste or type email addresses (one per line, comma-separated, or mixed format)'
+                    }
+                  />
+                </Stack>
+
+                {/* Preview Section */}
+                {recipientsText.trim().length > 0 && parseRecipients(recipientsText).length > 0 && (
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.3)' }}>
+                    <Stack spacing={1.5}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          ✓ Valid Recipients: {parseRecipients(recipientsText).length}
+                        </Typography>
+                      </Stack>
+                      <Stack 
+                        spacing={0.75} 
+                        sx={{ 
+                          maxHeight: 150, 
+                          overflowY: 'auto',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                          gap: 1
+                        }}
+                      >
+                        {parseRecipients(recipientsText).slice(0, 12).map((recipient, idx) => (
+                          <Paper 
+                            key={`${recipient.email}-${idx}`}
+                            variant="outlined" 
+                            sx={{ 
+                              p: 1, 
+                              bgcolor: 'rgba(255,255,255,0.03)',
+                              borderColor: 'rgba(34,197,94,0.2)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}
+                          >
+                            <Typography variant="caption" sx={{ flex: 1, wordBreak: 'break-word' }}>
+                              {recipient.name ? `${recipient.name} <${recipient.email}>` : recipient.email}
+                            </Typography>
+                          </Paper>
+                        ))}
+                      </Stack>
+                      {parseRecipients(recipientsText).length > 12 && (
+                        <Typography variant="caption" color="text.secondary">
+                          +{parseRecipients(recipientsText).length - 12} more recipients...
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Paper>
+                )}
               </Stack>
             )}
 
             {/* Step 2: Compose */}
             {step === 'compose' && (
               <Stack spacing={2}>
-                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.35)' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    ✓ {recipients.length} recipients selected
-                  </Typography>
+                {/* Recipients Summary */}
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.35)', borderLeft: '4px solid rgb(234,179,8)' }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Stack spacing={0.5}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        📧 Recipients Ready
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {recipients.length} email{recipients.length !== 1 ? 's' : ''} selected
+                      </Typography>
+                    </Stack>
+                    <BrandButton
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setStep('recipients')}
+                    >
+                      Edit Recipients
+                    </BrandButton>
+                  </Stack>
                 </Paper>
 
-                <TextField
-                  label="Subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Email subject"
-                  fullWidth
-                />
+                {/* Subject Field */}
+                <Stack spacing={0.5}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Subject Line
+                  </Typography>
+                  <TextField
+                    label="Email subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Enter email subject..."
+                    fullWidth
+                    helperText={subject.length > 0 ? `${subject.length} characters` : 'Keep subject concise and compelling'}
+                  />
+                </Stack>
 
-                <TextField
-                  label="Body"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Email message"
-                  multiline
-                  minRows={6}
-                  fullWidth
-                />
+                {/* Body Field */}
+                <Stack spacing={0.5}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Email Body
+                  </Typography>
+                  <TextField
+                    label="Email message"
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder="Write your email message here..."
+                    multiline
+                    minRows={8}
+                    maxRows={12}
+                    fullWidth
+                    helperText={`${body.length} characters${body.length > 5000 ? ' ⚠ Approaching limit (5000)' : ''}`}
+                    FormHelperTextProps={{
+                      sx: { color: body.length > 5000 ? 'warning.main' : 'text.secondary' }
+                    }}
+                  />
+                </Stack>
 
-                <FormControlLabel
-                  control={<Checkbox checked={rotationEnabled} onChange={(e) => setRotationEnabled(e.target.checked)} />}
-                  label="Enable Email Rotation"
-                />
+                {/* Advanced Options Collapsible Section */}
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(100,116,139,0.05)', borderColor: 'rgba(100,116,139,0.2)' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    ⚙️ Sending Options
+                  </Typography>
+                  <Stack spacing={2}>
+                    <FormControlLabel
+                      control={<Checkbox checked={rotationEnabled} onChange={(e) => setRotationEnabled(e.target.checked)} />}
+                      label={
+                        <Stack spacing={0.5}>
+                          <Typography variant="body2" sx={{ fontWeight: 500 }}>Enable Email Account Rotation</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Distributes emails across multiple accounts to avoid hitting rate limits
+                          </Typography>
+                        </Stack>
+                      }
+                    />
 
-                {rotationEnabled && (
-                  <Stack spacing={1} sx={{ pl: 1 }}>
-                    <FormControl size="small" sx={{ maxWidth: 220 }}>
-                      <InputLabel id="emails-per-account-label">Emails per Account</InputLabel>
-                      <Select
-                        labelId="emails-per-account-label"
-                        value={String(emailsPerAccount)}
-                        label="Emails per Account"
-                        onChange={(e) => setEmailsPerAccount(parseInt(String(e.target.value), 10))}
-                      >
-                        <MenuItem value="5">5 emails</MenuItem>
-                        <MenuItem value="10">10 emails</MenuItem>
-                        <MenuItem value="15">15 emails</MenuItem>
-                      </Select>
-                    </FormControl>
-                    <Typography variant="caption" color="text.secondary">
-                      {accounts.length > 0
-                        ? `Will use ${accounts.length} accounts: ${accounts.map((a) => a.email_address).join(', ')}`
-                        : 'No accounts configured'}
-                    </Typography>
+                    {rotationEnabled && (
+                      <Stack spacing={1.5} sx={{ pl: 3, pt: 1, borderLeft: '2px solid rgba(234,179,8,0.2)' }}>
+                        <FormControl size="small" sx={{ maxWidth: 280 }}>
+                          <InputLabel id="emails-per-account-label">Emails per Account</InputLabel>
+                          <Select
+                            labelId="emails-per-account-label"
+                            value={String(emailsPerAccount)}
+                            label="Emails per Account"
+                            onChange={(e) => setEmailsPerAccount(parseInt(String(e.target.value), 10))}
+                          >
+                            <MenuItem value="5">5 emails</MenuItem>
+                            <MenuItem value="10">10 emails</MenuItem>
+                            <MenuItem value="15">15 emails</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.2)' }}>
+                          {accounts.length > 0 ? (
+                            <Stack spacing={0.5}>
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>✓ Accounts Ready: {accounts.length}</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {accounts.map((a) => a.email_address).join(', ')}
+                              </Typography>
+                            </Stack>
+                          ) : (
+                            <Typography variant="caption" color="error.main">⚠ No accounts configured - emails cannot be sent</Typography>
+                          )}
+                        </Paper>
+                      </Stack>
+                    )}
                   </Stack>
-                )}
+                </Paper>
               </Stack>
             )}
 
             {/* Step 3: Review */}
             {step === 'review' && campaign && (
-              <Stack spacing={2}>
-                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.30)' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    ✓ Campaign Ready to Send
-                  </Typography>
+              <Stack spacing={2.5}>
+                {/* Status Indicator */}
+                <Paper variant="outlined" sx={{ p: 2.5, bgcolor: 'rgba(34,197,94,0.10)', borderColor: 'rgba(34,197,94,0.35)', borderLeft: '4px solid rgb(34,197,94)' }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Box sx={{ fontSize: '1.5rem' }}>✓</Box>
+                    <Stack spacing={0.5} sx={{ flex: 1 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        Campaign Ready to Send
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Review details before sending to {campaign.total_recipients} recipient{campaign.total_recipients !== 1 ? 's' : ''}
+                      </Typography>
+                    </Stack>
+                  </Stack>
                 </Paper>
 
-                <Stack spacing={0.5}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
-                    Campaign Summary
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Recipients: {campaign.total_recipients}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Subject: {campaign.subject}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Rotation: {campaign.rotation_enabled ? `Enabled (${campaign.emails_per_account} per account)` : 'Disabled'}
-                  </Typography>
+                {/* Campaign Details Grid */}
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 2,
+                  }}
+                >
+                  {/* Recipients Card */}
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(100,116,139,0.05)', borderColor: 'rgba(100,116,139,0.2)' }}>
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>📧 Recipients</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                        {campaign.total_recipients}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Email addresses
+                      </Typography>
+                    </Stack>
+                  </Paper>
+
+                  {/* Rotation Info Card */}
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(100,116,139,0.05)', borderColor: 'rgba(100,116,139,0.2)' }}>
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>🔄 Rotation</Typography>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: campaign.rotation_enabled ? 'success.main' : 'text.secondary' }}>
+                        {campaign.rotation_enabled ? 'Enabled' : 'Disabled'}
+                      </Typography>
+                      {campaign.rotation_enabled && (
+                        <Typography variant="caption" color="text.secondary">
+                          {campaign.emails_per_account} emails/account
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Paper>
+                </Box>
+
+                {/* Subject Preview */}
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>📝 Subject Line</Typography>
+                  <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(100,116,139,0.05)', borderColor: 'rgba(100,116,139,0.2)' }}>
+                    <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                      {campaign.subject}
+                    </Typography>
+                  </Paper>
                 </Stack>
 
-                <Paper variant="outlined" sx={{ p: 2, maxHeight: 220, overflowY: 'auto', bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {campaign.body}
-                  </Typography>
-                </Paper>
+                {/* Email Body Preview */}
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>💬 Email Body Preview</Typography>
+                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflowY: 'auto', bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        whiteSpace: 'pre-wrap',
+                        lineHeight: 1.6,
+                        color: 'text.secondary',
+                        fontFamily: 'monospace'
+                      }}
+                    >
+                      {campaign.body}
+                    </Typography>
+                  </Paper>
+                </Stack>
+
+                {/* Warning if rotation enabled but no accounts */}
+                {campaign.rotation_enabled && accounts.length === 0 && (
+                  <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.35)', borderLeft: '4px solid rgb(239,68,68)' }}>
+                    <Stack spacing={0.5}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.main' }}>
+                        ⚠️ No Email Accounts Configured
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Campaign cannot be sent without configured email accounts. Please add accounts in settings first.
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                )}
               </Stack>
             )}
 

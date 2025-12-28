@@ -122,15 +122,26 @@ export const SignatureManager = ({
       <Paper
         variant="outlined"
         sx={{
-          p: 2,
-          bgcolor: 'background.paper',
-          borderColor: 'rgba(234,179,8,0.20)',
+          p: 2.5,
+          bgcolor: '#ffffff',
+          borderColor: '#e5e7eb',
+          borderRadius: '8px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          transition: 'all 0.2s ease',
         }}
       >
         <Stack spacing={2}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Email Signatures
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                fontWeight: 700,
+                fontSize: '18px',
+                color: '#111827',
+                letterSpacing: '-0.3px'
+              }}
+            >
+              ✍️ Email Signatures
             </Typography>
             <Button
               size="small"
@@ -138,64 +149,132 @@ export const SignatureManager = ({
               startIcon={<Plus className="w-4 h-4" />}
               onClick={handleNew}
               disabled={disabled}
+              sx={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                fontWeight: 600,
+                borderRadius: '6px',
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: '#1d4ed8',
+                },
+                '&:disabled': {
+                  backgroundColor: '#e5e7eb',
+                  color: '#9ca3af'
+                }
+              }}
             >
-              New
+              + New Signature
             </Button>
           </Stack>
 
           {signatures.length === 0 ? (
-            <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-              No signatures yet. Create one to add to emails.
-            </Typography>
+            <Paper
+              sx={{
+                p: 3,
+                textAlign: 'center',
+                bgcolor: '#f3f4f6',
+                borderRadius: '8px',
+                border: '1px dashed #d1d5db'
+              }}
+            >
+              <Typography variant="body2" sx={{ color: '#4b5563', fontWeight: 500 }}>
+                📝 No signatures yet
+              </Typography>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  color: '#6b7280',
+                  display: 'block',
+                  mt: 0.5
+                }}
+              >
+                Click "+ New Signature" to create your first email signature
+              </Typography>
+            </Paper>
           ) : (
-            <Stack spacing={1}>
+            <Stack spacing={1.5}
+              role="list"
+              aria-label="Email signatures"
+            >
               {signatures.map(signature => (
                 <Paper
                   key={signature.id}
                   variant="outlined"
+                  role="listitem"
                   sx={{
-                    p: 1.5,
-                    bgcolor: 'rgba(234,179,8,0.02)',
-                    borderColor: 'rgba(234,179,8,0.1)',
+                    p: 2,
+                    bgcolor: '#f9fafb',
+                    borderColor: '#e5e7eb',
+                    borderRadius: '6px',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      borderColor: '#d1d5db',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
+                    },
                   }}
                 >
-                  <Stack spacing={1}>
+                  <Stack spacing={1.5}>
                     <Stack direction="row" justifyContent="space-between" alignItems="start">
-                      <Stack>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      <Stack sx={{ flex: 1 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              fontWeight: 700,
+                              color: '#111827',
+                              fontSize: '14px'
+                            }}
+                          >
                             {signature.name}
                           </Typography>
                           {signature.isDefault && (
                             <Chip
                               label="Default"
                               size="small"
-                              variant="outlined"
+                              variant="filled"
                               icon={<Check className="w-3 h-3" />}
                               sx={{
-                                bgcolor: 'rgba(34,197,94,0.1)',
-                                borderColor: 'rgba(34,197,94,0.3)',
+                                backgroundColor: '#ecfdf5',
+                                borderColor: '#6ee7b7',
+                                color: '#10b981',
+                                fontWeight: 600,
+                                fontSize: '11px',
                               }}
                             />
                           )}
                         </Stack>
                         <Typography
                           variant="caption"
-                          color="text.secondary"
-                          sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}
+                          sx={{ 
+                            whiteSpace: 'pre-wrap', 
+                            color: '#4b5563',
+                            lineHeight: 1.5
+                          }}
                         >
                           {signature.content.substring(0, 100)}
                           {signature.content.length > 100 ? '...' : ''}
                         </Typography>
                       </Stack>
 
-                      <Stack direction="row" spacing={0.5}>
+                      <Stack direction="row" spacing={0.5} sx={{ ml: 2, flexShrink: 0 }}>
                         <Tooltip title="Use in email">
                           <Button
                             size="small"
                             variant="outlined"
                             onClick={() => handleInsert(signature)}
                             disabled={disabled}
+                            sx={{
+                              borderRadius: '6px',
+                              borderColor: '#2563eb',
+                              color: '#2563eb',
+                              fontWeight: 600,
+                              textTransform: 'none',
+                              '&:hover': {
+                                backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                                borderColor: '#1d4ed8',
+                              }
+                            }}
                           >
                             Insert
                           </Button>
@@ -205,6 +284,15 @@ export const SignatureManager = ({
                             size="small"
                             onClick={() => handleEdit(signature)}
                             disabled={disabled}
+                            aria-label={`Edit signature ${signature.name}`}
+                            sx={{
+                              borderRadius: '6px',
+                              color: '#4b5563',
+                              '&:hover': {
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                color: '#2563eb',
+                              }
+                            }}
                           >
                             <Edit2 className="w-4 h-4" />
                           </IconButton>
@@ -214,6 +302,15 @@ export const SignatureManager = ({
                             size="small"
                             onClick={() => handleDelete(signature.id)}
                             disabled={disabled}
+                            aria-label={`Delete signature ${signature.name}`}
+                            sx={{
+                              borderRadius: '6px',
+                              color: '#6b7280',
+                              '&:hover': {
+                                color: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                              }
+                            }}
                           >
                             <Trash2 className="w-4 h-4" />
                           </IconButton>
@@ -227,8 +324,18 @@ export const SignatureManager = ({
                         variant="text"
                         onClick={() => handleSetDefault(signature.id)}
                         disabled={disabled}
+                        sx={{
+                          color: '#2563eb',
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          padding: '4px 8px',
+                          justifyContent: 'flex-start',
+                          '&:hover': {
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                          }
+                        }}
                       >
-                        Set as Default
+                        ⭐ Set as Default
                       </Button>
                     )}
                   </Stack>
@@ -241,58 +348,114 @@ export const SignatureManager = ({
 
       {/* Dialog */}
       <Dialog open={showDialog} onClose={() => setShowDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {editingId ? 'Edit Signature' : 'Create New Signature'}
+        <DialogTitle
+          sx={{
+            fontWeight: 700,
+            fontSize: '18px',
+            color: '#111827',
+            borderBottom: '1px solid #e5e7eb',
+            py: 2,
+          }}
+        >
+          {editingId ? '✏️ Edit Signature' : '✍️ Create New Signature'}
         </DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ mt: 1 }}>
-            <TextField
-              label="Signature Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Professional, Formal, Casual"
-              fullWidth
-              size="small"
-              error={!formData.name.trim() && formData.content.trim() !== ''}
-              helperText={!formData.name.trim() && formData.content.trim() !== '' ? 'Name is required' : ''}
-            />
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            <Stack spacing={0.5}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: '#111827',
+                }}
+              >
+                Signature Name
+              </Typography>
+              <TextField
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="e.g., Professional, Formal, Casual"
+                fullWidth
+                size="small"
+                error={!formData.name.trim() && formData.content.trim() !== ''}
+                helperText={!formData.name.trim() && formData.content.trim() !== '' ? 'Name is required' : ''}
+                inputProps={{
+                  'aria-label': 'Signature name',
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '6px',
+                  },
+                }}
+              />
+            </Stack>
 
-            <TextField
-              label="Signature Content"
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder={`Best regards,
+            <Stack spacing={0.5}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 600,
+                  color: '#111827',
+                }}
+              >
+                Signature Content
+              </Typography>
+              <TextField
+                value={formData.content}
+                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                placeholder={`Best regards,
 John Doe
 john@example.com
 (555) 123-4567`}
-              multiline
-              minRows={6}
-              fullWidth
-              size="small"
-              error={!formData.content.trim() && formData.name.trim() !== ''}
-              helperText={!formData.content.trim() && formData.name.trim() !== '' ? 'Content is required' : 'Use markdown for formatting'}
-            />
+                multiline
+                minRows={6}
+                fullWidth
+                size="small"
+                error={!formData.content.trim() && formData.name.trim() !== ''}
+                helperText={!formData.content.trim() && formData.name.trim() !== '' ? 'Content is required' : 'Plain text or markdown formatting'}
+                inputProps={{
+                  'aria-label': 'Signature content',
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '6px',
+                  },
+                }}
+              />
+            </Stack>
 
             {/* Preview */}
             {formData.content && (
               <Paper
                 sx={{
-                  p: 1.5,
-                  bgcolor: 'rgba(234,179,8,0.05)',
-                  borderColor: 'rgba(234,179,8,0.2)',
+                  p: 2,
+                  bgcolor: '#f9fafb',
+                  borderColor: '#e5e7eb',
                   border: '1px solid',
+                  borderRadius: '6px',
                 }}
               >
-                <Typography variant="caption" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  Preview
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    fontWeight: 700,
+                    color: '#4b5563',
+                    display: 'block',
+                    mb: 1,
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  📋 Preview
                 </Typography>
                 <Typography
-                  variant="caption"
+                  variant="body2"
                   sx={{
                     whiteSpace: 'pre-wrap',
-                    display: 'block',
-                    mt: 0.5,
-                    color: 'text.secondary',
+                    color: '#111827',
+                    lineHeight: 1.6,
+                    fontSize: '13px',
                   }}
                 >
                   {formData.content}
@@ -301,14 +464,42 @@ john@example.com
             )}
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowDialog(false)}>Cancel</Button>
+        <DialogActions
+          sx={{
+            borderTop: '1px solid #e5e7eb',
+            padding: '16px',
+            gap: 1,
+          }}
+        >
+          <Button 
+            onClick={() => setShowDialog(false)}
+            sx={{
+              borderRadius: '6px',
+              textTransform: 'none',
+              borderColor: '#e5e7eb',
+              color: '#4b5563',
+            }}
+          >
+            Cancel
+          </Button>
           <Button
             variant="contained"
             onClick={handleSave}
             disabled={!formData.name.trim() || !formData.content.trim()}
+            sx={{
+              borderRadius: '6px',
+              textTransform: 'none',
+              backgroundColor: '#2563eb',
+              '&:hover': {
+                backgroundColor: '#1d4ed8',
+              },
+              '&:disabled': {
+                backgroundColor: '#e5e7eb',
+                color: '#9ca3af'
+              }
+            }}
           >
-            {editingId ? 'Update' : 'Create'}
+            {editingId ? '✏️ Update' : '✍️ Create'}
           </Button>
         </DialogActions>
       </Dialog>

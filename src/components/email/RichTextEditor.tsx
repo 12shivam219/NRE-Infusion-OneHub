@@ -38,6 +38,34 @@ interface RichTextEditorProps {
   showFormatting?: boolean;
 }
 
+interface ToolbarButtonProps {
+  tooltip: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}
+
+const ToolbarButton = ({ tooltip, onClick, disabled: isDisabled, children }: ToolbarButtonProps) => (
+  <Tooltip title={tooltip}>
+    <IconButton
+      size="small"
+      onClick={onClick}
+      disabled={isDisabled}
+      sx={{
+        '&:hover': {
+          bgcolor: 'rgba(37, 99, 235, 0.1)',
+          color: '#2563eb',
+        },
+        borderRadius: '6px',
+        transition: 'all 0.2s ease',
+        color: '#4b5563',
+      }}
+    >
+      {children}
+    </IconButton>
+  </Tooltip>
+);
+
 export const RichTextEditor = ({
   value,
   onChange,
@@ -51,7 +79,6 @@ export const RichTextEditor = ({
   const [history, setHistory] = useState<string[]>([value]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [textColor, setTextColor] = useState('#000000');
   const [fontSize, setFontSize] = useState('16');
   const [fontFamily, setFontFamily] = useState('Arial');
   const [showLinkDialog, setShowLinkDialog] = useState(false);
@@ -126,15 +153,6 @@ export const RichTextEditor = ({
     setLinkText('');
   };
 
-  // Insert snippet
-  const insertSnippet = (snippet: string) => {
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-    const start = textarea.selectionStart;
-    const newValue = value.substring(0, start) + snippet + value.substring(start);
-    onChange(newValue);
-    addToHistory(newValue);
-  };
-
   // Get character and word count
   const charCount = value.length;
   const wordCount = value.trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -143,309 +161,254 @@ export const RichTextEditor = ({
     <Paper
       variant="outlined"
       sx={{
-        p: 2,
-        bgcolor: 'background.paper',
-        borderColor: 'rgba(234,179,8,0.20)',
+        p: 2.5,
+        bgcolor: '#ffffff',
+        borderColor: '#e5e7eb',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        transition: 'all 0.2s ease',
       }}
     >
-      <Stack spacing={1.5}>
+      <Stack spacing={2}>
+        {/* Header */}
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 700,
+            fontSize: '18px',
+            color: '#111827',
+            letterSpacing: '-0.3px',
+          }}
+        >
+          ✏️ Email Body
+        </Typography>
+
         {/* Toolbar */}
         {showFormatting && (
           <>
             <Stack spacing={1}>
-              {/* Row 1: Basic Formatting */}
-              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                <Tooltip title="Bold (Ctrl+B)">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('**', '**')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
+              {/* Row 1: Text Styling */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  bgcolor: '#f9fafb',
+                  borderColor: '#e5e7eb',
+                  borderRadius: '6px',
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    mb: 0.75,
+                    fontWeight: 700,
+                    color: '#4b5563',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Text Formatting
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <ToolbarButton tooltip="Bold (Ctrl+B)" onClick={() => applyFormatting('**', '**')} disabled={disabled}>
                     <FormatBold fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                  </ToolbarButton>
 
-                <Tooltip title="Italic (Ctrl+I)">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('*', '*')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
+                  <ToolbarButton tooltip="Italic (Ctrl+I)" onClick={() => applyFormatting('*', '*')} disabled={disabled}>
                     <FormatItalic fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                  </ToolbarButton>
 
-                <Tooltip title="Underline">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('<u>', '</u>')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
+                  <ToolbarButton tooltip="Underline" onClick={() => applyFormatting('<u>', '</u>')} disabled={disabled}>
                     <FormatUnderlined fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                  </ToolbarButton>
 
-                <Tooltip title="Strikethrough">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('~~', '~~')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
+                  <ToolbarButton tooltip="Strikethrough" onClick={() => applyFormatting('~~', '~~')} disabled={disabled}>
                     <StrikethroughS fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                  </ToolbarButton>
 
-                <Divider orientation="vertical" flexItem />
+                  <Divider orientation="vertical" flexItem sx={{ my: 0.5, borderColor: '#d1d5db' }} />
 
-                {/* Font Size */}
-                <select
-                  value={fontSize}
-                  onChange={(e) => setFontSize(e.target.value)}
-                  disabled={disabled}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(234,179,8,0.2)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="12">12px</option>
-                  <option value="14">14px</option>
-                  <option value="16">16px</option>
-                  <option value="18">18px</option>
-                  <option value="20">20px</option>
-                  <option value="24">24px</option>
-                </select>
-
-                {/* Font Family */}
-                <select
-                  value={fontFamily}
-                  onChange={(e) => setFontFamily(e.target.value)}
-                  disabled={disabled}
-                  style={{
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(234,179,8,0.2)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    fontFamily: fontFamily,
-                  }}
-                >
-                  <option value="Arial">Arial</option>
-                  <option value="Verdana">Verdana</option>
-                  <option value="Georgia">Georgia</option>
-                  <option value="Times New Roman">Times New Roman</option>
-                  <option value="Courier New">Courier New</option>
-                  <option value="Trebuchet MS">Trebuchet MS</option>
-                </select>
-
-                <Divider orientation="vertical" flexItem />
-
-                {/* Lists */}
-                <Tooltip title="Bullet List">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('• ')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <FormatListBulleted fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Numbered List">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('1. ')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <FormatListNumbered fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Divider orientation="vertical" flexItem />
-
-                {/* Alignment */}
-                <Tooltip title="Align Left">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('\n⬅ ')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <FormatAlignLeft fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Align Center">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('\n🔹 ')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <FormatAlignCenter fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Tooltip title="Align Right">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('\n➡ ')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <FormatAlignRight fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                <Divider orientation="vertical" flexItem />
-
-                {/* Link */}
-                <Tooltip title="Insert Link">
-                  <IconButton
-                    size="small"
-                    onClick={() => setShowLinkDialog(true)}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <LinkIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                {/* Code */}
-                <Tooltip title="Code Block">
-                  <IconButton
-                    size="small"
-                    onClick={() => applyFormatting('```\n', '\n```')}
-                    disabled={disabled}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
-                    <Code fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-
-                {/* Color */}
-                <Tooltip title="Text Color">
-                  <Box position="relative">
-                    <IconButton
-                      size="small"
-                      onClick={() => setShowColorPicker(!showColorPicker)}
+                  {/* Font Size */}
+                  <Tooltip title="Font Size">
+                    <select
+                      value={fontSize}
+                      onChange={(e) => setFontSize(e.target.value)}
                       disabled={disabled}
-                      sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        backgroundColor: '#ffffff',
+                        color: '#111827',
+                        fontWeight: 500,
+                      }}
                     >
-                      <Palette fontSize="small" />
-                    </IconButton>
-                    {showColorPicker && (
-                      <Paper
+                      <option value="12">12px</option>
+                      <option value="14">14px</option>
+                      <option value="16">16px</option>
+                      <option value="18">18px</option>
+                      <option value="20">20px</option>
+                      <option value="24">24px</option>
+                    </select>
+                  </Tooltip>
+
+                  {/* Font Family */}
+                  <Tooltip title="Font Family">
+                    <select
+                      value={fontFamily}
+                      onChange={(e) => setFontFamily(e.target.value)}
+                      disabled={disabled}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid #e5e7eb',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontFamily: fontFamily,
+                        backgroundColor: '#ffffff',
+                        color: '#111827',
+                        fontWeight: 500,
+                      }}
+                    >
+                      <option value="Arial">Arial</option>
+                      <option value="Verdana">Verdana</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Courier New">Courier New</option>
+                      <option value="Trebuchet MS">Trebuchet MS</option>
+                    </select>
+                  </Tooltip>
+
+                  <Divider orientation="vertical" flexItem sx={{ my: 0.5, borderColor: '#d1d5db' }} />
+
+                  {/* Text Color */}
+                  <Tooltip title="Text Color">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        disabled={disabled}
                         sx={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          zIndex: 1000,
-                          p: 1,
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(4, 1fr)',
-                          gap: 1,
-                          mt: 1,
+                          '&:hover': {
+                            bgcolor: 'rgba(37, 99, 235, 0.1)',
+                            color: '#2563eb',
+                          },
+                          borderRadius: '6px',
+                          transition: 'all 0.2s ease',
+                          color: '#4b5563',
                         }}
                       >
-                        {['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#808080'].map((color) => (
-                          <Box
-                            key={color}
-                            onClick={() => {
-                              setTextColor(color);
-                              setShowColorPicker(false);
-                            }}
-                            sx={{
-                              width: '24px',
-                              height: '24px',
-                              bgcolor: color,
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              border: textColor === color ? '2px solid gold' : '1px solid #ccc',
-                            }}
-                          />
-                        ))}
-                      </Paper>
-                    )}
-                  </Box>
-                </Tooltip>
+                        <Palette fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Box>
+              </Paper>
 
-                <Divider orientation="vertical" flexItem />
+              {/* Row 2: List & Alignment */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  bgcolor: '#f9fafb',
+                  borderColor: '#e5e7eb',
+                  borderRadius: '6px',
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    mb: 0.75,
+                    fontWeight: 700,
+                    color: '#4b5563',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Structure
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Lists */}
+                  <ToolbarButton tooltip="Bullet List" onClick={() => applyFormatting('• ')} disabled={disabled}>
+                    <FormatListBulleted fontSize="small" />
+                  </ToolbarButton>
 
-                {/* Undo/Redo */}
-                <Tooltip title="Undo">
-                  <IconButton
-                    size="small"
-                    onClick={handleUndo}
-                    disabled={disabled || historyIndex === 0}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
+                  <ToolbarButton tooltip="Numbered List" onClick={() => applyFormatting('1. ')} disabled={disabled}>
+                    <FormatListNumbered fontSize="small" />
+                  </ToolbarButton>
+
+                  <Divider orientation="vertical" flexItem sx={{ my: 0.5, borderColor: '#d1d5db' }} />
+
+                  {/* Alignment */}
+                  <ToolbarButton tooltip="Align Left" onClick={() => applyFormatting('\n⬅ ')} disabled={disabled}>
+                    <FormatAlignLeft fontSize="small" />
+                  </ToolbarButton>
+
+                  <ToolbarButton tooltip="Align Center" onClick={() => applyFormatting('\n🔹 ')} disabled={disabled}>
+                    <FormatAlignCenter fontSize="small" />
+                  </ToolbarButton>
+
+                  <ToolbarButton tooltip="Align Right" onClick={() => applyFormatting('\n➡ ')} disabled={disabled}>
+                    <FormatAlignRight fontSize="small" />
+                  </ToolbarButton>
+                </Box>
+              </Paper>
+
+              {/* Row 3: Advanced */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.5,
+                  bgcolor: '#f9fafb',
+                  borderColor: '#e5e7eb',
+                  borderRadius: '6px',
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    mb: 0.75,
+                    fontWeight: 700,
+                    color: '#4b5563',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Advanced
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {/* Link */}
+                  <ToolbarButton tooltip="Insert Link" onClick={() => setShowLinkDialog(true)} disabled={disabled}>
+                    <LinkIcon fontSize="small" />
+                  </ToolbarButton>
+
+                  <ToolbarButton tooltip="Insert Code" onClick={() => applyFormatting('<code>', '</code>')} disabled={disabled}>
+                    <Code fontSize="small" />
+                  </ToolbarButton>
+
+                  <Divider orientation="vertical" flexItem sx={{ my: 0.5, borderColor: '#d1d5db' }} />
+
+                  {/* Undo/Redo */}
+                  <ToolbarButton tooltip="Undo" onClick={handleUndo} disabled={disabled || historyIndex === 0}>
                     <Undo fontSize="small" />
-                  </IconButton>
-                </Tooltip>
+                  </ToolbarButton>
 
-                <Tooltip title="Redo">
-                  <IconButton
-                    size="small"
-                    onClick={handleRedo}
-                    disabled={disabled || historyIndex === history.length - 1}
-                    sx={{ '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } }}
-                  >
+                  <ToolbarButton tooltip="Redo" onClick={handleRedo} disabled={disabled || historyIndex === history.length - 1}>
                     <Redo fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-
-              {/* Row 2: Quick Snippets */}
-              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => insertSnippet('Best regards,\n')}
-                  disabled={disabled}
-                  sx={{ fontSize: '11px' }}
-                >
-                  Best Regards
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => insertSnippet('Thank you for your attention.\n')}
-                  disabled={disabled}
-                  sx={{ fontSize: '11px' }}
-                >
-                  Thank You
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => insertSnippet('Looking forward to hearing from you.\n')}
-                  disabled={disabled}
-                  sx={{ fontSize: '11px' }}
-                >
-                  Looking Forward
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={() => insertSnippet('If you have any questions, please feel free to reach out.\n')}
-                  disabled={disabled}
-                  sx={{ fontSize: '11px' }}
-                >
-                  Questions
-                </Button>
-              </Box>
+                  </ToolbarButton>
+                </Box>
+              </Paper>
             </Stack>
 
-            <Divider />
+            <Divider sx={{ borderColor: '#e5e7eb' }} />
           </>
         )}
 
@@ -462,33 +425,138 @@ export const RichTextEditor = ({
           variant="outlined"
           size="small"
           inputProps={{
-            'aria-label': 'Email body',
+            'aria-label': 'Email body content',
             spellCheck: 'true',
           }}
           sx={{
             '& .MuiOutlinedInput-root': {
               fontFamily: fontFamily,
               fontSize: `${fontSize}px`,
-              color: textColor,
+              backgroundColor: '#f9fafb',
+              borderRadius: '6px',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                borderColor: '#d1d5db',
+              },
+              '&.Mui-focused': {
+                boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
+                borderColor: '#2563eb',
+              },
+            },
+            '& .MuiOutlinedInput-input::placeholder': {
+              color: '#9ca3af',
+              opacity: 1,
             },
           }}
         />
 
         {/* Character/Word Count */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="caption" color="text.secondary">
-            Characters: {charCount} | Words: {wordCount}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {charCount > 5000 && <span style={{ color: 'orange' }}>⚠ Large email</span>}
-          </Typography>
-        </Stack>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            bgcolor: '#f3f4f6',
+            borderColor: '#e5e7eb',
+            borderRadius: '6px',
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
+            <Stack direction="row" spacing={2}>
+              <Stack spacing={0.25}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700,
+                    color: '#4b5563',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Words
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: '#2563eb',
+                    fontSize: '16px',
+                  }}
+                >
+                  {wordCount}
+                </Typography>
+              </Stack>
+              <Stack spacing={0.25}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700,
+                    color: '#4b5563',
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  Characters
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: charCount > 5000 ? '#f97316' : '#111827',
+                    fontSize: '16px',
+                  }}
+                >
+                  {charCount}
+                </Typography>
+              </Stack>
+            </Stack>
+
+            {charCount > 0 && (
+              <Stack spacing={0.25} alignItems="flex-end">
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: charCount > 5000 ? '#f97316' : '#10b981',
+                    fontWeight: 600,
+                  }}
+                >
+                  {charCount > 5000 ? '⚠ Over recommended limit' : '✓ Good'}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: '#4b5563',
+                  }}
+                >
+                  Limit: 5000 chars
+                </Typography>
+              </Stack>
+            )}
+          </Stack>
+        </Paper>
 
         {/* Link Dialog */}
         {showLinkDialog && (
-          <Paper sx={{ p: 2, bgcolor: 'rgba(234,179,8,0.1)' }}>
-            <Stack spacing={1}>
-              <Typography variant="subtitle2">Insert Link</Typography>
+          <Paper
+            sx={{
+              p: 2,
+              bgcolor: '#ecfdf5',
+              borderColor: '#6ee7b7',
+              border: '1px solid',
+              borderRadius: '6px',
+            }}
+          >
+            <Stack spacing={1.5}>
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  fontWeight: 700,
+                  color: '#111827',
+                }}
+              >
+                Insert Link
+              </Typography>
               <TextField
                 size="small"
                 label="Link Text"
@@ -496,6 +564,11 @@ export const RichTextEditor = ({
                 onChange={(e) => setLinkText(e.target.value)}
                 placeholder="Display text"
                 fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '6px',
+                  },
+                }}
               />
               <TextField
                 size="small"
@@ -504,9 +577,23 @@ export const RichTextEditor = ({
                 onChange={(e) => setLinkUrl(e.target.value)}
                 placeholder="https://example.com"
                 fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '6px',
+                  },
+                }}
               />
               <Stack direction="row" spacing={1} justifyContent="flex-end">
-                <Button size="small" onClick={() => setShowLinkDialog(false)}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setShowLinkDialog(false)}
+                  sx={{
+                    borderRadius: '6px',
+                    textTransform: 'none',
+                    borderColor: '#e5e7eb',
+                  }}
+                >
                   Cancel
                 </Button>
                 <Button
@@ -514,8 +601,16 @@ export const RichTextEditor = ({
                   variant="contained"
                   onClick={handleInsertLink}
                   disabled={!linkUrl || !linkText}
+                  sx={{
+                    borderRadius: '6px',
+                    textTransform: 'none',
+                    backgroundColor: '#10b981',
+                    '&:hover': {
+                      backgroundColor: '#059669',
+                    },
+                  }}
                 >
-                  Insert
+                  Insert Link
                 </Button>
               </Stack>
             </Stack>

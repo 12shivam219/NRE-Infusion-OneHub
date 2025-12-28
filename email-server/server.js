@@ -7,12 +7,25 @@ import rateLimit from 'express-rate-limit';
 import sanitizeHtml from 'sanitize-html';
 import { encryptPassword, decryptPassword, isEncrypted } from './encryption.js';
 import { createClient } from '@supabase/supabase-js';
+// [FIX 1] Import Queue and Redis dependencies
+import { Queue, Worker } from 'bullmq';
+import IORedis from 'ioredis';
+import { RedisStore } from 'rate-limit-redis';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.EMAIL_SERVER_PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+
+// [FIX 1] Redis Connection Setup
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const connection = new IORedis(REDIS_URL, {
+  maxRetriesPerRequest: null, // Required for BullMQ
+});
+
+// [FIX 1] Create Persistent Email Queue
+const emailQueue = new Queue('bulk-email-queue', { connection });
 
 // Supabase client for persisting campaign status (server-side key required)
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -55,19 +68,21 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// SECURITY: Rate limiting to prevent abuse
+// [FIX 4] SECURITY: Distributed Rate limiting using Redis
 const emailLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: 'Too many requests',
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({
+    sendCommand: (...args) => connection.call(...args),
+  }),
 });
 
 app.use(bodyParser.json({ limit: '10mb' }));
 
 // SECURITY: HTML sanitization options using sanitize-html library
-// Battle-tested library that properly handles XSS prevention
 const SANITIZE_OPTIONS = {
   allowedTags: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'ol', 'li', 'div', 'span'],
   allowedAttributes: {
@@ -112,9 +127,6 @@ const emailAccounts = new Map();
 
 // Initialize email accounts from environment variables
 function initializeEmailAccounts() {
-  // Parse email accounts from .env
-  // Format: EMAIL_ACCOUNTS=email1:password1;email2:password2;email3:password3
-  // Passwords can be encrypted (format: iv:encryptedData:authTag) or plain text
   const accountsEnv = process.env.EMAIL_ACCOUNTS;
   
   if (accountsEnv) {
@@ -123,7 +135,6 @@ function initializeEmailAccounts() {
       const [email, encryptedPassword] = account.split(':');
       if (email && encryptedPassword) {
         try {
-          // Try to decrypt if encrypted, otherwise use as-is
           let password = encryptedPassword.trim();
           if (isEncrypted(encryptedPassword)) {
             password = decryptPassword(encryptedPassword.trim());
@@ -151,11 +162,9 @@ function initializeEmailAccounts() {
     });
   }
   
-  // Fallback: single account from legacy .env format
   if (emailAccounts.size === 0 && process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
     try {
       let password = process.env.EMAIL_PASSWORD;
-      // Try to decrypt if encrypted
       if (isEncrypted(password)) {
         password = decryptPassword(password);
       }
@@ -187,6 +196,189 @@ function initializeEmailAccounts() {
 
 // Initialize on startup
 initializeEmailAccounts();
+
+// ==========================================
+// [FIX 1] BACKGROUND WORKER LOGIC
+// Replaces processBulkEmailsInBackground with a persistent worker
+// ==========================================
+
+const emailWorker = new Worker('bulk-email-queue', async (job) => {
+  const { campaignId, emails, subject, body, rotationConfig, accountEmails, recipientAccountMap } = job.data;
+  
+  console.log(`[Worker] Processing campaign ${campaignId} with ${emails.length} emails`);
+  
+  // Rehydrate Transporters: Look up the transporter objects using the emails passed in the job
+  // (We cannot pass the transporter objects via Redis because they are not JSON serializable)
+  const activeAccounts = [];
+  if (accountEmails && Array.isArray(accountEmails)) {
+    accountEmails.forEach(email => {
+      const acc = emailAccounts.get(email);
+      if (acc) activeAccounts.push(acc);
+    });
+  }
+
+  // Fallback if no specific accounts found/passed (should not happen if valid req)
+  if (activeAccounts.length === 0) {
+    console.warn('[Worker] No valid accounts found for job, using all available.');
+    activeAccounts.push(...emailAccounts.values());
+  }
+  
+  // Execute the sending logic
+  await processBulkEmailsLogic(campaignId, emails, subject, body, rotationConfig, activeAccounts, recipientAccountMap);
+
+}, { connection });
+
+// Handle worker errors
+emailWorker.on('failed', (job, err) => {
+  console.error(`[Worker] Job ${job.id} failed with error ${err.message}`);
+});
+
+// The core sending logic (Refactored for Batching)
+async function processBulkEmailsLogic(campaignId, emails, subject, body, rotationConfig, accounts, recipientAccountMap = {}) {
+  const startTime = Date.now();
+  console.log(`[processBulkEmailsLogic] Started. Using ${accounts.length} accounts.`);
+  
+  await updateCampaignRecord(campaignId, { status: 'processing', started_at: new Date().toISOString() });
+
+  const normalizedRecipientMap = {};
+  for (const [k, v] of Object.entries(recipientAccountMap || {})) {
+    if (typeof k === 'string' && k.trim()) {
+      normalizedRecipientMap[k.toLowerCase()] = (v || '').toLowerCase();
+    }
+  }
+
+  const accountEmailMap = new Map();
+  for (const acc of accounts) {
+    if (acc && acc.email) accountEmailMap.set(acc.email.toLowerCase(), acc);
+  }
+
+  // [FIX 2] Batching Configuration
+  const EVENT_BATCH_SIZE = 50; 
+  let eventBuffer = [];
+  let sentCount = 0;
+  let failedCount = 0;
+
+  // Helper to flush events to DB
+  const flushEvents = async () => {
+    if (eventBuffer.length === 0) return;
+
+    if (supabase) {
+      // Use RPC for atomic batch updates to reduce connection overhead
+      // You must have the 'append_campaign_event' RPC function in Supabase
+      const progress = Math.round(((sentCount + failedCount) / emails.length) * 100);
+      
+      const { error: rpcError } = await supabase.rpc('append_campaign_event', {
+        p_id: campaignId,
+        p_event: eventBuffer, // Pass array of events
+        p_sent: sentCount,    // Pass cumulative totals
+        p_failed: failedCount,
+        p_processed: sentCount + failedCount,
+        p_progress: progress,
+      });
+
+      if (rpcError) {
+        console.error('RPC append_campaign_event error:', rpcError.message);
+        // Fallback: If RPC fails, try standard update (slower but safer)
+        await updateCampaignRecord(campaignId, {
+            processed: sentCount + failedCount,
+            progress: progress
+        });
+      }
+    } else {
+      // Fallback for no-supabase mode (update JSON column)
+      const { data: current } = await getCampaignRecord(campaignId);
+      const details = (current && current.details) ? [...current.details, ...eventBuffer] : [...eventBuffer];
+      await updateCampaignRecord(campaignId, {
+        sent: sentCount,
+        failed: failedCount,
+        processed: sentCount + failedCount,
+        progress: Math.round(((sentCount + failedCount) / emails.length) * 100),
+        details,
+      });
+    }
+    
+    // Clear buffer after writing
+    eventBuffer = [];
+  };
+
+  for (let i = 0; i < emails.length; i++) {
+    const recipient = emails[i];
+    const recipientEmail = typeof recipient === 'string' ? recipient : (recipient.email || '').toString();
+
+    const mappedAccountEmail = normalizedRecipientMap[recipientEmail.toLowerCase()];
+    let account;
+    if (mappedAccountEmail && accountEmailMap.has(mappedAccountEmail)) {
+      account = accountEmailMap.get(mappedAccountEmail);
+    } else {
+      const accountIndex = accounts.length > 1 ? i % accounts.length : 0;
+      account = accounts[accountIndex];
+    }
+
+    try {
+      const sanitizedBody = sanitizeHtml(body, SANITIZE_OPTIONS);
+      const sanitizedSubject = sanitizeHtml(subject, { allowedTags: [], allowedAttributes: {} });
+
+      const mailOptions = {
+        from: account.email,
+        to: recipientEmail,
+        subject: sanitizedSubject,
+        html: `<p style="font-family: Arial, sans-serif; white-space: pre-wrap;">${sanitizedBody.replace(/\n/g, '<br>')}</p>`,
+        text: body,
+      };
+
+      const info = await account.transporter.sendMail(mailOptions);
+
+      sentCount++;
+      // Push to buffer instead of writing immediately
+      eventBuffer.push({
+        email: recipientEmail,
+        status: 'sent',
+        fromAccount: account.email,
+        messageId: info.messageId,
+        sentAt: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      console.error(`Failed to send email to ${recipientEmail}:`, error.message);
+      failedCount++;
+      eventBuffer.push({
+        email: recipientEmail,
+        status: 'failed',
+        fromAccount: account.email,
+        error: error.message,
+        failedAt: new Date().toISOString(),
+      });
+    }
+
+    // Flush batch if full
+    if (eventBuffer.length >= EVENT_BATCH_SIZE) {
+      await flushEvents();
+    }
+
+    // Throttle slightly (50ms) to prevent absolute network saturation
+    if (i < emails.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  }
+
+  // Final flush for remaining events
+  await flushEvents();
+
+  console.log(`[processBulkEmailsLogic] Completing campaign ${campaignId}`);
+  
+  if (supabase) {
+    const { error } = await supabase.from('bulk_email_campaign_status')
+      .update({ status: 'completed', completed_at: new Date().toISOString(), progress: 100 })
+      .eq('id', campaignId);
+    if (error) console.error('Failed to mark campaign completed:', error.message);
+  } else {
+    await updateCampaignRecord(campaignId, { status: 'completed', completed_at: new Date().toISOString(), progress: 100 });
+  }
+
+  const totalTime = Date.now() - startTime;
+  console.log(`[Worker] Campaign ${campaignId} finished in ${totalTime}ms`);
+}
+
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -230,26 +422,19 @@ app.post('/api/send-email', emailLimiter, authenticateRequest, async (req, res) 
   try {
     const { to, subject, body, from } = req.body;
 
-    // SECURITY: Validate required fields
     if (!to || !subject || !body) {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
-
-    // SECURITY: Validate email format
     if (!isValidEmail(to)) {
       return res.status(400).json({ success: false, error: 'Invalid email format' });
     }
-
-    // SECURITY: Validate lengths
     if (subject.length < 1 || subject.length > 500) {
       return res.status(400).json({ success: false, error: 'Invalid subject length' });
     }
-
     if (body.length < 1 || body.length > 50000) {
       return res.status(400).json({ success: false, error: 'Invalid body length' });
     }
 
-    // Get the specified account or use the first available
     let account;
     if (from && emailAccounts.has(from)) {
       account = emailAccounts.get(from);
@@ -261,15 +446,9 @@ app.post('/api/send-email', emailLimiter, authenticateRequest, async (req, res) 
       return res.status(503).json({ success: false, error: 'Service unavailable' });
     }
 
-    // SECURITY: Sanitize HTML content to prevent XSS injection
-    // Using battle-tested sanitize-html library instead of regex
     const sanitizedBody = sanitizeHtml(body, SANITIZE_OPTIONS);
-    const sanitizedSubject = sanitizeHtml(subject, {
-      allowedTags: [],
-      allowedAttributes: {}
-    });
+    const sanitizedSubject = sanitizeHtml(subject, { allowedTags: [], allowedAttributes: {} });
 
-    // Create email options
     const mailOptions = {
       from: account.email,
       to: to,
@@ -278,55 +457,33 @@ app.post('/api/send-email', emailLimiter, authenticateRequest, async (req, res) 
       text: body,
     };
 
-    // Send email
     const info = await account.transporter.sendMail(mailOptions);
 
-    if (NODE_ENV === 'development') {
-      console.log('Email sent:', info.messageId);
-    }
+    if (NODE_ENV === 'development') console.log('Email sent:', info.messageId);
 
     res.json({ success: true, message: 'Email sent', messageId: info.messageId });
   } catch (error) {
-    if (NODE_ENV === 'development') {
-      console.error('Error sending email:', error);
-    }
+    if (NODE_ENV === 'development') console.error('Error sending email:', error);
     res.status(500).json({ success: false, error: 'Service unavailable' });
   }
 });
 
-// Helper function to generate unique campaign ID
 function generateCampaignId() {
   return `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 // DB-backed helpers (Supabase)
 async function createCampaignRecord(campaign) {
-  if (!supabase) {
-    console.warn('❌ Supabase not configured - cannot create campaign record');
-    return null;
-  }
-  
-  console.log(`[createCampaignRecord] Creating record for campaign: ${campaign.id}`);
-  console.log(`[createCampaignRecord] Record data:`, JSON.stringify(campaign, null, 2));
-  
+  if (!supabase) return null;
   const { data, error } = await supabase.from('bulk_email_campaign_status').insert(campaign).select().single();
-  if (error) {
-    console.error('❌ Supabase insert error:', error.message || error);
-    console.error('❌ Full error object:', JSON.stringify(error, null, 2));
-    console.error('❌ Campaign record that failed to insert:', campaign);
-    return null;
-  }
-  console.log(`✅ Campaign record created: ${campaign.id}`);
+  if (error) console.error('❌ Supabase insert error:', error.message);
   return data;
 }
 
 async function updateCampaignRecord(id, updates) {
   if (!supabase) return null;
   const { data, error } = await supabase.from('bulk_email_campaign_status').update(updates).eq('id', id).select().single();
-  if (error) {
-    console.error('Supabase update error:', error.message || error);
-    return null;
-  }
+  if (error) console.error('Supabase update error:', error.message);
   return data;
 }
 
@@ -336,250 +493,41 @@ async function getCampaignRecord(id) {
   return { data, error };
 }
 
-// Background worker function - processes emails asynchronously and persists status to Supabase
-async function processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, accounts, recipientAccountMap = {}) {
-  // mark started
-  const startTime = Date.now();
-  console.log(`[processBulkEmails] Starting campaign ${campaignId} with ${emails.length} emails`);
-  console.log(`[processBulkEmails] Using ${accounts.length} email account(s):`, accounts.map(a => a.email).join(', '));
-  await updateCampaignRecord(campaignId, { status: 'processing', started_at: new Date().toISOString() });
-
-  // Normalize recipient->account map keys and account emails for case-insensitive lookup
-  const normalizedRecipientMap = {};
-  for (const [k, v] of Object.entries(recipientAccountMap || {})) {
-    if (typeof k === 'string' && k.trim()) {
-      normalizedRecipientMap[k.toLowerCase()] = (v || '').toLowerCase();
-    }
-  }
-
-  // Map account email -> account object for quick lookup
-  const accountEmailMap = new Map();
-  for (const acc of accounts) {
-    if (acc && acc.email) accountEmailMap.set(acc.email.toLowerCase(), acc);
-  }
-
-  for (let i = 0; i < emails.length; i++) {
-    const recipient = emails[i];
-    const recipientEmail = typeof recipient === 'string' ? recipient : (recipient.email || '').toString();
-
-    // If recipient is explicitly assigned to an account, use that account
-    const mappedAccountEmail = normalizedRecipientMap[recipientEmail.toLowerCase()];
-    let account;
-    if (mappedAccountEmail && accountEmailMap.has(mappedAccountEmail)) {
-      account = accountEmailMap.get(mappedAccountEmail);
-      if (NODE_ENV === 'development') {
-        console.log(`[processBulkEmails] Recipient ${recipientEmail} assigned to ${mappedAccountEmail}`);
-      }
-    } else {
-      // Distribute emails across selected accounts (round-robin)
-      // If only 1 account selected, use it for all emails
-      // If multiple accounts selected, rotate through them
-      const accountIndex = accounts.length > 1 ? i % accounts.length : 0;
-      account = accounts[accountIndex];
-    }
-
-    try {
-      const sanitizedBody = sanitizeHtml(body, SANITIZE_OPTIONS);
-      const sanitizedSubject = sanitizeHtml(subject, { allowedTags: [], allowedAttributes: {} });
-
-      const mailOptions = {
-        from: account.email,
-        to: typeof recipient === 'string' ? recipient : recipient.email,
-        subject: sanitizedSubject,
-        html: `<p style="font-family: Arial, sans-serif; white-space: pre-wrap;">${sanitizedBody.replace(/\n/g, '<br>')}</p>`,
-        text: body,
-      };
-
-      const info = await account.transporter.sendMail(mailOptions);
-
-      // Atomically append success event and increment counters via Postgres function
-      if (supabase) {
-        const event = {
-          email: typeof recipient === 'string' ? recipient : recipient.email,
-          status: 'sent',
-          fromAccount: account.email,
-          messageId: info.messageId,
-          sentAt: new Date().toISOString(),
-        };
-
-        const p_progress = Math.round(((i + 1) / emails.length) * 100);
-        const { data: rpcData, error: rpcError } = await supabase.rpc('append_campaign_event', {
-          p_id: campaignId,
-          p_event: [event],
-          p_sent: 1,
-          p_failed: 0,
-          p_processed: i + 1,
-          p_progress,
-        });
-
-        if (rpcError) {
-          console.error('RPC append_campaign_event error:', rpcError.message || rpcError);
-        } else {
-          if (NODE_ENV === 'development') {
-            console.log(`[processBulkEmails] Email ${i + 1}/${emails.length} sent successfully. Progress: ${p_progress}%`);
-          }
-        }
-      } else {
-        // Fallback to read-modify-write if Supabase is not configured
-        const { data: current } = await getCampaignRecord(campaignId);
-        const details = (current && current.details) ? current.details : [];
-        details.push({
-          email: typeof recipient === 'string' ? recipient : recipient.email,
-          status: 'sent',
-          fromAccount: account.email,
-          messageId: info.messageId,
-          sentAt: new Date().toISOString(),
-        });
-
-        await updateCampaignRecord(campaignId, {
-          sent: (current?.sent || 0) + 1,
-          processed: i + 1,
-          progress: Math.round(((i + 1) / emails.length) * 100),
-          details,
-        });
-      }
-
-      if (NODE_ENV === 'development') {
-        console.log(`[${i + 1}/${emails.length}] Email sent to ${typeof recipient === 'string' ? recipient : recipient.email} from ${account.email}`);
-      }
-
-      if (i < emails.length - 1) {
-        // Ultra-fast delay for instant sending (50ms instead of 200ms)
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-    } catch (error) {
-      console.error(`Failed to send email to ${typeof recipient === 'string' ? recipient : recipient.email}:`, error.message);
-      if (supabase) {
-        const event = {
-          email: typeof recipient === 'string' ? recipient : recipient.email,
-          status: 'failed',
-          fromAccount: account.email,
-          error: error.message,
-          failedAt: new Date().toISOString(),
-        };
-
-        const p_progress = Math.round(((i + 1) / emails.length) * 100);
-        const { data: rpcData, error: rpcError } = await supabase.rpc('append_campaign_event', {
-          p_id: campaignId,
-          p_event: [event],
-          p_sent: 0,
-          p_failed: 1,
-          p_processed: i + 1,
-          p_progress,
-        });
-
-        if (rpcError) {
-          console.error('RPC append_campaign_event error:', rpcError.message || rpcError);
-        }
-      } else {
-        const { data: current } = await getCampaignRecord(campaignId);
-        const details = (current && current.details) ? current.details : [];
-        details.push({
-          email: typeof recipient === 'string' ? recipient : recipient.email,
-          status: 'failed',
-          fromAccount: account.email,
-          error: error.message,
-          failedAt: new Date().toISOString(),
-        });
-
-        await updateCampaignRecord(campaignId, {
-          failed: (current?.failed || 0) + 1,
-          processed: i + 1,
-          progress: Math.round(((i + 1) / emails.length) * 100),
-          details,
-        });
-      }
-    }
-  }
-
-  console.log(`[processBulkEmails] Completing campaign ${campaignId}`);
-  
-  if (supabase) {
-    const { data, error } = await supabase.from('bulk_email_campaign_status').update({ status: 'completed', completed_at: new Date().toISOString(), progress: 100 }).eq('id', campaignId).select().single();
-    if (error) {
-      console.error('Failed to mark campaign completed:', error.message || error);
-    } else {
-      const totalTime = Date.now() - startTime;
-      console.log(`[processBulkEmails] Campaign ${campaignId} marked as completed in ${totalTime}ms (${Math.round(totalTime / emails.length)}ms per email)`);
-    }
-  } else {
-    await updateCampaignRecord(campaignId, { status: 'completed', completed_at: new Date().toISOString(), progress: 100 });
-  }
-}
-
-// Bulk send emails with rotation - returns immediately with 202 Accepted
+// Bulk send emails - Updated to use Queue
 app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req, res) => {
   try {
     const { emails, subject, body, rotationConfig, selectedAccountEmails = [], selectedAccountIds = [], recipientAccountMap = {} } = req.body;
 
-    // SECURITY: Validate inputs
+    // Validation
     if (!emails || !Array.isArray(emails) || emails.length === 0) {
       return res.status(400).json({ success: false, error: 'Invalid emails array' });
     }
-
-    // SECURITY: Limit bulk size to prevent DoS
-    const MAX_BULK_SIZE = 1000;
+    const MAX_BULK_SIZE = 5000; // Increased limit because Queue can handle it
     if (emails.length > MAX_BULK_SIZE) {
       return res.status(400).json({ success: false, error: 'Bulk limit exceeded' });
     }
-
-    // SECURITY: Validate all email formats
-    for (const email of emails) {
-      if (typeof email === 'string' && !isValidEmail(email)) {
-        return res.status(400).json({ success: false, error: 'Invalid email in list' });
-      }
-      if (typeof email === 'object' && !isValidEmail(email.email)) {
-        return res.status(400).json({ success: false, error: 'Invalid email in list' });
-      }
-    }
-
-    // SECURITY: Validate subject and body
     if (!subject || !body) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields: subject, body',
-      });
+      return res.status(400).json({ success: false, error: 'Missing required fields: subject, body' });
     }
 
-    // Get available accounts
+    // Account Selection
     const allAccounts = Array.from(emailAccounts.values());
-    if (allAccounts.length === 0) {
-      return res.status(500).json({
-        success: false,
-        error: 'No email accounts configured',
-      });
-    }
+    if (allAccounts.length === 0) return res.status(500).json({ success: false, error: 'No email accounts configured' });
 
-    // Filter accounts based on selectedAccountEmails or selectedAccountIds
-    // First try selectedAccountEmails (new format), fall back to selectedAccountIds for backwards compatibility
     let selectedAccounts = allAccounts;
-    
     if (selectedAccountEmails.length > 0) {
-      // Filter by email addresses (new approach - more reliable)
-      selectedAccounts = allAccounts.filter(acc => 
-        selectedAccountEmails.some(email => 
-          email.toLowerCase() === acc.email.toLowerCase()
-        )
-      );
+      selectedAccounts = allAccounts.filter(acc => selectedAccountEmails.some(email => email.toLowerCase() === acc.email.toLowerCase()));
     } else if (selectedAccountIds.length > 0) {
-      // Fall back to filtering by IDs if present (legacy support)
       selectedAccounts = allAccounts.filter(acc => selectedAccountIds.includes(acc.id));
     }
 
     if (selectedAccounts.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'No valid email accounts selected',
-      });
+      return res.status(400).json({ success: false, error: 'No valid email accounts selected' });
     }
 
-    console.log(`[/api/send-bulk-emails] Using ${selectedAccounts.length} selected account(s) out of ${allAccounts.length} available`);
-    selectedAccounts.forEach(acc => console.log(`  - ${acc.email} (index: ${acc.index})`));
-
-    // Generate unique campaign ID
     const campaignId = generateCampaignId();
 
-    // Initialize campaign status in Supabase (if configured)
+    // Initialize DB Record
     const initialRecord = {
       id: campaignId,
       status: 'queued',
@@ -595,16 +543,26 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
     };
 
     if (supabase) {
-      const created = await createCampaignRecord(initialRecord);
-      if (!created) {
-        console.warn('⚠️  Failed to persist campaign initial record to Supabase');
-        console.warn('Campaign will not have status updates visible in UI');
-      } else {
-        console.log(`✅ Campaign ${campaignId} ready for polling`);
-      }
+      await createCampaignRecord(initialRecord);
     }
 
-    // Return immediately with 202 Accepted status
+    // [FIX 1] ADD TO QUEUE
+    // We pass the *email addresses* of the accounts to the worker so it can retrieve the transporters
+    const accountEmailsList = selectedAccounts.map(a => a.email);
+
+    await emailQueue.add('send-campaign', {
+      campaignId,
+      emails,
+      subject,
+      body,
+      rotationConfig,
+      accountEmails: accountEmailsList, // Pass list of emails, not objects
+      recipientAccountMap
+    }, {
+      removeOnComplete: true, // Auto clean up successful jobs
+      removeOnFail: 500 // Keep failed jobs for inspection
+    });
+
     res.status(202).json({
       success: true,
       message: 'Email campaign queued for processing',
@@ -613,31 +571,19 @@ app.post('/api/send-bulk-emails', emailLimiter, authenticateRequest, async (req,
       statusUrl: `/api/campaign-status/${campaignId}`,
     });
 
-    // Process emails in background (no await - fire and forget)
-    processBulkEmailsInBackground(campaignId, emails, subject, body, rotationConfig, selectedAccounts, recipientAccountMap).catch(
-      error => console.error(`Error processing campaign ${campaignId}:`, error)
-    );
   } catch (error) {
     console.error('Error in bulk send endpoint:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to process bulk emails',
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Get campaign status endpoint for polling
 app.get('/api/campaign-status/:campaignId', async (req, res) => {
   const { campaignId } = req.params;
-
-  if (!supabase) {
-    return res.status(500).json({ success: false, error: 'Supabase not configured' });
-  }
+  if (!supabase) return res.status(500).json({ success: false, error: 'Supabase not configured' });
 
   const { data: campaign, error } = await getCampaignRecord(campaignId);
-  if (error || !campaign) {
-    return res.status(404).json({ success: false, error: 'Campaign not found' });
-  }
+  if (error || !campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
 
   res.json({
     success: true,
@@ -657,15 +603,10 @@ app.get('/api/campaign-status/:campaignId', async (req, res) => {
 // Get campaign details endpoint (with email sending details)
 app.get('/api/campaign-details/:campaignId', async (req, res) => {
   const { campaignId } = req.params;
-
-  if (!supabase) {
-    return res.status(500).json({ success: false, error: 'Supabase not configured' });
-  }
+  if (!supabase) return res.status(500).json({ success: false, error: 'Supabase not configured' });
 
   const { data: campaign, error } = await getCampaignRecord(campaignId);
-  if (error || !campaign) {
-    return res.status(404).json({ success: false, error: 'Campaign not found' });
-  }
+  if (error || !campaign) return res.status(404).json({ success: false, error: 'Campaign not found' });
 
   res.json({ success: true, ...campaign });
 });
@@ -677,38 +618,22 @@ app.get('/api/email-accounts', (req, res) => {
     index: account.index,
   }));
 
-  res.json({
-    success: true,
-    accounts: accounts,
-    count: accounts.length,
-  });
+  res.json({ success: true, accounts: accounts, count: accounts.length });
 });
 
-// Manual email sync endpoint (optional)
+// Manual email sync endpoint
 app.post('/api/emails/sync-now', async (req, res) => {
   try {
     const { userId } = req.body;
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required',
-      });
-    }
+    if (!userId) return res.status(400).json({ success: false, error: 'userId is required' });
 
-    // Dynamic import of gmail-sync module
     const { syncGmailEmails } = await import('./gmail-sync.js');
     const result = await syncGmailEmails(userId);
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    res.json({ success: true, data: result });
   } catch (error) {
     console.error('Manual sync error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -720,11 +645,6 @@ app.listen(PORT, async () => {
     console.log(`   └─ ${account.email}`);
   });
 
-  // Start Gmail sync scheduler (optional).
-  // The scheduler has been moved to a dedicated worker process by default to
-  // avoid duplicate runs in horizontally scaled deployments. To run the
-  // scheduler in-process (not recommended for production), set
-  // `START_SCHEDULER_IN_PROCESS=true` in the environment.
   if (process.env.START_SCHEDULER_IN_PROCESS === 'true') {
     try {
       const { startSyncScheduler } = await import('./gmail-sync.js');

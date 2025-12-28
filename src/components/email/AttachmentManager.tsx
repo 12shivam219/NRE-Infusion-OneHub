@@ -154,14 +154,25 @@ export const AttachmentManager = ({
     <Paper
       variant="outlined"
       sx={{
-        p: 2,
-        bgcolor: 'background.paper',
-        borderColor: 'rgba(234,179,8,0.20)',
+        p: 2.5,
+        bgcolor: '#ffffff',
+        borderColor: '#e5e7eb',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        transition: 'all 0.2s ease',
       }}
     >
       <Stack spacing={2}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Attachments
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontWeight: 700,
+            fontSize: '18px',
+            color: '#111827',
+            letterSpacing: '-0.3px'
+          }}
+        >
+          📎 Attachments
         </Typography>
 
         {/* Error Alert */}
@@ -182,37 +193,73 @@ export const AttachmentManager = ({
             p: 3,
             textAlign: 'center',
             border: '2px dashed',
-            borderColor: isDragging ? 'primary.main' : 'rgba(234,179,8,0.2)',
-            borderRadius: 2,
-            bgcolor: isDragging ? 'rgba(234,179,8,0.08)' : 'rgba(234,179,8,0.02)',
-            transition: 'all 0.2s',
-            cursor: 'pointer',
+            borderColor: isDragging ? '#2563eb' : '#d1d5db',
+            borderRadius: '8px',
+            bgcolor: isDragging ? 'rgba(37, 99, 235, 0.08)' : '#f9fafb',
+            transition: 'all 0.2s ease',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.5 : 1,
             '&:hover': {
-              borderColor: 'rgba(234,179,8,0.4)',
-              bgcolor: 'rgba(234,179,8,0.05)',
+              borderColor: isDragging ? '#2563eb' : '#9ca3af',
+              bgcolor: isDragging ? 'rgba(37, 99, 235, 0.08)' : '#f3f4f6',
             },
           }}
         >
-          <Stack spacing={1} alignItems="center">
-            <Box sx={{ fontSize: '2rem' }}>☁️</Box>
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Drag and drop files here or{' '}
-                <Button
-                  component="span"
-                  size="small"
-                  variant="text"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={disabled}
-                  sx={{ textTransform: 'none' }}
-                >
-                  browse
-                </Button>
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Max file size: {maxFileSize}MB • Max total: {maxTotalSize}MB
-              </Typography>
+          <Stack spacing={1.5} alignItems="center">
+            <Box
+              sx={{
+                fontSize: '2.5rem',
+                animation: isDragging ? 'pulse 1s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.7 },
+                },
+              }}
+            >
+              📁
             </Box>
+            <Stack spacing={0.5} alignItems="center">
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: '#111827',
+                  fontSize: '16px'
+                }}
+              >
+                {isDragging ? '✓ Drop files here' : 'Drop files or browse'}
+              </Typography>
+              <Typography 
+                variant="caption" 
+                sx={{
+                  color: '#4b5563',
+                  lineHeight: 1.5
+                }}
+              >
+                PNG, JPG, PDF, DOC (Max {maxFileSize}MB per file, {maxTotalSize}MB total)
+              </Typography>
+            </Stack>
+            <Button
+              component="span"
+              size="small"
+              variant="outlined"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              sx={{
+                textTransform: 'none',
+                mt: 0.5,
+                borderRadius: '6px',
+                borderColor: '#2563eb',
+                color: '#2563eb',
+                fontWeight: 600,
+                '&:hover': {
+                  backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                  borderColor: '#1d4ed8',
+                },
+              }}
+            >
+              📁 Browse Files
+            </Button>
           </Stack>
         </Box>
 
@@ -229,49 +276,145 @@ export const AttachmentManager = ({
 
         {/* Attachments List */}
         {attachments.length > 0 && (
-          <Stack spacing={1.5}>
-            {/* Size Indicator */}
-            <Box>
-              <Stack direction="row" justifyContent="space-between" mb={0.5}>
-                <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                  Storage Used
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {formatFileSize(totalSize)} / {formatFileSize(maxTotalSize * 1024 * 1024)}
+          <Stack spacing={2}>
+            {/* Size Indicator with Clear Labels */}
+            <Stack 
+              spacing={1.5} 
+              sx={{ 
+                p: 2, 
+                bgcolor: '#f9fafb', 
+                borderRadius: '6px', 
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                <Stack spacing={0.25}>
+                  <Typography 
+                    variant="subtitle2" 
+                    sx={{ 
+                      fontWeight: 700,
+                      color: '#111827',
+                      fontSize: '14px'
+                    }}
+                  >
+                    📊 Storage Usage
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: '#4b5563',
+                      fontSize: '13px'
+                    }}
+                  >
+                    Current: <strong>{formatFileSize(totalSize)}</strong> / {formatFileSize(maxTotalSize * 1024 * 1024)} ({Math.round(totalSizePercent)}%)
+                  </Typography>
+                </Stack>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    fontWeight: 700, 
+                    color: totalSizePercent > 80 ? '#ef4444' : '#10b981',
+                    fontSize: '12px'
+                  }}
+                >
+                  {totalSizePercent > 80 ? '⚠ Warning' : '✓ OK'}
                 </Typography>
               </Stack>
               <LinearProgress
                 variant="determinate"
                 value={Math.min(totalSizePercent, 100)}
                 sx={{
-                  height: 6,
-                  borderRadius: 1,
-                  backgroundColor: 'rgba(234,179,8,0.1)',
+                  height: 8,
+                  borderRadius: '4px',
+                  backgroundColor: '#e5e7eb',
                   '& .MuiLinearProgress-bar': {
                     backgroundColor:
-                      totalSizePercent > 80
+                      totalSizePercent > 90
                         ? '#ef4444'
-                        : totalSizePercent > 60
+                        : totalSizePercent > 75
                           ? '#f97316'
-                          : 'rgba(34,197,94,0.7)',
+                          : totalSizePercent > 60
+                            ? '#eab308'
+                            : '#10b981',
+                    borderRadius: '4px',
                   },
                 }}
               />
-            </Box>
+              <Stack direction="row" spacing={1}>
+                <Paper 
+                  variant="outlined" 
+                  sx={{ 
+                    flex: 1, 
+                    p: 1, 
+                    bgcolor: '#ffffff',
+                    borderColor: '#e5e7eb',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <Typography 
+                    variant="caption" 
+                    sx={{
+                      color: '#4b5563',
+                      fontWeight: 500
+                    }}
+                  >
+                    Per File: <strong>{maxFileSize}MB max</strong>
+                  </Typography>
+                </Paper>
+                <Paper 
+                  variant="outlined" 
+                  sx={{ 
+                    flex: 1, 
+                    p: 1, 
+                    bgcolor: '#ffffff',
+                    borderColor: '#e5e7eb',
+                    borderRadius: '6px'
+                  }}
+                >
+                  <Typography 
+                    variant="caption" 
+                    sx={{
+                      color: '#4b5563',
+                      fontWeight: 500
+                    }}
+                  >
+                    Total: <strong>{maxTotalSize}MB max</strong>
+                  </Typography>
+                </Paper>
+              </Stack>
+            </Stack>
 
             {/* Attachment Items */}
             <Stack spacing={1}>
+              <Typography 
+                variant="subtitle2" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: '#111827',
+                  fontSize: '14px'
+                }}
+              >
+                📎 Attached Files ({attachments.length})
+              </Typography>
               {attachments.map((attachment) => (
                 <Paper
                   key={attachment.id}
                   variant="outlined"
                   sx={{
-                    p: 1.5,
+                    p: 2,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    bgcolor: 'rgba(234,179,8,0.02)',
-                    borderColor: 'rgba(234,179,8,0.1)',
+                    bgcolor: '#f9fafb',
+                    borderColor: '#e5e7eb',
+                    transition: 'all 0.2s',
+                    borderRadius: '6px',
+                    '&:hover': {
+                      borderColor: '#d1d5db',
+                      bgcolor: '#f3f4f6',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
+                    },
                   }}
                 >
                   <Stack
@@ -280,7 +423,17 @@ export const AttachmentManager = ({
                     alignItems="center"
                     sx={{ flex: 1, minWidth: 0 }}
                   >
-                    <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        p: 1,
+                        bgcolor: 'rgba(37, 99, 235, 0.1)',
+                        borderRadius: '6px',
+                        color: '#2563eb',
+                      }}
+                    >
                       {getFileIcon(attachment.type)}
                     </Box>
                     <Stack sx={{ flex: 1, minWidth: 0 }}>
@@ -288,7 +441,8 @@ export const AttachmentManager = ({
                         <Typography
                           variant="body2"
                           sx={{
-                            fontWeight: 500,
+                            fontWeight: 600,
+                            color: '#111827',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
@@ -297,7 +451,13 @@ export const AttachmentManager = ({
                           {attachment.name}
                         </Typography>
                       </Tooltip>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography 
+                        variant="caption" 
+                        sx={{
+                          color: '#4b5563',
+                          marginTop: '2px'
+                        }}
+                      >
                         {formatFileSize(attachment.size)}
                       </Typography>
                     </Stack>
@@ -307,17 +467,26 @@ export const AttachmentManager = ({
                     <LinearProgress
                       variant="determinate"
                       value={attachment.uploadProgress}
-                      sx={{ width: 60, mr: 1 }}
+                      sx={{ width: 60, mr: 1, borderRadius: '4px' }}
                     />
                   )}
 
-                  <Tooltip title="Remove">
+                  <Tooltip title="Remove file">
                     <Button
                       size="small"
                       variant="text"
                       onClick={() => removeAttachment(attachment.id)}
                       disabled={disabled}
-                      sx={{ minWidth: 0, p: 0.5 }}
+                      sx={{
+                        minWidth: 0,
+                        p: 0.75,
+                        color: '#6b7280',
+                        '&:hover': {
+                          color: '#ef4444',
+                          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        },
+                        borderRadius: '6px'
+                      }}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -326,17 +495,40 @@ export const AttachmentManager = ({
               ))}
             </Stack>
 
-            {/* Upload Info */}
-            <Alert severity="info">
-              {attachments.length} file(s) attached • {formatFileSize(totalSize)} used
-            </Alert>
+            {/* Upload Summary */}
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 1.5, 
+                bgcolor: '#ecfdf5', 
+                borderColor: '#6ee7b7', 
+                borderLeft: '4px solid #10b981',
+                borderRadius: '6px'
+              }}
+            >
+              <Typography 
+                variant="body2"
+                sx={{
+                  color: '#111827'
+                }}
+              >
+                <strong>✓ {attachments.length}</strong> file{attachments.length !== 1 ? 's' : ''} • <strong>{formatFileSize(totalSize)}</strong> used
+              </Typography>
+            </Paper>
           </Stack>
         )}
 
         {/* Empty State */}
         {attachments.length === 0 && (
-          <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', py: 1 }}>
-            No attachments yet
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              textAlign: 'center', 
+              py: 2,
+              color: '#4b5563'
+            }}
+          >
+            ℹ️ No attachments yet. Drop files or click "Browse Files" to add them.
           </Typography>
         )}
       </Stack>
