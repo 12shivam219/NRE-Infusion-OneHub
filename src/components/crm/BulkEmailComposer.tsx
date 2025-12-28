@@ -52,13 +52,20 @@ interface EmailAccountRow {
 interface BulkEmailComposerProps {
   requirementId?: string;
   onClose?: () => void;
+  initialRecipients?: Array<{ email: string; name?: string }>;
+  initialSubject?: string;
 }
 
 /**
  * Bulk Email Composer Component
  * Allows users to send emails to multiple recipients with account rotation
  */
-export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerProps) => {
+export const BulkEmailComposer = ({ 
+  requirementId, 
+  onClose,
+  initialRecipients,
+  initialSubject 
+}: BulkEmailComposerProps) => {
   const { user } = useAuth();
   const { showToast } = useToast();
 
@@ -96,6 +103,23 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
     loadAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pre-fill data if replying
+  useEffect(() => {
+    if (initialRecipients && initialRecipients.length > 0) {
+      setRecipients(initialRecipients);
+      // Format text for the input field as well (fallback view)
+      const text = initialRecipients.map(r => r.name ? `${r.name} <${r.email}>` : r.email).join('\n');
+      setRecipientsText(text);
+      
+      // Auto-advance to compose step if we have valid recipients
+      setStep('compose');
+    }
+    
+    if (initialSubject) {
+      setSubject(initialSubject);
+    }
+  }, [initialRecipients, initialSubject]);
 
   const parseRecipients = (text: string) => {
     // Use robust email parser that handles various formats
@@ -282,7 +306,7 @@ export const BulkEmailComposer = ({ requirementId, onClose }: BulkEmailComposerP
         <Stack direction="row" spacing={1.5} alignItems="center">
           <MailIcon className="w-5 h-5" />
           <Typography variant="h6" sx={{ fontWeight: 500 }}>
-            Bulk Email Campaign
+            {initialSubject ? 'Reply to Email' : 'Bulk Email Campaign'}
           </Typography>
         </Stack>
         {onClose ? (

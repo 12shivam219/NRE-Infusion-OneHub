@@ -18,6 +18,7 @@
     "@mui/icons-material": "^7.3.6",
     "@mui/lab": "^7.0.1-beta.20",
     "@mui/material": "^7.3.6",
+    "@mui/x-data-grid": "^8.23.0",
     "@sentry/react": "^7.112.0",
     "@supabase/supabase-js": "^2.57.4",
     "@tanstack/react-virtual": "^3.13.13",

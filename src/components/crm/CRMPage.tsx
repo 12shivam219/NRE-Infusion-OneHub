@@ -29,16 +29,10 @@ export const CRMPage = () => {
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
 
   // Define all callbacks at top level (before any conditional rendering)
-  const handleRequirementsQuickAdd = useCallback(() => setShowCreateForm(true), []);
-
   const handleCreateInterview = useCallback((requirementId: string) => {
     setSelectedRequirementIdForInterview(requirementId);
     setShowCreateInterview(true);
   }, []);
-
-  const handleInterviewsQuickAdd = useCallback(() => setShowCreateInterview(true), []);
-
-  const handleConsultantsQuickAdd = useCallback(() => setShowCreateConsultant(true), []);
 
   // Sync currentView with query parameter
   useLayoutEffect(() => {
@@ -149,7 +143,6 @@ export const CRMPage = () => {
                 {currentView === 'requirements' ? (
                   <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
                     <RequirementsManagement
-                      onQuickAdd={handleRequirementsQuickAdd}
                       onCreateInterview={handleCreateInterview}
                       toolbarPortalTargetId="crm-requirements-actions"
                     />
@@ -158,13 +151,13 @@ export const CRMPage = () => {
 
                 {currentView === 'interviews' ? (
                   <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
-                    <InterviewTracking onQuickAdd={handleInterviewsQuickAdd} />
+                    <InterviewTracking />
                   </Suspense>
                 ) : null}
 
                 {currentView === 'consultants' ? (
                   <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
-                    <ConsultantProfiles onQuickAdd={handleConsultantsQuickAdd} />
+                    <ConsultantProfiles />
                   </Suspense>
                 ) : null}
               </ErrorBoundary>

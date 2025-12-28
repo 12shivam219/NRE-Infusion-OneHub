@@ -2,6 +2,7 @@ import { Suspense, useState, useEffect, useLayoutEffect, useRef, useCallback, us
 import { Command as CommandIcon, X as CloseIcon } from 'lucide-react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
+import { CreateFormProvider } from './contexts/CreateFormContext';
 import { useAuth } from './hooks/useAuth';
 import { useToast } from './contexts/ToastContext';
 import { LoginForm } from './components/auth/LoginForm';
@@ -308,11 +309,13 @@ function App() {
     <AuthProvider>
       <ThemeSyncProvider>
         <AdaptiveAtmosphereProvider>
-          <AppContent />
-          <SyncQueueModal />
-          {/* Offline indicator and sync error handler shown even before authentication */}
-          <OfflineIndicator />
-          <SyncErrorHandler />
+          <CreateFormProvider>
+            <AppContent />
+            <SyncQueueModal />
+            {/* Offline indicator and sync error handler shown even before authentication */}
+            <OfflineIndicator />
+            <SyncErrorHandler />
+          </CreateFormProvider>
         </AdaptiveAtmosphereProvider>
       </ThemeSyncProvider>
     </AuthProvider>

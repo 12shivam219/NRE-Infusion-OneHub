@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import Redis from 'ioredis';
-import pLimit from 'p-limit'; // [FIX 3] Import p-limit
+import pLimit from 'p-limit';
 
 dotenv.config();
 
@@ -10,6 +10,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const REDIS_URL = process.env.REDIS_URL;
 
+// Initialize Redis
 let redis = null;
 const instanceId = `${process.pid}-${Date.now()}`;
 
@@ -23,6 +24,7 @@ if (REDIS_URL) {
   }
 }
 
+// Initialize Supabase
 let supabase = null;
 if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -31,7 +33,7 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
 }
 
 // ============================================
-// [FIX 5] Token Management & Refresh
+// Token Management & Refresh
 // ============================================
 
 async function refreshGmailToken(refreshToken) {
@@ -53,7 +55,6 @@ async function refreshGmailToken(refreshToken) {
   return response.json();
 }
 
-// Wrapper to handle 401 errors automatically
 async function fetchWithRetry(url, options, tokenData, userId) {
   let response = await fetch(url, options);
 
@@ -95,7 +96,6 @@ async function getGmailMessages(accessToken, refreshToken, userId, pageToken = n
   const url = `https://www.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`;
   const options = { headers: { Authorization: `Bearer ${accessToken}` } };
 
-  // Use retry wrapper
   const response = await fetchWithRetry(url, options, { refresh_token: refreshToken }, userId);
 
   if (!response.ok) throw new Error(`Gmail API error (list): ${response.status}`);
@@ -106,7 +106,6 @@ async function getGmailMessageDetails(accessToken, refreshToken, userId, message
   const url = `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`;
   const options = { headers: { Authorization: `Bearer ${accessToken}` } };
 
-  // Use retry wrapper
   const response = await fetchWithRetry(url, options, { refresh_token: refreshToken }, userId);
 
   if (!response.ok) throw new Error(`Gmail API error (details): ${response.status}`);
@@ -160,33 +159,142 @@ function extractNameFromEmail(headerValue, email) {
 }
 
 // ============================================
-// Keyword Matching Logic
+// Advanced Matching Logic (Ported from Frontend)
 // ============================================
 
+/**
+ * Extract meaningful keywords from text
+ */
 function extractKeywords(text) {
   if (!text) return [];
-  const clean = text.toLowerCase().replace(/[^\w\s]/g, ' ');
-  const commonWords = new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','by','from','as','is','was','are','be','been','have','has','do','does','did','will','would','could','should','if','this','that','these','those','i','you','he','she','it','we','they','what','which','who','where','when','why','how']);
-  
-  return [...new Set(clean.split(/\s+/).filter(w => w.length > 2 && !commonWords.has(w)))];
+
+  const commonWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'be', 'been',
+    'have', 'has', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+    'can', 'may', 'might', 'must', 'if', 'this', 'that', 'these', 'those', 
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'what', 'which', 'who', 
+    'where', 'when', 'why', 'how', 'just', 'also', 'more', 'most', 're', 
+    'fwd', 'subject', 'body', 'message'
+  ]);
+
+  // Convert to lowercase and remove special characters
+  const cleaned = text.toLowerCase().replace(/[^\w\s]/g, ' ');
+
+  // Split into words and filter
+  const words = cleaned.split(/\s+/).filter((word) => {
+    return word.length > 2 && !commonWords.has(word);
+  });
+
+  return [...new Set(words)];
 }
 
-function calculateMatchConfidence(requirementKeywords, emailSubject, emailBody) {
-  if (requirementKeywords.length === 0) return 0;
-  const emailContent = `${emailSubject || ''} ${emailBody || ''}`.toLowerCase();
-  let matches = 0;
-  for (const keyword of requirementKeywords) {
-    if (emailContent.includes(keyword)) matches++;
+/**
+ * Calculate similarity between two strings (Levenshtein)
+ */
+function stringSimilarity(str1, str2) {
+  const s1 = str1.toLowerCase();
+  const s2 = str2.toLowerCase();
+
+  if (s1 === s2) return 100;
+  
+  const longer = s1.length > s2.length ? s1 : s2;
+  const shorter = s1.length > s2.length ? s2 : s1;
+  
+  if (longer.length === 0) return 100;
+  
+  const editDistance = getEditDistance(longer, shorter);
+  return Math.round(((longer.length - editDistance) / longer.length) * 100);
+}
+
+function getEditDistance(s1, s2) {
+  const costs = [];
+  for (let i = 0; i <= s1.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= s2.length; j++) {
+      if (i === 0) {
+        costs[j] = j;
+      } else if (j > 0) {
+        let newValue = costs[j - 1];
+        if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+        }
+        costs[j - 1] = lastValue;
+        lastValue = newValue;
+      }
+    }
+    if (i > 0) costs[s2.length] = lastValue;
   }
-  const confidence = Math.round((matches / requirementKeywords.length) * 100);
-  if (emailSubject && emailSubject.toLowerCase().includes(requirementKeywords[0])) {
-    return Math.min(100, confidence + 20);
+  return costs[s2.length];
+}
+
+function findKeywordMatches(keywords, searchText, threshold = 70) {
+  const matches = [];
+  const searchLower = searchText.toLowerCase();
+
+  for (const keyword of keywords) {
+    if (searchLower.includes(keyword)) {
+      matches.push(keyword);
+    } else {
+      // Fuzzy check only if exact match failed
+      const similarity = stringSimilarity(keyword, searchText); // This is expensive, use sparingly
+      if (similarity >= threshold) {
+        matches.push(keyword);
+      }
+    }
   }
-  return confidence;
+  return matches;
+}
+
+function extractDomain(text) {
+  if (!text) return null;
+  const domainMatch = text.match(/([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/);
+  return domainMatch ? domainMatch[1].toLowerCase() : null;
+}
+
+/**
+ * Weighted Confidence Score Calculation
+ */
+function calculateAdvancedConfidence(requirement, emailSubject, emailBody, recipientEmail) {
+  let score = 0;
+  const weights = {
+    subjectMatch: 40,
+    bodyMatch: 30,
+    titleMatch: 20,
+    recipientMatch: 10,
+  };
+
+  const reqText = `${requirement.title} ${requirement.description || ''}`;
+  const reqKeywords = extractKeywords(reqText);
+  
+  if (reqKeywords.length === 0) return 0;
+
+  // 1. Subject Matching (40%)
+  const subjectMatches = findKeywordMatches(reqKeywords, emailSubject || '');
+  score += (subjectMatches.length / Math.min(reqKeywords.length, 5)) * weights.subjectMatch; // Cap denominator to avoid dilution
+
+  // 2. Body Matching (30%)
+  const bodyMatches = findKeywordMatches(reqKeywords, emailBody || '', 80); // Higher threshold for body
+  score += (bodyMatches.length / Math.min(reqKeywords.length, 10)) * weights.bodyMatch;
+
+  // 3. Title Similarity (20%)
+  const titleSim = stringSimilarity(requirement.title, emailSubject || '');
+  score += (titleSim / 100) * weights.titleMatch;
+
+  // 4. Recipient Domain Match (10%)
+  // Try to find client domain in requirement title (e.g., "Java Dev - Google")
+  const reqDomain = extractDomain(requirement.title);
+  const recipientDomain = recipientEmail.split('@')[1];
+  
+  if (reqDomain && recipientDomain && (recipientDomain.includes(reqDomain) || reqDomain.includes(recipientDomain))) {
+    score += weights.recipientMatch;
+  }
+
+  return Math.min(Math.round(score), 100);
 }
 
 // ============================================
-// [FIX 3] Optimized Sync Logic (Parallel)
+// Sync Logic
 // ============================================
 
 async function syncGmailEmails(userId) {
@@ -214,7 +322,7 @@ async function syncGmailEmails(userId) {
     if (logError) throw logError;
     logId = log.id;
 
-    // Fetch messages (pass refresh_token and user_id for retry logic)
+    // Fetch messages
     const messages = await getGmailMessages(tokenData.access_token, tokenData.refresh_token, userId, tokenData.last_sync_message_id);
     const emailList = messages.messages || [];
 
@@ -227,16 +335,20 @@ async function syncGmailEmails(userId) {
       return log;
     }
 
-    const { data: requirements } = await supabase.from('requirements').select('id, title, description').eq('user_id', userId);
+    const { data: requirements } = await supabase
+        .from('requirements')
+        .select('id, title, description')
+        .eq('user_id', userId)
+        .eq('status', 'open'); // Only match open requirements for efficiency
 
-    // [FIX 3] PARALLEL PROCESSING
-    const limit = pLimit(10); // Concurrent limit
+    const limit = pLimit(5); // Conservative concurrency
     let emailsMatched = 0;
     let emailsCreated = 0;
 
     const processPromises = emailList.map(message => {
       return limit(async () => {
         try {
+          // Check for existing
           const { data: existing } = await supabase
              .from('requirement_emails')
              .select('id')
@@ -245,19 +357,22 @@ async function syncGmailEmails(userId) {
              
           if (existing) return;
 
-          const messageDetails = await getGmailMessageDetails(tokenData.access_token, tokenData.refresh_token, userId, message.id);
-          const headers = parseEmailHeaders(messageDetails.payload.headers);
-          const body = getBase64Body(messageDetails.payload);
+          // Fetch full details
+          const details = await getGmailMessageDetails(tokenData.access_token, tokenData.refresh_token, userId, message.id);
+          const headers = parseEmailHeaders(details.payload.headers);
+          const body = getBase64Body(details.payload);
           const recipients = extractRecipients(headers);
-          const sentDate = new Date(parseInt(messageDetails.internalDate));
+          const sentDate = new Date(parseInt(details.internalDate));
 
           let bestMatch = null;
           let bestConfidence = 0;
 
-          if (requirements) {
+          // Run the Advanced Matching Algorithm
+          if (requirements && requirements.length > 0) {
             for (const requirement of requirements) {
-                const requirementKeywords = extractKeywords(`${requirement.title} ${requirement.description}`);
-                const confidence = calculateMatchConfidence(requirementKeywords, headers.Subject, body);
+                // Use first recipient for domain matching (optimization)
+                const confidence = calculateAdvancedConfidence(requirement, headers.Subject, body, recipients[0]?.email || '');
+                
                 if (confidence > bestConfidence) {
                     bestConfidence = confidence;
                     bestMatch = requirement;
@@ -265,11 +380,28 @@ async function syncGmailEmails(userId) {
             }
           }
 
+          // Determine Status based on Confidence Levels
           const confidenceLevel = tokenData.auto_link_confidence_level || 'medium';
-          const autoLinkThreshold = confidenceLevel === 'high' ? 95 : confidenceLevel === 'medium' ? 70 : 0;
-          const needsConfirmation = bestConfidence < autoLinkThreshold && bestMatch;
+          const highThreshold = 95;
+          const mediumThreshold = 70;
+          const lowThreshold = 50;
+          
+          let shouldLink = false;
+          let needsConfirmation = false;
 
-          if (bestMatch) {
+          // User setting determines the "Auto Link" threshold
+          const userThreshold = confidenceLevel === 'high' ? highThreshold : 
+                               confidenceLevel === 'medium' ? mediumThreshold : lowThreshold;
+
+          if (bestMatch && bestConfidence >= lowThreshold) {
+              shouldLink = true;
+              // If confidence is lower than the user's "Auto Link" preference, flag it
+              if (bestConfidence < userThreshold) {
+                  needsConfirmation = true;
+              }
+          }
+
+          if (shouldLink && bestMatch) {
             for (const recipient of recipients) {
                 const { error: insertError } = await supabase.from('requirement_emails').insert({
                     requirement_id: bestMatch.id,
@@ -288,7 +420,7 @@ async function syncGmailEmails(userId) {
 
                 if (!insertError) {
                     emailsCreated++;
-                    if (bestConfidence >= autoLinkThreshold) emailsMatched++;
+                    if (!needsConfirmation) emailsMatched++;
                 }
             }
           }
@@ -304,7 +436,6 @@ async function syncGmailEmails(userId) {
     await supabase.from('email_sync_logs').update({
         sync_completed_at: new Date().toISOString(),
         emails_fetched: emailList.length,
-        emails_processed: emailList.length, // approximation
         emails_matched: emailsMatched,
         emails_created: emailsCreated,
         status: 'completed',

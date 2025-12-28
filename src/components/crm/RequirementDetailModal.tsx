@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Mail } from 'lucide-react';
+import { X, Edit2, Mail, History } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { updateRequirement } from '../../lib/api/requirements';
 import { useToast } from '../../contexts/ToastContext';
 import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { RequirementEmailManager } from './RequirementEmailManager';
+import EmailHistoryPanel from './EmailHistoryPanel';
 import { LogoLoader } from '../common/LogoLoader';
 import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
@@ -48,7 +49,7 @@ export const RequirementDetailModal = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Requirement> | null>(null);
-  const [activeTab, setActiveTab] = useState<'details' | 'emails'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'emails' | 'history'>('details');
   const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
 
   useEffect(() => {
@@ -210,12 +211,13 @@ export const RequirementDetailModal = ({
 
         <Tabs
           value={activeTab}
-          onChange={(_, value) => setActiveTab(value as 'details' | 'emails')}
+          onChange={(_, value) => setActiveTab(value as 'details' | 'emails' | 'history')}
           variant="fullWidth"
           sx={{ mt: 2 }}
         >
           <Tab value="details" label="Details" />
           <Tab value="emails" label="Emails" icon={<Mail className="w-4 h-4" />} iconPosition="start" />
+          <Tab value="history" label="History" icon={<History className="w-4 h-4" />} iconPosition="start" />
         </Tabs>
       </DialogTitle>
 
@@ -557,6 +559,13 @@ export const RequirementDetailModal = ({
                 requirementTitle={requirement.title}
                 vendorEmail={requirement.vendor_email}
               />
+            </Box>
+          )}
+
+          {/* History Tab */}
+          {activeTab === 'history' && (
+            <Box sx={{ p: { xs: 2, sm: 4 }, height: '100%' }}>
+              <EmailHistoryPanel requirementId={requirement.id} />
             </Box>
           )}
           </Box>

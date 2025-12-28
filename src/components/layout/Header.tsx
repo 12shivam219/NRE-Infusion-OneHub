@@ -1,6 +1,8 @@
 import { useState, useCallback, memo } from 'react';
 import { Bell, Menu as MenuIcon, Moon, Sun, LogOut } from 'lucide-react';
 import SyncStatusBadge from '../common/SyncStatusBadge';
+import { CreateDropdown } from '../common/CreateDropdown';
+import { useCreateForm } from '../../hooks/useCreateForm';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -42,6 +44,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
   const { notifications, unreadCount, markAsRead } = useNotifications();
   const { themeMode, toggleThemeMode } = useThemeMode();
   const { pathname } = useLocation();
+  const { openCreateForm } = useCreateForm();
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<HTMLElement | null>(null);
   const { theme } = useThemeSync();
   const accent = theme.accent;
@@ -49,6 +52,25 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
   const accentGlow = theme.accentGlow;
 
   const title = getPageTitle(pathname);
+
+  // Create dropdown handlers - open modals directly
+  const handleCreateRequirement = useCallback(() => {
+    openCreateForm('requirement');
+  }, [openCreateForm]);
+
+  const handleCreateInterview = useCallback(() => {
+    openCreateForm('interview');
+  }, [openCreateForm]);
+
+  const handleCreateConsultant = useCallback(() => {
+    openCreateForm('consultant');
+  }, [openCreateForm]);
+
+  const createItems = [
+    { label: 'Create Requirement', onClick: handleCreateRequirement },
+    { label: 'Create Interview', onClick: handleCreateInterview },
+    { label: 'Create Consultant', onClick: handleCreateConsultant },
+  ];
 
   const handleNotificationClick = useCallback((notificationId: string, alreadyRead: boolean) => {
     if (!alreadyRead) {
@@ -224,7 +246,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
             {/* Group A: Sync Status Badge */}
             <SyncStatusBadge />
 
-            {/* Group B: Actions (Notifications) */}
+            {/* Group B: Actions (Create Dropdown & Notifications) */}
             <Box
               sx={{
                 display: 'flex',
@@ -232,6 +254,12 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 gap: 1,
               }}
             >
+              {/* Create Dropdown Button */}
+              <CreateDropdown
+                items={createItems}
+                variant="header"
+              />
+
               <IconButton
                 onClick={handleNotificationsOpen}
                 aria-label="Notifications"

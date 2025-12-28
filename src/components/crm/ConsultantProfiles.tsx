@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Search, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { updateConsultant, deleteConsultant, getConsultantsPage } from '../../lib/api/consultants';
 import { subscribeToConsultants } from '../../lib/api/realtimeSync';
@@ -12,17 +12,12 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 import { EmptyStateNoData } from '../common/EmptyState';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
-import { BrandButton } from '../brand';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
 type RealtimeUpdate<T> = { type: 'INSERT' | 'UPDATE' | 'DELETE'; record: T };
 
-interface ConsultantProfilesProps {
-  onQuickAdd?: () => void;
-}
-
-export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps) => {
+export const ConsultantProfiles = memo(() => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
   const [consultants, setConsultants] = useState<Consultant[]>([]);
@@ -200,17 +195,6 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
         <h2 className="text-xl font-medium text-[color:var(--text)] font-heading">
           Consultant Profiles
         </h2>
-        <div className="w-full sm:w-auto">
-          <BrandButton
-            variant="primary"
-            size="md"
-            onClick={onQuickAdd}
-            className="w-full sm:w-auto flex items-center justify-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Quick Add
-          </BrandButton>
-        </div>
       </div>
 
       {/* Search and Filter */}
@@ -260,7 +244,7 @@ export const ConsultantProfiles = memo(({ onQuickAdd }: ConsultantProfilesProps)
 
       {/* Grid Content */}
       {consultants.length === 0 ? (
-        <EmptyStateNoData type="consultants" onCreate={onQuickAdd} />
+        <EmptyStateNoData type="consultants" />
       ) : (
         <ConsultantGridVirtualizer 
           consultants={consultants}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, lazy, useRef } from 'react';
-import { Plus, Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
+import { Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { useToast } from '../../contexts/ToastContext';
@@ -11,7 +11,6 @@ import type { Database, RequirementStatus } from '../../lib/database.types';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsTable } from './RequirementsTable';
-import { BrandButton } from '../brand';
 import { JDParserDialog } from './JDParserDialog';
 import { BatchJDParserDialog } from './BatchJDParserDialog';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
@@ -62,7 +61,6 @@ const statusColors: Record<RequirementStatus, { badge: string; label: string }> 
 };
 
 interface RequirementsManagementProps {
-  onQuickAdd?: () => void;
   onCreateInterview?: (requirementId: string) => void;
   toolbarPortalTargetId?: string;
 }
@@ -139,7 +137,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
   },
 }));
 
-export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
+export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
@@ -261,15 +259,7 @@ export const RequirementsManagement = memo(({ onQuickAdd, onCreateInterview, too
       >
         Tools
       </Button>
-      <BrandButton
-        variant="primary"
-        size="md"
-        onClick={onQuickAdd}
-        className="flex-1 sm:flex-none"
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        Create Requirement
-      </BrandButton>
+
     </Stack>
   );
 

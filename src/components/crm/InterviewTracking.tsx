@@ -35,11 +35,7 @@ type RealtimeUpdate<T> = { type: 'INSERT' | 'UPDATE' | 'DELETE'; record: T };
 
 const ITEMS_PER_PAGE = 12;
 
-interface InterviewTrackingProps {
-  onQuickAdd?: () => void;
-}
-
-export const InterviewTracking = memo(({ onQuickAdd }: InterviewTrackingProps) => {
+export const InterviewTracking = memo(() => {
   const { user, isAdmin } = useAuth();
   const { showToast } = useToast();
   const [interviews, setInterviews] = useState<Interview[]>([]);
@@ -273,15 +269,6 @@ export const InterviewTracking = memo(({ onQuickAdd }: InterviewTrackingProps) =
         <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
           Interview Tracking
         </Typography>
-        <BrandButton
-          variant="primary"
-          size="md"
-          onClick={onQuickAdd}
-          className="w-full sm:w-auto"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Quick Add
-        </BrandButton>
       </Stack>
 
       <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
@@ -386,7 +373,7 @@ export const InterviewTracking = memo(({ onQuickAdd }: InterviewTrackingProps) =
         <Box sx={{ p: 2 }}>
           {filteredInterviews.length === 0 ? (
             <Paper variant="outlined" sx={{ p: 3, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
-              <EmptyStateNoData type="interviews" onCreate={onQuickAdd} />
+              <EmptyStateNoData type="interviews" />
             </Paper>
           ) : (
             <Stack spacing={2}>
