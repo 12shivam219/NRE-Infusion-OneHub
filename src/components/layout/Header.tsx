@@ -199,20 +199,18 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
       sx={{
         top: 0,
         zIndex: 100,
-        borderBottom: 1,
-        borderColor: theme.headerBorder,
-        backgroundImage: theme.headerBackground,
-        backdropFilter: 'blur(12px)',
-        backgroundColor: 'rgba(9, 12, 18, 0.68)',
-        boxShadow: `0 18px 48px ${accentSoft}`,
-        transition: 'all 420ms cubic-bezier(0.4, 0, 0.2, 1)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'linear-gradient(180deg, rgba(13, 17, 23, 0.92) 0%, rgba(9, 12, 18, 0.88) 100%)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+        transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       <Toolbar
         sx={{
           px: { xs: 2, sm: 3, md: 4 },
-          py: 1,
-          minHeight: { xs: 64, sm: 72 },
+          py: 1.25,
+          minHeight: { xs: 64, sm: 70 },
           transition: 'padding 300ms ease, min-height 300ms ease',
         }}
       >
@@ -244,18 +242,20 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 aria-label="Toggle menu"
                 sx={{
                   display: { xs: 'inline-flex', md: 'none' },
-                  color: 'rgba(255,255,255,0.82)',
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  transition: 'all 320ms ease',
+                  color: 'rgba(255,255,255,0.8)',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  width: 40,
+                  height: 40,
+                  transition: 'all 250ms ease',
                   '&:hover': {
                     color: accent,
-                    backgroundColor: accentSoft,
-                    boxShadow: `0 16px 36px ${accentGlow}`,
+                    backgroundColor: 'rgba(255,255,255,0.12)',
+                    boxShadow: `0 8px 24px ${accentGlow}`,
                   },
                 }}
               >
-                <MenuIcon className="w-6 h-6" />
+                <MenuIcon className="w-5 h-5" />
               </IconButton>
             ) : null}
 
@@ -268,7 +268,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 flexShrink: 0,
               }}
             >
-              <Logo variant="icon" style="circular" className="w-10 h-10" animate />
+              <Logo variant="icon" style="circular" className="w-9 h-9" animate />
             </Box>
             <Box
               sx={{
@@ -280,7 +280,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
               <Logo
                 variant="horizontal"
                 style="circular"
-                className="w-40"
+                className="w-36"
                 showTagline={false}
                 animate
               />
@@ -291,9 +291,10 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
               orientation="vertical"
               sx={{
                 display: { xs: 'none', sm: 'block' },
-                height: 28,
+                height: 24,
                 alignSelf: 'center',
-                borderColor: 'rgba(255, 255, 255, 0.12)',
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                mx: 0.5,
               }}
             />
 
@@ -306,10 +307,13 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  p: 1.25,
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  transition: 'all 320ms ease',
+                  p: 0.75,
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  transition: 'all 250ms ease',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                  },
                 }}
               >
                 {renderPageIcon()}
@@ -350,12 +354,14 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 aria-label="Notifications"
                 sx={{
                   color: '#FFFFFF',
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.08)',
-                  transition: 'all 320ms ease',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  width: 40,
+                  height: 40,
+                  transition: 'all 250ms ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.16)',
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                    backgroundColor: 'rgba(255,255,255,0.12)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
                   },
                 }}
               >
@@ -366,12 +372,13 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                   sx={{
                     '& .MuiBadge-badge': {
                       backgroundColor: '#FFFFFF',
-                      color: '#11161F',
+                      color: '#0D1117',
                       fontWeight: 700,
+                      fontSize: '0.65rem',
                     },
                   }}
                 >
-                  <Bell className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
+                  <Bell className="w-5 h-5 sm:w-5 sm:h-5" aria-hidden="true" />
                 </Badge>
               </IconButton>
             </Box>
@@ -381,9 +388,9 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1.5,
-                paddingLeft: 1.5,
-                borderLeft: '1px solid rgba(255, 255, 255, 0.12)',
+                gap: 1,
+                paddingLeft: 1,
+                borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
               }}
             >
               <IconButton
@@ -391,12 +398,14 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 aria-label="Toggle theme"
                 sx={{
                   color: '#FFFFFF',
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255,255,255,0.08)',
-                  transition: 'all 320ms ease',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  width: 40,
+                  height: 40,
+                  transition: 'all 250ms ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(255,255,255,0.16)',
-                    boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                    backgroundColor: 'rgba(255,255,255,0.12)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
                   },
                 }}
               >
@@ -412,9 +421,9 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                     padding: 0,
                     width: 40,
                     height: 40,
-                    transition: 'all 320ms ease',
+                    transition: 'all 250ms ease',
                     '&:hover': {
-                      transform: 'scale(1.05)',
+                      transform: 'scale(1.08)',
                     },
                   }}
                 >
@@ -423,10 +432,10 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                       width: 40,
                       height: 40,
                       backgroundColor: accent,
-                      color: '#11161F',
+                      color: '#0D1117',
                       fontWeight: 700,
                       fontSize: '0.875rem',
-                      boxShadow: `0 0 16px ${accentGlow}`,
+                      boxShadow: `0 0 12px ${accentGlow}`,
                       border: `2px solid ${accentSoft}`,
                       cursor: 'pointer',
                     }}
