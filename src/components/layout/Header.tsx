@@ -4,7 +4,6 @@ import Tooltip from '@mui/material/Tooltip';
 import { useSearchParams } from 'react-router-dom';
 import SyncStatusBadge from '../common/SyncStatusBadge';
 import { CreateDropdown } from '../common/CreateDropdown';
-import { GlobalSearch } from '../common/GlobalSearch';
 import { useCreateForm } from '../../hooks/useCreateForm';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -316,22 +315,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 {renderPageIcon()}
               </Box>
             </Tooltip>
-          </Box>
-
-          {/* CENTER SECTION: Global Search */}
-          <Box
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              display: { xs: 'none', md: 'flex' },
-              justifyContent: 'center',
-              px: 2,
-            }}
-          >
-            <GlobalSearch
-              accentColor={accent}
-              accentGlow={accentGlow}
-            />
           </Box>
 
           {/* RIGHT SECTION: Controls & User Info */}
