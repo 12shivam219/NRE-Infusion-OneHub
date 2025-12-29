@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Plus, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getInterviews, updateInterview, deleteInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
@@ -12,7 +12,6 @@ import { InterviewDetailModal } from './InterviewDetailModal';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { EmptyStateNoData } from '../common/EmptyState';
-import { BrandButton } from '../brand';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';

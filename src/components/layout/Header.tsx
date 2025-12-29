@@ -1,7 +1,10 @@
 import { useState, useCallback, memo } from 'react';
-import { Bell, Menu as MenuIcon, Moon, Sun, LogOut } from 'lucide-react';
+import { Bell, Menu as MenuIcon, Moon, Sun, LogOut, ChevronRight, FileText, Bot, LayoutDashboard, Briefcase, MessagesSquare, Users } from 'lucide-react';
+import Tooltip from '@mui/material/Tooltip';
+import { useSearchParams } from 'react-router-dom';
 import SyncStatusBadge from '../common/SyncStatusBadge';
 import { CreateDropdown } from '../common/CreateDropdown';
+import { GlobalSearch } from '../common/GlobalSearch';
 import { useCreateForm } from '../../hooks/useCreateForm';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,13 +21,28 @@ import Badge from '@mui/material/Badge';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Divider from '@mui/material/Divider';
+import Avatar from '@mui/material/Avatar';
 import { Logo } from '../common/Logo';
 
 interface HeaderProps {
   onMenuClick?: () => void;
 }
 
-const getPageTitle = (pathname: string) => {
+const getPageTitle = (pathname: string, searchParams?: URLSearchParams) => {
+  if (pathname === '/crm' && searchParams) {
+    const view = searchParams.get('view');
+    switch (view) {
+      case 'requirements':
+        return 'Requirements';
+      case 'interviews':
+        return 'Interviews';
+      case 'consultants':
+        return 'Consultants';
+      default:
+        return 'Marketing & CRM';
+    }
+  }
+
   switch (pathname) {
     case '/documents':
       return 'Resume Editor';
@@ -39,19 +57,95 @@ const getPageTitle = (pathname: string) => {
   }
 };
 
+const getPageIcon = (pathname: string, searchParams?: URLSearchParams) => {
+  if (pathname === '/crm' && searchParams) {
+    const view = searchParams.get('view');
+    switch (view) {
+      case 'requirements':
+        return 'briefcase';
+      case 'interviews':
+        return 'messages-square';
+      case 'consultants':
+        return 'users';
+      default:
+        return 'briefcase';
+    }
+  }
+
+  switch (pathname) {
+    case '/documents':
+      return 'file-text';
+    case '/crm':
+      return 'briefcase'; // Requirements is main view in CRM
+    case '/admin':
+      return 'bot';
+    case '/dashboard':
+    case '/':
+    default:
+      return 'layout-dashboard';
+  }
+};
+
 export const Header = memo(({ onMenuClick }: HeaderProps) => {
   const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead } = useNotifications();
   const { themeMode, toggleThemeMode } = useThemeMode();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
   const { openCreateForm } = useCreateForm();
   const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<HTMLElement | null>(null);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
+  const [userMenuAnchorEl, setUserMenuAnchorEl] = useState<HTMLElement | null>(null);
   const { theme } = useThemeSync();
   const accent = theme.accent;
   const accentSoft = theme.accentSoft;
   const accentGlow = theme.accentGlow;
 
-  const title = getPageTitle(pathname);
+  const title = getPageTitle(pathname, searchParams);
+  const pageIconName = getPageIcon(pathname, searchParams);
+  const NOTIFICATIONS_PREVIEW_LIMIT = 5;
+
+  // Helper function to render the appropriate icon
+  const renderPageIcon = () => {
+    const iconProps = {
+      size: 26,
+      color: accent,
+      strokeWidth: 2,
+      style: {
+        transition: 'all 320ms ease',
+        filter: `drop-shadow(0 0 8px ${accentGlow})`,
+      },
+    };
+
+    switch (pageIconName) {
+      case 'file-text':
+        return <FileText {...iconProps} />;
+      case 'briefcase':
+        return <Briefcase {...iconProps} />;
+      case 'messages-square':
+        return <MessagesSquare {...iconProps} />;
+      case 'users':
+        return <Users {...iconProps} />;
+      case 'bot':
+        return <Bot {...iconProps} />;
+      case 'layout-dashboard':
+      default:
+        return <LayoutDashboard {...iconProps} />;
+    }
+  };
+
+  // Helper function to get user initials
+  const getUserInitials = (fullName: string | undefined) => {
+    if (!fullName) return '?';
+    return fullName
+      .split(' ')
+      .map(name => name[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const userInitials = getUserInitials(user?.full_name);
 
   // Create dropdown handlers - open modals directly
   const handleCreateRequirement = useCallback(() => {
@@ -85,6 +179,19 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
   const handleNotificationsClose = useCallback(() => {
     setNotificationsAnchorEl(null);
   }, []);
+
+  const handleUserMenuOpen = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    setUserMenuAnchorEl(e.currentTarget);
+  }, []);
+
+  const handleUserMenuClose = useCallback(() => {
+    setUserMenuAnchorEl(null);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    handleUserMenuClose();
+    logout();
+  }, [handleUserMenuClose, logout]);
 
   return (
     <AppBar
@@ -191,46 +298,41 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
               }}
             />
 
-            {/* Page Title */}
-            <Box sx={{ minWidth: 0, flexShrink: 0 }}>
-              <Typography
-                variant="h6"
+            {/* Page Title Icon */}
+            <Tooltip title={title} arrow placement="bottom">
+              <Box
                 sx={{
-                  fontWeight: 700,
-                  lineHeight: 1.1,
-                  fontFamily: '"Poppins", sans-serif',
-                  letterSpacing: '-0.015em',
-                  color: accent,
-                  fontSize: { xs: '1.125rem', sm: '1.25rem' },
-                  textShadow: `0 0 18px ${accentGlow}`,
-                  position: 'relative',
-                  transition: 'color 320ms ease, text-shadow 320ms ease',
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    left: 0,
-                    bottom: -6,
-                    width: '28%',
-                    height: '2px',
-                    borderRadius: '999px',
-                    background: `linear-gradient(90deg, ${accent}, transparent)`
-                  }
+                  minWidth: 0,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 1.25,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  transition: 'all 320ms ease',
                 }}
-                noWrap
               >
-                {title}
-              </Typography>
-            </Box>
+                {renderPageIcon()}
+              </Box>
+            </Tooltip>
           </Box>
 
-          {/* CENTER SECTION: Spacer */}
+          {/* CENTER SECTION: Global Search */}
           <Box
             sx={{
               flex: 1,
               minWidth: 0,
-              display: { xs: 'none', md: 'block' },
+              display: { xs: 'none', md: 'flex' },
+              justifyContent: 'center',
+              px: 2,
             }}
-          />
+          >
+            <GlobalSearch
+              accentColor={accent}
+              accentGlow={accentGlow}
+            />
+          </Box>
 
           {/* RIGHT SECTION: Controls & User Info */}
           <Box
@@ -318,66 +420,113 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 {themeMode === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </IconButton>
 
-              {/* User Info - Hidden on mobile, shown on tablet+ */}
+              {/* User Avatar Button */}
               {user && (
-                <Box
+                <IconButton
+                  onClick={handleUserMenuOpen}
+                  aria-label="User menu"
                   sx={{
-                    display: { xs: 'none', sm: 'flex' },
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    minWidth: 0,
+                    padding: 0,
+                    width: 40,
+                    height: 40,
+                    transition: 'all 320ms ease',
+                    '&:hover': {
+                      transform: 'scale(1.05)',
+                    },
                   }}
                 >
-                  <Typography
-                    variant="caption"
-                    noWrap
+                  <Avatar
                     sx={{
-                      color: 'rgba(255, 255, 255, 0.72)',
-                      fontSize: '0.7rem',
-                      fontFamily: '"Inter", sans-serif',
-                      transition: 'color 320ms ease',
+                      width: 40,
+                      height: 40,
+                      backgroundColor: accent,
+                      color: '#11161F',
+                      fontWeight: 700,
+                      fontSize: '0.875rem',
+                      boxShadow: `0 0 16px ${accentGlow}`,
+                      border: `2px solid ${accentSoft}`,
+                      cursor: 'pointer',
                     }}
                   >
-                    Signed in as
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    noWrap
-                    sx={{
-                      color: accent,
-                      fontWeight: 600,
-                      fontSize: '0.75rem',
-                      fontFamily: '"Poppins", sans-serif',
-                      transition: 'color 320ms ease',
-                      textShadow: `0 0 12px ${accentGlow}`,
-                    }}
-                  >
-                    {user.full_name}
-                  </Typography>
-                </Box>
+                    {userInitials}
+                  </Avatar>
+                </IconButton>
               )}
-
-              <IconButton
-                onClick={logout}
-                aria-label="Sign out"
-                sx={{
-                  color: '#ff6b6b',
-                  borderRadius: 2,
-                  backgroundColor: 'rgba(255, 107, 107, 0.08)',
-                  transition: 'all 320ms ease',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 107, 107, 0.16)',
-                    boxShadow: '0 12px 32px rgba(255, 107, 107, 0.2)',
-                  },
-                }}
-                title="Sign out"
-              >
-                <LogOut className="w-5 h-5" />
-              </IconButton>
             </Box>
           </Box>
         </Box>
 
+        {/* User Menu */}
+        {user && (
+          <Menu
+            anchorEl={userMenuAnchorEl}
+            open={Boolean(userMenuAnchorEl)}
+            onClose={handleUserMenuClose}
+            disableScrollLock={true}
+            PaperProps={{
+              sx: {
+                width: 280,
+                backgroundColor: '#161B22',
+                backgroundImage: 'linear-gradient(135deg, #161B22 0%, #0D1117 100%)',
+                border: '1px solid rgba(234, 179, 8, 0.1)',
+                borderRadius: '1rem',
+                boxShadow: `0 0 30px ${accentGlow}`,
+              },
+            }}
+          >
+            {/* User Info Header */}
+            <Box sx={{ px: 2, py: 2 }}>
+              <Stack spacing={0.5}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 600,
+                    fontFamily: '"Poppins", sans-serif',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {user.full_name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    fontFamily: '"Inter", sans-serif',
+                  }}
+                >
+                  {user.email}
+                </Typography>
+              </Stack>
+            </Box>
+            <Divider sx={{ borderColor: 'rgba(234, 179, 8, 0.1)' }} />
+
+            {/* Logout Option */}
+            <MenuItem
+              onClick={handleLogout}
+              sx={{
+                py: 1.5,
+                '&:hover': {
+                  backgroundColor: accentSoft,
+                  filter: 'brightness(1.05)',
+                },
+                transition: 'all 200ms ease',
+              }}
+              aria-label="Sign out"
+            >
+              <LogOut className="w-4 h-4 mr-2" style={{ color: '#ff6b6b' }} />
+              <Typography
+                variant="body2"
+                sx={{
+                  fontFamily: '"Poppins", sans-serif',
+                  color: '#ff6b6b',
+                  fontWeight: 500,
+                }}
+              >
+                Sign Out
+              </Typography>
+            </MenuItem>
+          </Menu>
+        )}
           <Menu
             anchorEl={notificationsAnchorEl}
             open={Boolean(notificationsAnchorEl)}
@@ -420,62 +569,63 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                 </Typography>
               </Box>
             ) : (
-              notifications.slice(0, 5).map((notification) => (
-                <MenuItem
-                  key={notification.id}
-                  onClick={() => {
-                    handleNotificationClick(notification.id, notification.read);
-                    setNotificationsAnchorEl(null);
-                  }}
-                  sx={{
-                    alignItems: 'flex-start',
-                    whiteSpace: 'normal',
-                    py: 1.5,
-                    bgcolor: !notification.read ? accentSoft : undefined,
-                    '&:hover': {
-                      backgroundColor: accentSoft,
-                      filter: 'brightness(1.05)',
-                    },
-                    transition: 'all 200ms ease',
-                  }}
-                  aria-label={`Notification: ${notification.title}`}
-                >
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+              <>
+                {notifications.slice(0, showAllNotifications ? notifications.length : NOTIFICATIONS_PREVIEW_LIMIT).map((notification) => (
+                  <MenuItem
+                    key={notification.id}
+                    onClick={() => {
+                      handleNotificationClick(notification.id, notification.read);
+                      setNotificationsAnchorEl(null);
+                    }}
+                    sx={{
+                      alignItems: 'flex-start',
+                      whiteSpace: 'normal',
+                      py: 1.5,
+                      bgcolor: !notification.read ? accentSoft : undefined,
+                      '&:hover': {
+                        backgroundColor: accentSoft,
+                        filter: 'brightness(1.05)',
+                      },
+                      transition: 'all 200ms ease',
+                    }}
+                    aria-label={`Notification: ${notification.title}`}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 600,
+                            fontFamily: '"Poppins", sans-serif',
+                            color: '#FFFFFF',
+                          }}
+                        >
+                          {notification.title}
+                        </Typography>
+                        {!notification.read && (
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              bgcolor: accent,
+                              mt: 0.75,
+                              flexShrink: 0,
+                              boxShadow: `0 0 12px ${accentGlow}`,
+                            }}
+                          />
+                        )}
+                      </Stack>
                       <Typography
                         variant="body2"
                         sx={{
-                          fontWeight: 600,
-                          fontFamily: '"Poppins", sans-serif',
-                          color: '#FFFFFF',
+                          mt: 0.5,
+                          color: 'rgba(255, 255, 255, 0.7)',
+                          fontFamily: '"Inter", sans-serif',
                         }}
                       >
-                        {notification.title}
+                        {notification.message}
                       </Typography>
-                      {!notification.read && (
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            bgcolor: accent,
-                            mt: 0.75,
-                            flexShrink: 0,
-                            boxShadow: `0 0 12px ${accentGlow}`,
-                          }}
-                        />
-                      )}
-                    </Stack>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        mt: 0.5,
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        fontFamily: '"Inter", sans-serif',
-                      }}
-                    >
-                      {notification.message}
-                    </Typography>
                     <Typography
                       variant="caption"
                       sx={{
@@ -489,7 +639,38 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
                     </Typography>
                   </Box>
                 </MenuItem>
-              ))
+              ))}
+
+                {notifications.length > NOTIFICATIONS_PREVIEW_LIMIT && (
+                  <>
+                    <Divider sx={{ borderColor: 'rgba(234, 179, 8, 0.1)' }} />
+                    <MenuItem
+                      onClick={() => setShowAllNotifications(!showAllNotifications)}
+                      sx={{
+                        justifyContent: 'space-between',
+                        py: 1.5,
+                        '&:hover': {
+                          backgroundColor: accentSoft,
+                          filter: 'brightness(1.05)',
+                        },
+                        transition: 'all 200ms ease',
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          fontFamily: '"Poppins", sans-serif',
+                          color: accent,
+                        }}
+                      >
+                        {showAllNotifications ? 'Show Less' : `View All (${notifications.length})`}
+                      </Typography>
+                      <ChevronRight className="w-4 h-4" style={{ color: accent }} />
+                    </MenuItem>
+                  </>
+                )}
+              </>
             )}
           </Menu>
       </Toolbar>
