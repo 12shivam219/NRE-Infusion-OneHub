@@ -222,7 +222,7 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
             width: '100%',
             maxWidth: '1440px',
             margin: '0 auto',
-            gap: { xs: 1, sm: 2, md: 3 },
+            justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
