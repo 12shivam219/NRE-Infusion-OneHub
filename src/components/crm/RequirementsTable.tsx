@@ -35,16 +35,18 @@ interface RequirementsTableProps {
   isFetchingPage: boolean;
   onPageChange: (page: number) => void;
   headerSearch?: JSX.Element | null;
+  selectedStatusFilter?: RequirementStatus | 'ALL';
+  onStatusFilterChange?: (status: RequirementStatus | 'ALL') => void;
 }
 
 const statusColorMap: Record<RequirementStatus, { bg: string; text: string; border: string; dot: string }> = {
-  'NEW': { bg: 'bg-[color:var(--gold)] bg-opacity-10', text: 'text-[color:var(--gold)]', border: 'border-[color:var(--gold)] border-opacity-30', dot: 'bg-[color:var(--gold)]' },
-  'IN_PROGRESS': { bg: 'bg-amber-500 bg-opacity-10', text: 'text-amber-600', border: 'border-amber-500 border-opacity-30', dot: 'bg-amber-600' },
-  'INTERVIEW': { bg: 'bg-purple-500 bg-opacity-10', text: 'text-purple-600', border: 'border-purple-500 border-opacity-30', dot: 'bg-purple-600' },
-  'OFFER': { bg: 'bg-green-500 bg-opacity-10', text: 'text-green-600', border: 'border-green-500 border-opacity-30', dot: 'bg-green-600' },
-  'CLOSED': { bg: 'bg-[color:var(--text-secondary)] bg-opacity-10', text: 'text-[color:var(--text-secondary)]', border: 'border-[color:var(--text-secondary)] border-opacity-30', dot: 'bg-[color:var(--text-secondary)]' },
-  'REJECTED': { bg: 'bg-red-500 bg-opacity-10', text: 'text-red-600', border: 'border-red-500 border-opacity-30', dot: 'bg-red-600' },
-  'SUBMITTED': { bg: 'bg-indigo-500 bg-opacity-10', text: 'text-indigo-600', border: 'border-indigo-500 border-opacity-30', dot: 'bg-indigo-600' },
+  'NEW': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border border-blue-200', dot: 'bg-blue-500' },
+  'IN_PROGRESS': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border border-amber-200', dot: 'bg-amber-500' },
+  'INTERVIEW': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border border-purple-200', dot: 'bg-purple-500' },
+  'OFFER': { bg: 'bg-green-50', text: 'text-green-700', border: 'border border-green-200', dot: 'bg-green-500' },
+  'CLOSED': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border border-gray-200', dot: 'bg-gray-500' },
+  'REJECTED': { bg: 'bg-red-50', text: 'text-red-700', border: 'border border-red-200', dot: 'bg-red-500' },
+  'SUBMITTED': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border border-indigo-200', dot: 'bg-indigo-500' },
 };
 
 const TableRow = memo(({
@@ -59,6 +61,8 @@ const TableRow = memo(({
   rowIndex,
   rowRef,
   dataIndex,
+  selectedStatusFilter,
+  onStatusFilterChange,
 }: {
   req: RequirementWithLogs;
   isSelected: boolean;
@@ -71,6 +75,8 @@ const TableRow = memo(({
   rowIndex: number;
   rowRef?: (el: HTMLTableRowElement | null) => void;
   dataIndex?: number;
+  selectedStatusFilter?: RequirementStatus | 'ALL';
+  onStatusFilterChange?: (status: RequirementStatus | 'ALL') => void;
 }) => {
   return (
     <tr
@@ -78,7 +84,7 @@ const TableRow = memo(({
       data-index={dataIndex}
         className={`transition-all duration-150 ${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10`}
     > 
-      <td className="px-2 py-3 text-center align-middle w-8 border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-center align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
         <div className="flex items-center justify-center">
           <button
             onClick={() => toggleRowSelected(req.id)}
@@ -97,12 +103,12 @@ const TableRow = memo(({
       </td>
       
       {/* Requirement Number */}
-      <td className="px-2 py-3 text-left align-middle w-14 font-mono text-xs font-medium text-[color:var(--text-secondary)] border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-middle font-mono text-xs font-medium text-[color:var(--text-secondary)] border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '50px' }}>
         {String(req.requirement_number || 1).padStart(3, '0')}
       </td>
       
       {/* Title */}
-      <td className="px-2 py-3 text-left align-top min-w-[160px] max-w-[320px] whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-top whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>
         <div className="min-w-0">
           <button
             onClick={() => onViewDetails(req)}
@@ -123,17 +129,29 @@ const TableRow = memo(({
       </td>
       
       {/* Status */}
-      <td className="px-2 py-3 text-left align-middle min-w-[100px] whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-middle whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>
         <div className="flex items-center">
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold font-heading border ${colors.bg} ${colors.text} ${colors.border}`}>
-            <span className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0 mr-1`} />
-            <span>{req.status}</span>
-          </span>
+          <button
+            onClick={() => {
+              if (onStatusFilterChange) {
+                // Toggle behavior: click same status to clear, click different to select
+                onStatusFilterChange(req.status === selectedStatusFilter ? 'ALL' : req.status);
+              }
+            }}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold font-heading transition-all duration-150 cursor-pointer ${colors.bg} ${colors.text} hover:shadow-md ${
+              req.status === selectedStatusFilter ? 'ring-2 ring-[color:var(--gold)] ring-offset-1' : 'hover:shadow-sm'
+            }`}
+            title={`Click to filter by ${req.status} status`}
+            aria-label={`Filter by ${req.status} status`}
+          >
+            <span className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0 animate-pulse`} />
+            <span className="whitespace-nowrap">{req.status}</span>
+          </button>
         </div>
       </td>
       
       {/* Vendor Company */}
-      <td className="px-2 py-3 text-left align-top min-w-[140px] max-w-[220px] font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-top font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '18%' }}>
         <div className="min-w-0">
           {req.vendor_company ? (
             <div 
@@ -149,7 +167,7 @@ const TableRow = memo(({
       </td>
       
       {/* Vendor Person */}
-      <td className="px-2 py-3 text-left align-top min-w-[120px] max-w-[180px] font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-top font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>
         <div className="min-w-0">
           {req.vendor_person_name ? (
             <div 
@@ -165,7 +183,7 @@ const TableRow = memo(({
       </td>
       
       {/* Vendor Phone */}
-      <td className="px-2 py-3 text-left align-top min-w-[120px] max-w-[160px] font-mono text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-top font-mono text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>
         <div className="min-w-0 max-w-full">
           {req.vendor_phone ? (
             <a 
@@ -183,7 +201,7 @@ const TableRow = memo(({
       </td>
       
       {/* Vendor Email */}
-      <td className="px-2 py-3 text-left align-top min-w-[140px] max-w-[200px] text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-top text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>
         <div className="min-w-0 max-w-full">
           {req.vendor_email ? (
             <a 
@@ -201,7 +219,7 @@ const TableRow = memo(({
       </td>
       
       {/* Actions */}
-      <td className="px-2 py-3 text-left align-middle min-w-[80px] border-b border-r border-[color:var(--gold)] border-opacity-10">
+      <td className="px-2 py-3 text-left align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '140px' }}>
         <div className="flex gap-1 justify-end items-center">
           <button
             onClick={() => onViewDetails(req)}
@@ -250,6 +268,8 @@ export const RequirementsTable = memo(({
   isFetchingPage,
   onPageChange,
   headerSearch,
+  selectedStatusFilter,
+  onStatusFilterChange,
 }: RequirementsTableProps) => {
   // State for table functionality
   const sortField: SortField = 'created_at';
@@ -339,36 +359,15 @@ export const RequirementsTable = memo(({
         bgcolor: 'var(--darkbg-surface)',
       }}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-[color:var(--gold)] border-opacity-10 bg-[color:var(--darkbg-surface)]">
-        <div className="flex items-center w-full gap-3 relative">
-          <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">Results</h3>
-          <div className="flex-1 mt-2 sm:mt-0 relative">
-            <div style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>
-              {headerSearch ?? null}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
-          <span className="text-xs font-body text-[color:var(--text-secondary)]">Page: {page + 1}</span>
-          <span className="text-xs font-body text-[color:var(--text-secondary)]">|</span>
-          <span className="text-xs font-body text-[color:var(--text-secondary)]">Rows: {sortedRequirements.length}</span>
-          <span className="text-xs font-body text-[color:var(--text-secondary)]">|</span>
-          <span className="text-xs font-body text-[color:var(--text-secondary)]">Selected: {selectedRows.size}</span>
+      <div className="bg-white">
+        {/* Header Row - Title and Search */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-gray-200 gap-3">
+          <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">Requirements</h3>
           
-          <button
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 0 || isFetchingPage}
-            className="px-3 py-1 text-xs font-body text-[color:var(--text)] bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg hover:bg-[color:var(--darkbg-surface-light)] focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 transition-all"
-          >
-            Prev
-          </button>
-          <button
-            onClick={() => onPageChange(page + 1)}
-            disabled={!hasNextPage || isFetchingPage}
-            className="px-3 py-1 text-xs font-body text-[color:var(--text)] bg-[color:var(--darkbg-surface)] border border-[color:var(--gold)] border-opacity-20 rounded-lg hover:bg-[color:var(--darkbg-surface-light)] focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 transition-all"
-          >
-            Next
-          </button>
+          {/* Search Bar - Right */}
+          <div className="flex-shrink-0 min-w-0">
+            {headerSearch ?? null}
+          </div>
         </div>
       </div>
 
@@ -376,15 +375,35 @@ export const RequirementsTable = memo(({
         ref={parentRef}
         sx={{
           overflow: 'auto',
+          overflowX: { xs: 'auto', sm: 'auto', md: 'auto' },
+          overflowY: 'auto',
           maxHeight: { xs: '60vh', sm: '65vh', md: '70vh' },
           pb: 1,
+          scrollbarGutter: 'stable',
+          width: '100%',
+          WebkitOverflowScrolling: 'touch',
+          '& table': {
+            width: '100%',
+            minWidth: { xs: '1200px', sm: '1200px', md: '100%' },
+            tableLayout: 'fixed',
+            borderCollapse: 'collapse',
+          },
+          '& thead': {
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            boxShadow: `0 2px 0 0 rgba(234, 179, 8, 0.3)`,
+          },
+          '& thead tr': {
+            borderBottom: '2px solid rgba(234, 179, 8, 0.3)',
+          },
         }}
       >
-        <table className="min-w-full w-max border-separate border-spacing-0 border border-[color:var(--gold)] border-opacity-20 rounded-lg">
-          <thead className="bg-[color:var(--darkbg-surface-light)] sticky top-0 z-10">
+        <table className="min-w-full border border-[color:var(--gold)] border-opacity-20 rounded-lg">
+          <thead className="bg-white">
             <tr>
               
-              <th className="px-2 py-3 text-center text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide w-10 border-b border-r border-[color:var(--gold)] border-opacity-10">
+              <th className="px-2 py-3 text-center text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
                 <button
                   onClick={toggleSelectAll}
                   className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 focus:ring-offset-1 transition-all"
@@ -397,14 +416,14 @@ export const RequirementsTable = memo(({
                   )}
                 </button>
               </th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">REQ</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Title</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Status</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Vendor Company</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Contact Person</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Phone</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Email</th>
-              <th className="px-2 py-3 text-right text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-b border-r border-[color:var(--gold)] border-opacity-10">Actions</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '50px' }}>REQ</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>Title</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>Status</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '18%' }}>Vendor Company</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>Contact Person</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>Phone</th>
+              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>Email</th>
+              <th className="px-2 py-3 text-right text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '140px' }}>Actions</th>
             </tr>
           </thead>
           <tbody
@@ -450,6 +469,8 @@ export const RequirementsTable = memo(({
                       rowIndex={virtualRow.index}
                       dataIndex={virtualRow.index}
                       rowRef={rowVirtualizer.measureElement}
+                      selectedStatusFilter={selectedStatusFilter}
+                      onStatusFilterChange={onStatusFilterChange}
                     />
                   );
                 })}
@@ -464,6 +485,36 @@ export const RequirementsTable = memo(({
           </tbody>
         </table>
       </Box>
+
+      {/* Footer - Pagination and Stats */}
+      <div className="bg-white border-t border-gray-200">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 gap-3">
+          <div className="flex items-center space-x-2 text-xs font-body text-gray-600">
+            <span>Page: <strong>{page + 1}</strong></span>
+            <span className="text-gray-300">|</span>
+            <span>Rows: <strong>{sortedRequirements.length}</strong></span>
+            <span className="text-gray-300">|</span>
+            <span>Selected: <strong>{selectedRows.size}</strong></span>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={page === 0 || isFetchingPage}
+              className="px-3 py-1.5 text-xs font-body text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={!hasNextPage || isFetchingPage}
+              className="px-3 py-1.5 text-xs font-body text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
     </Paper>
   );
 });

@@ -60,12 +60,12 @@ export const InterviewTracking = memo(() => {
       setError(null);
       const interviewsResult = await getInterviews(user.id);
       if (interviewsResult.success && interviewsResult.interviews) {
-        setInterviews(interviewsResult.interviews);
+        setInterviews(interviewsResult.interviews as Interview[]);
         
         // Update the selected interview if it exists with the new data
         setSelectedInterview(prev => {
           if (prev && interviewsResult.interviews) {
-            const updatedInterview = interviewsResult.interviews.find(i => i.id === prev.id);
+            const updatedInterview = interviewsResult.interviews.find(i => i.id === prev.id) as Interview | undefined;
             return updatedInterview || prev;
           }
           return null;

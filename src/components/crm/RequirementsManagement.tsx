@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, lazy, useRef } from 'react';
-import { Download, XCircle, ArrowUpDown, X, SlidersHorizontal } from 'lucide-react';
+import { Download, XCircle, ArrowUpDown, X, SlidersHorizontal, Zap, Settings, Filter } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { useToast } from '../../contexts/ToastContext';
@@ -15,10 +15,10 @@ import { JDParserDialog } from './JDParserDialog';
 import { BatchJDParserDialog } from './BatchJDParserDialog';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
+import type { JdExtractionResult } from '../../lib/jdParser';
 import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
-import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
@@ -42,7 +42,7 @@ import DialogActions from '@mui/material/DialogActions';
 import Popover from '@mui/material/Popover';
 import Portal from '@mui/material/Portal';
 import Tooltip from '@mui/material/Tooltip';
-import { alpha, styled } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 
 const RequirementsReport = lazy(() => import('./RequirementsReport').then((m) => ({ default: m.RequirementsReport })));
 const RequirementDetailModal = lazy(() => import('./RequirementDetailModal').then((m) => ({ default: m.RequirementDetailModal })));
@@ -62,82 +62,79 @@ const statusColors: Record<RequirementStatus, { badge: string; label: string }> 
 
 interface RequirementsManagementProps {
   onCreateInterview?: (requirementId: string) => void;
+  onParsedJDData?: (extraction: JdExtractionResult, cleanedText: string) => void;
   toolbarPortalTargetId?: string;
 }
 
-const Search = styled('div')(({ theme }) => ({
+const Search = styled('div')({
   position: 'relative',
-  borderRadius: 10,
-  backgroundColor:
-    theme.palette.mode === 'dark'
-      ? alpha(theme.palette.common.white, 0.12)
-      : alpha(theme.palette.common.black, 0.06),
-  '&:hover': {
-    backgroundColor:
-      theme.palette.mode === 'dark'
-        ? alpha(theme.palette.common.white, 0.16)
-        : alpha(theme.palette.common.black, 0.09),
-  },
-  width: '100%',
-  height: 40,
   display: 'flex',
   alignItems: 'center',
-}));
-
-const CollapsedSearchButton = styled(IconButton)(({ theme }) => ({
-  width: 40,
-  height: 40,
-  borderRadius: 10,
-  backgroundColor:
-    theme.palette.mode === 'dark'
-      ? alpha(theme.palette.common.white, 0.12)
-      : alpha(theme.palette.common.black, 0.06),
-  color: theme.palette.text.secondary,
-  '&:hover': {
-    backgroundColor:
-      theme.palette.mode === 'dark'
-        ? alpha(theme.palette.common.white, 0.16)
-        : alpha(theme.palette.common.black, 0.09),
+  maxWidth: 280,
+  width: '100%',
+  height: 36,
+  borderRadius: 6,
+  backgroundColor: '#ffffff',
+  border: '1px solid #d1d5db',
+  transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+  paddingLeft: 8,
+  '&:focus-within': {
+    borderColor: '#007bff',
+    boxShadow: '0 0 0 3px rgba(0, 123, 255, 0.1)',
   },
-  '&.Mui-focusVisible': {
-    boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`,
-  },
-}));
+});
 
-const SearchIconWrapper = styled('div')(({ theme }) => ({
-  padding: theme.spacing(0, 1),
-  height: '100%',
-  position: 'absolute',
-  pointerEvents: 'none',
+const SearchIconWrapper = styled('div')({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: theme.palette.text.secondary,
-}));
+  color: '#6b7280',
+  marginRight: 6,
+  '& svg': {
+    width: 18,
+    height: 18,
+  },
+});
 
-const SearchClearWrapper = styled('div')(({ theme }) => ({
-  padding: theme.spacing(0, 0.25),
-  height: '100%',
-  position: 'absolute',
-  right: theme.spacing(0.5),
-  top: 0,
+const SearchClearWrapper = styled('div')({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-}));
+  marginLeft: 'auto',
+  marginRight: 3,
+  '& button': {
+    color: '#6b7280',
+    width: 28,
+    height: 28,
+    transition: 'color 0.2s ease',
+  },
+  '& button:hover': {
+    color: '#007bff',
+  },
+  '& svg': {
+    width: 16,
+    height: 16,
+  },
+});
 
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
-  width: '100%',
+const StyledInputBase = styled(InputBase)({
+  flex: 1,
+  height: '100%',
+  backgroundColor: 'transparent',
+  color: '#1f2937',
   '& .MuiInputBase-input': {
-    padding: theme.spacing(1, 1, 1, 0),
-    paddingLeft: `calc(1em + ${theme.spacing(3)})`,
-    paddingRight: `calc(1em + ${theme.spacing(4)})`,
-    fontSize: theme.typography.pxToRem(14),
+    padding: '6px 8px',
+    fontSize: 13,
+    fontWeight: 400,
+    color: 'inherit',
+    '::placeholder': {
+      color: '#9ca3af',
+      opacity: 1,
+    },
   },
-}));
+});
 
-export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTargetId }: RequirementsManagementProps) => {
+export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData, toolbarPortalTargetId }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
@@ -230,7 +227,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
 
   const [toolsAnchorEl, setToolsAnchorEl] = useState<HTMLElement | null>(null);
   const toolsOpen = Boolean(toolsAnchorEl);
-  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(() => Boolean(savedFilters?.searchTerm));
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<RequirementStatus | 'ALL'>('ALL');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [toolbarTarget, setToolbarTarget] = useState<HTMLElement | null>(() => {
     if (!toolbarPortalTargetId || typeof document === 'undefined') return null;
@@ -250,101 +247,70 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
   const toolbar = (
     <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ width: { xs: '100%', sm: 'auto' } }}>
       <Box sx={{ flex: { xs: 1, sm: 'unset' } }} />
-      <Button
-        variant="outlined"
-        color="inherit"
-        startIcon={<SlidersHorizontal className="w-4 h-4" />}
-        onClick={(e) => setToolsAnchorEl(e.currentTarget)}
-        sx={{ flex: { xs: 1, sm: 'unset' } }}
-      >
-        Tools
-      </Button>
-
     </Stack>
   );
 
   const tableSearch = (
-    <ClickAwayListener
-      onClickAway={() => {
-        if (!searchTerm) setIsSearchOpen(false);
-      }}
-    >
-      <Box>
-        {!isSearchOpen ? (
-          <CollapsedSearchButton
-            onClick={() => {
-              setIsSearchOpen(true);
-              // focus after opening
-              setTimeout(() => searchInputRef.current?.focus(), 0);
-            }}
-            aria-label="Open search"
-            title="Search"
-          >
-            <SearchIcon fontSize="small" />
-          </CollapsedSearchButton>
-        ) : (
-          <Search role="search" aria-label="Search requirements" sx={{ maxWidth: { xs: '100%', sm: 520 }, width: '100%' }}>
-            <SearchIconWrapper>
-              <SearchIcon fontSize="small" />
-            </SearchIconWrapper>
-            <StyledInputBase
-              inputRef={searchInputRef}
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                handleDebouncedSearch(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }
-                if (e.key === 'Escape') {
-                  if (searchTerm) {
-                    setSearchTerm('');
-                    setDebouncedValue('');
-                  }
-                  searchInputRef.current?.blur();
-                }
-              }}
-              placeholder="Search..."
-              inputProps={{
-                'aria-label': 'Search requirements',
-              }}
-            />
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+      <Search role="search" aria-label="Search requirements">
+        <SearchIconWrapper>
+          <SearchIcon fontSize="small" />
+        </SearchIconWrapper>
+        <StyledInputBase
+          inputRef={searchInputRef}
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            handleDebouncedSearch(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+            if (e.key === 'Escape') {
+              if (searchTerm) {
+                setSearchTerm('');
+                setDebouncedValue('');
+              }
+              searchInputRef.current?.blur();
+            }
+          }}
+          placeholder="Search…"
+          inputProps={{
+            'aria-label': 'Search requirements',
+          }}
+        />
 
-            <SearchClearWrapper>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  if (searchTerm) {
-                    setSearchTerm('');
-                    setDebouncedValue('');
-                  }
-                }}
-                aria-label={searchTerm ? 'Clear search' : 'Close search'}
-                title={searchTerm ? 'Clear search' : 'Close search'}
-              >
-                <X className="w-5 h-5" />
-              </IconButton>
-            </SearchClearWrapper>
-          </Search>
+        {searchTerm && (
+          <SearchClearWrapper>
+            <IconButton
+              size="small"
+              onClick={() => {
+                if (searchTerm) {
+                  setSearchTerm('');
+                  setDebouncedValue('');
+                }
+              }}
+              aria-label="Clear search"
+              title="Clear search"
+            >
+              <X className="w-5 h-5" />
+            </IconButton>
+          </SearchClearWrapper>
         )}
-      </Box>
-    </ClickAwayListener>
+      </Search>
+      <Tooltip title="Tools">
+        <IconButton
+          color="inherit"
+          onClick={(e) => setToolsAnchorEl(e.currentTarget)}
+          size="small"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+        </IconButton>
+      </Tooltip>
+    </Box>
   );
-
-  useEffect(() => {
-    if (searchTerm || debouncedValue) {
-      setIsSearchOpen(true);
-    }
-  }, [searchTerm, debouncedValue]);
-
-  useEffect(() => {
-    if (isSearchOpen) {
-      searchInputRef.current?.focus();
-    }
-  }, [isSearchOpen]);
 
   // Initialize debounced search with saved value
   useEffect(() => {
@@ -382,49 +348,9 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
     []
   );
 
-  // Enhanced search function - searches across multiple fields including phone numbers and requirement number
-  const isRateInRange = useCallback((rate: string | null): boolean => {
-    if (!rate) return true;
-    const rateNum = parseFloat(rate.replace(/[^0-9.-]/g, ''));
-    if (isNaN(rateNum)) return true;
-
-    if (minRate && parseFloat(minRate) > rateNum) return false;
-    if (maxRate && parseFloat(maxRate) < rateNum) return false;
-    return true;
-  }, [minRate, maxRate]);
-
-  // Helper to check if date is in range - with validation
-  const isDateInRange = useCallback((createdAt: string): boolean => {
-    if (!dateRange.from && !dateRange.to) return true;
-
-    try {
-      const created = new Date(createdAt).getTime();
-      if (isNaN(created)) return true; // Skip invalid dates
-
-      if (dateRange.from) {
-        const fromDate = new Date(dateRange.from).getTime();
-        if (!isNaN(fromDate) && fromDate > created) return false;
-      }
-
-      if (dateRange.to) {
-        const toDate = new Date(dateRange.to).getTime();
-        if (!isNaN(toDate) && toDate < created) return false;
-      }
-
-      return true;
-    } catch {
-      return true; // Skip if there's an error
-    }
-  }, [dateRange]);
-
-  // Helper to check remote preference
-  const matchesRemoteFilter = useCallback((remote: string | null): boolean => {
-    if (remoteFilter === 'ALL') return true;
-    if (!remote) return true;
-
-    const isRemote = remote.toLowerCase().includes('remote') || remote.toLowerCase().includes('yes');
-    return remoteFilter === 'REMOTE' ? isRemote : !isRemote;
-  }, [remoteFilter]);
+  // ⚡ OPTIMIZATION: Client-side filters removed - now handled server-side in getRequirementsPage()
+  // This eliminates the overhead of filtering potentially 50K+ records in JavaScript
+  // Filters (rate, date, remote) are now pushed to the database query for better performance
 
   // Effect to handle filter changes - resets to page 0
   useEffect(() => {
@@ -622,20 +548,18 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
     setSelectedUpdatedBy(req.updated_by || null);
   };
 
+  // ⚡ OPTIMIZATION: No client-side filtering needed - all filters are applied server-side
+  // This means requirements from API are already filtered by rate, date, and remote preference
   const filteredRequirements = useMemo(() => {
-    // After switching to server-side pagination, `requirements` contains the current pages fetched.
-    // We still apply lightweight client-side filters that aren't yet supported server-side (min/max rate, remote)
-    const filtered = requirements.filter(req => {
-      if (!req) return false;
-      // Apply client-side advanced filters not handled by server
-      const rateMatches = isRateInRange(req.rate);
-      const dateMatches = isDateInRange(req.created_at);
-      const remoteMatches = matchesRemoteFilter(req.remote);
-      return rateMatches && dateMatches && remoteMatches;
-    });
-
+    let filtered = requirements;
+    
+    // Apply status filter if selected
+    if (selectedStatusFilter !== 'ALL') {
+      filtered = filtered.filter(req => req.status === selectedStatusFilter);
+    }
+    
     return filtered;
-  }, [requirements, isRateInRange, isDateInRange, matchesRemoteFilter]);
+  }, [requirements, selectedStatusFilter]);
 
   // Handle sort changes for server-side sorting
   const handleSortChange = useCallback((field: 'title' | 'company' | 'status' | 'created_at' | 'rate', order: 'asc' | 'desc') => {
@@ -647,7 +571,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
     setPage(0);
   }, []);
 
-  if (loading) {
+  if (loading && requirements.length === 0) {
     return (
       <div className="space-y-6">
         <div className="sticky top-0 z-40 bg-white pb-6 -mx-6 px-6 pt-6 border-b border-gray-200 shadow-sm">
@@ -690,7 +614,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
       {isToolbarPortaled ? <Portal container={toolbarTarget}>{toolbar}</Portal> : null}
 
       <Popover
-        open={toolsOpen}
+        open={toolsOpen && Boolean(toolsAnchorEl)}
         anchorEl={toolsAnchorEl}
         onClose={() => setToolsAnchorEl(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
@@ -698,248 +622,344 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
         disableAutoFocus
         disableEnforceFocus
         disableScrollLock
+        disablePortal={false}
         slotProps={{
           paper: {
             sx: {
-              p: 2,
-              width: { xs: 'calc(100vw - 32px)', sm: 460 },
+              p: 0,
+              width: { xs: 'calc(100vw - 32px)', sm: 480 },
               maxWidth: 'calc(100vw - 32px)',
+              borderRadius: '12px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             },
           },
           backdrop: {
             sx: { backgroundColor: 'transparent' },
+            onClick: () => setToolsAnchorEl(null),
           },
         }}
       >
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-            <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>
-              Tools
-            </Typography>
-            <IconButton size="small" onClick={() => setToolsAnchorEl(null)} aria-label="Close tools">
+        <Box sx={{ overflow: 'hidden' }}>
+          {/* Header */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 2,
+              py: 1.5,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+            }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center">
+              <SlidersHorizontal className="w-4 h-4" style={{ color: 'var(--gold)' }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>
+                Tools & Settings
+              </Typography>
+            </Stack>
+            <IconButton size="small" onClick={() => setToolsAnchorEl(null)} aria-label="Close tools" sx={{ color: 'text.secondary' }}>
               <X className="w-4 h-4" />
             </IconButton>
-          </Stack>
+          </Box>
 
-          <Button
-            variant="outlined"
-            color="inherit"
-            onClick={() => {
-              setShowJDParser(true);
-              setToolsAnchorEl(null);
-            }}
-          >
-            JD Parser
-          </Button>
-
-          <Button
-            variant="outlined"
-            color="inherit"
-            onClick={() => {
-              setShowBatchJDParser(true);
-              setToolsAnchorEl(null);
-            }}
-          >
-            Batch JD Parser
-          </Button>
-
-          <Button
-            variant="outlined"
-            color="inherit"
-            startIcon={<Download className="w-4 h-4" />}
-            onClick={() => {
-              setShowReport(true);
-              setToolsAnchorEl(null);
-            }}
-          >
-            Report
-          </Button>
-
-          <FormControl size="small" fullWidth>
-            <InputLabel id="req-status-label">Status</InputLabel>
-            <Select
-              labelId="req-status-label"
-              value={filterStatus}
-              label="Status"
-              onChange={(e) => {
-                setFilterStatus(e.target.value as RequirementStatus | 'ALL');
-              }}
-              title="Filter requirements by status"
-            >
-              <MenuItem value="ALL">All Statuses</MenuItem>
-              <MenuItem value="NEW">New</MenuItem>
-              <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-              <MenuItem value="SUBMITTED">Submitted</MenuItem>
-              <MenuItem value="INTERVIEW">Interview</MenuItem>
-              <MenuItem value="OFFER">Offer</MenuItem>
-              <MenuItem value="REJECTED">Rejected</MenuItem>
-              <MenuItem value="CLOSED">Closed</MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" fullWidth>
-            <InputLabel id="req-rowsperpage-label">Rows</InputLabel>
-            <Select
-              labelId="req-rowsperpage-label"
-              value={String(rowsPerPage)}
-              label="Rows"
-              onChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
-              title="Rows per page"
-            >
-              <MenuItem value="100">100</MenuItem>
-              <MenuItem value="200">200</MenuItem>
-              <MenuItem value="500">500</MenuItem>
-              <MenuItem value="1000">1000</MenuItem>
-            </Select>
-          </FormControl>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <FormControl size="small" sx={{ flex: 1, minWidth: 200 }}>
-              <InputLabel id="req-sortby-label">Sort By</InputLabel>
-              <Select
-                labelId="req-sortby-label"
-                value={sortBy}
-                label="Sort By"
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                title="Sort requirements by selected criteria"
-              >
-                <MenuItem value="date">Sort by Date</MenuItem>
-                <MenuItem value="company">Sort by Company</MenuItem>
-                <MenuItem value="daysOpen">Sort by Days Open</MenuItem>
-              </Select>
-            </FormControl>
-
-            <Button
-              variant="outlined"
-              color="inherit"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              startIcon={<ArrowUpDown className="w-4 h-4" />}
-              title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-              sx={{ whiteSpace: 'nowrap' }}
-            >
-              {sortOrder === 'asc' ? 'Asc' : 'Desc'}
-            </Button>
-          </Stack>
-
-          <Button
-            variant={showAdvancedFilters ? 'contained' : 'outlined'}
-            color={showAdvancedFilters ? 'primary' : 'inherit'}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            title="Toggle advanced filters"
-          >
-            Advanced Filters {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to) ? '✓' : ''}
-          </Button>
-
-          {showAdvancedFilters ? (
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                bgcolor: 'rgba(212,175,55,0.10)',
-                borderColor: 'rgba(212,175,55,0.35)',
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                  gap: 2,
-                }}
-              >
-                <TextField
-                  size="small"
-                  label="Min Rate"
-                  placeholder="e.g., 50"
-                  value={minRate}
-                  onChange={(e) => setMinRate(e.target.value)}
-                  title="Minimum hourly/daily rate"
-                />
-                <TextField
-                  size="small"
-                  label="Max Rate"
-                  placeholder="e.g., 150"
-                  value={maxRate}
-                  onChange={(e) => setMaxRate(e.target.value)}
-                  title="Maximum hourly/daily rate"
-                />
-
-                <FormControl size="small">
-                  <InputLabel id="req-worktype-label">Work Type</InputLabel>
-                  <Select
-                    labelId="req-worktype-label"
-                    value={remoteFilter}
-                    label="Work Type"
-                    onChange={(e) => setRemoteFilter(e.target.value as typeof remoteFilter)}
-                    title="Filter by remote/onsite preference"
+          <Box sx={{ p: 2 }}>
+            <Stack spacing={3}>
+              {/* Data Tools Section */}
+              <Box>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5 }}>
+                  <Zap className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                      color: 'text.secondary',
+                    }}
                   >
-                    <MenuItem value="ALL">All Types</MenuItem>
-                    <MenuItem value="REMOTE">Remote</MenuItem>
-                    <MenuItem value="ONSITE">On-site</MenuItem>
-                  </Select>
-                </FormControl>
+                    Data Tools
+                  </Typography>
+                </Stack>
+                <Stack spacing={1}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="inherit"
+                    onClick={() => {
+                      setShowJDParser(true);
+                      setToolsAnchorEl(null);
+                    }}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      py: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+                    }}
+                  >
+                    📄 JD Parser
+                  </Button>
 
-                <TextField
-                  size="small"
-                  label="From Date"
-                  type="date"
-                  value={dateRange.from}
-                  onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-                  title="Filter requirements created from this date"
-                  InputLabelProps={{ shrink: true }}
-                />
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="inherit"
+                    onClick={() => {
+                      setShowBatchJDParser(true);
+                      setToolsAnchorEl(null);
+                    }}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      py: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+                    }}
+                  >
+                    📑 Batch JD Parser
+                  </Button>
 
-                <TextField
-                  size="small"
-                  label="To Date"
-                  type="date"
-                  value={dateRange.to}
-                  onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-                  title="Filter requirements created until this date"
-                  InputLabelProps={{ shrink: true }}
-                />
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    color="inherit"
+                    startIcon={<Download className="w-4 h-4" />}
+                    onClick={() => {
+                      setShowReport(true);
+                      setToolsAnchorEl(null);
+                    }}
+                    sx={{
+                      justifyContent: 'flex-start',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.75rem',
+                      py: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+                    }}
+                  >
+                    Export Report
+                  </Button>
+                </Stack>
               </Box>
 
-              {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || debouncedValue || filterStatus !== 'ALL') ? (
-                <Button
-                  variant="text"
-                  color="primary"
-                  size="small"
-                  onClick={() => {
-                    setSearchTerm('');
-                    setDebouncedValue('');
-                    setFilterStatus('ALL');
-                    setMinRate('');
-                    setMaxRate('');
-                    setRemoteFilter('ALL');
-                    setDateRange({ from: '', to: '' });
-                    clearFilters();
-                  }}
-                  sx={{ mt: 1, px: 0 }}
-                  title="Reset all advanced filters"
-                >
-                  Clear all filters
-                </Button>
-              ) : null}
-            </Paper>
-          ) : null}
-        </Stack>
-      </Popover>
+              {/* Display Settings Section */}
+              <Box>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5 }}>
+                  <Settings className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      letterSpacing: '0.5px',
+                      textTransform: 'uppercase',
+                      color: 'text.secondary',
+                    }}
+                  >
+                    Display Settings
+                  </Typography>
+                </Stack>
+                <Stack spacing={1.5}>
+                  <Box>
+                    <FormControl size="small" fullWidth>
+                      <InputLabel id="req-rowsperpage-label" sx={{ fontSize: '0.75rem' }}>
+                        Rows Per Page
+                      </InputLabel>
+                      <Select
+                        labelId="req-rowsperpage-label"
+                        value={String(rowsPerPage)}
+                        label="Rows Per Page"
+                        onChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
+                        title="Rows per page"
+                        sx={{ fontSize: '0.75rem' }}
+                      >
+                        <MenuItem value="100" sx={{ fontSize: '0.75rem' }}>100 rows</MenuItem>
+                        <MenuItem value="200" sx={{ fontSize: '0.75rem' }}>200 rows</MenuItem>
+                        <MenuItem value="500" sx={{ fontSize: '0.75rem' }}>500 rows</MenuItem>
+                        <MenuItem value="1000" sx={{ fontSize: '0.75rem' }}>1000 rows</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Box>
 
-      {!isToolbarPortaled ? (
-        <Paper
-          elevation={0}
-          sx={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 40,
-            p: { xs: 2, sm: 3 },
-            borderBottom: 1,
-            borderColor: 'divider',
-          }}
-        >
-          {toolbar}
-        </Paper>
-      ) : null}
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <FormControl size="small" sx={{ flex: 1 }}>
+                      <InputLabel id="req-sortby-label" sx={{ fontSize: '0.75rem' }}>
+                        Sort By
+                      </InputLabel>
+                      <Select
+                        labelId="req-sortby-label"
+                        value={sortBy}
+                        label="Sort By"
+                        onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                        title="Sort requirements by selected criteria"
+                        sx={{ fontSize: '0.75rem' }}
+                      >
+                        <MenuItem value="date" sx={{ fontSize: '0.75rem' }}>📅 Date (newest first)</MenuItem>
+                        <MenuItem value="company" sx={{ fontSize: '0.75rem' }}>🏢 Company Name</MenuItem>
+                        <MenuItem value="daysOpen" sx={{ fontSize: '0.75rem' }}>⏱️ Days Open</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    <Button
+                      variant="outlined"
+                      color="inherit"
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      startIcon={<ArrowUpDown className="w-4 h-4" />}
+                      title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        fontSize: '0.75rem',
+                        whiteSpace: 'nowrap',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+                      }}
+                    >
+                      {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Box>
+
+              {/* Advanced Filters Section */}
+              <Box>
+                <Button
+                  fullWidth
+                  variant={showAdvancedFilters ? 'contained' : 'outlined'}
+                  color={showAdvancedFilters ? 'primary' : 'inherit'}
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  startIcon={<Filter className="w-4 h-4" />}
+                  title="Toggle advanced filters"
+                  sx={{
+                    justifyContent: 'flex-start',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    py: 1,
+                    mb: 1,
+                    borderColor: 'divider',
+                  }}
+                >
+                  Advanced Filters {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to) ? '✓' : ''}
+                </Button>
+
+                {showAdvancedFilters ? (
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 1.5,
+                      bgcolor: 'rgba(212,175,55,0.08)',
+                      borderColor: 'rgba(212,175,55,0.25)',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                        gap: 1.5,
+                      }}
+                    >
+                      <TextField
+                        size="small"
+                        label="Min Rate"
+                        placeholder="e.g., 50"
+                        value={minRate}
+                        onChange={(e) => setMinRate(e.target.value)}
+                        title="Minimum hourly/daily rate"
+                        sx={{ fontSize: '0.75rem' }}
+                      />
+                      <TextField
+                        size="small"
+                        label="Max Rate"
+                        placeholder="e.g., 150"
+                        value={maxRate}
+                        onChange={(e) => setMaxRate(e.target.value)}
+                        title="Maximum hourly/daily rate"
+                        sx={{ fontSize: '0.75rem' }}
+                      />
+
+                      <FormControl size="small">
+                        <InputLabel id="req-worktype-label" sx={{ fontSize: '0.75rem' }}>
+                          Work Type
+                        </InputLabel>
+                        <Select
+                          labelId="req-worktype-label"
+                          value={remoteFilter}
+                          label="Work Type"
+                          onChange={(e) => setRemoteFilter(e.target.value as typeof remoteFilter)}
+                          title="Filter by remote/onsite preference"
+                          sx={{ fontSize: '0.75rem' }}
+                        >
+                          <MenuItem value="ALL" sx={{ fontSize: '0.75rem' }}>All Types</MenuItem>
+                          <MenuItem value="REMOTE" sx={{ fontSize: '0.75rem' }}>🌐 Remote</MenuItem>
+                          <MenuItem value="ONSITE" sx={{ fontSize: '0.75rem' }}>🏢 On-site</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      <TextField
+                        size="small"
+                        label="From Date"
+                        type="date"
+                        value={dateRange.from}
+                        onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
+                        title="Filter requirements created from this date"
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ fontSize: '0.75rem' }}
+                      />
+
+                      <TextField
+                        size="small"
+                        label="To Date"
+                        type="date"
+                        value={dateRange.to}
+                        onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
+                        title="Filter requirements created until this date"
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ fontSize: '0.75rem' }}
+                      />
+                    </Box>
+
+                    {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || debouncedValue || filterStatus !== 'ALL') ? (
+                      <Button
+                        variant="text"
+                        color="primary"
+                        size="small"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setDebouncedValue('');
+                          setFilterStatus('ALL');
+                          setMinRate('');
+                          setMaxRate('');
+                          setRemoteFilter('ALL');
+                          setDateRange({ from: '', to: '' });
+                          clearFilters();
+                        }}
+                        sx={{ mt: 1, px: 0, fontSize: '0.75rem', fontWeight: 500 }}
+                        title="Reset all advanced filters"
+                      >
+                        ↺ Clear all filters
+                      </Button>
+                    ) : null}
+                  </Paper>
+                ) : null}
+              </Box>
+            </Stack>
+          </Box>
+        </Box>
+      </Popover>
 
       {/* Search and Filter */}
       <Stack spacing={2}>
@@ -1104,6 +1124,19 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
 
       {/* Requirements Display - Table View Only */}
       <div className="w-full">
+        {/* Active Status Filter Chip */}
+        {selectedStatusFilter !== 'ALL' && (
+          <Box sx={{ mb: 2 }}>
+            <Chip
+              label={`Status: ${selectedStatusFilter}`}
+              onDelete={() => setSelectedStatusFilter('ALL')}
+              color="primary"
+              variant="outlined"
+              size="small"
+            />
+          </Box>
+        )}
+
         <RequirementsTable
           requirements={filteredRequirements}
           onViewDetails={handleViewDetails}
@@ -1118,7 +1151,10 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
           page={page}
           hasNextPage={hasNextPage}
           isFetchingPage={isFetchingPage}
-          onPageChange={setPage} badge={''} label={''} />
+          onPageChange={setPage}
+          selectedStatusFilter={selectedStatusFilter}
+          onStatusFilterChange={setSelectedStatusFilter}
+          badge={''} label={''} />
       </div>
 
 
@@ -1177,11 +1213,13 @@ export const RequirementsManagement = memo(({ onCreateInterview, toolbarPortalTa
       <JDParserDialog
         open={showJDParser}
         onClose={() => setShowJDParser(false)}
+        onParsedData={onParsedJDData}
       />
 
       <BatchJDParserDialog
         open={showBatchJDParser}
         onClose={() => setShowBatchJDParser(false)}
+        onParsedData={onParsedJDData}
       />
 
       {/* Detail Modal */}

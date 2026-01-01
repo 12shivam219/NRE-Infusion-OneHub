@@ -81,9 +81,11 @@ const makeRequirementPayload = (
 export const JDParserDialog = ({
   open,
   onClose,
+  onParsedData,
 }: {
   open: boolean;
   onClose: () => void;
+  onParsedData?: (extraction: JdExtractionResult, cleanedText: string) => void;
 }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -188,7 +190,7 @@ export const JDParserDialog = ({
   }, []);
 
   /* ======================================================
-     SAVE HANDLER (UNCHANGED LOGIC)
+     SAVE HANDLER (WITH CALLBACK SUPPORT)
   ====================================================== */
   const handleSave = useCallback(async () => {
     if (!user || loading) return;
@@ -200,6 +202,14 @@ export const JDParserDialog = ({
         title: 'Nothing selected',
         message: 'Select at least one extracted job to save.',
       });
+      return;
+    }
+
+    // If callback is provided and only one item selected, pass data to form and close
+    if (onParsedData && selected.length === 1) {
+      const item = selected[0];
+      onParsedData(item.parsed.extraction, item.parsed.cleanedJobText);
+      onClose();
       return;
     }
 
@@ -319,6 +329,7 @@ export const JDParserDialog = ({
     isOnline,
     queueOfflineOperation,
     onClose,
+    onParsedData,
   ]);
 
   const canSelectAll = useMemo(
@@ -327,7 +338,27 @@ export const JDParserDialog = ({
   );
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="lg"
+      scroll="paper"
+      disableScrollLock
+      slotProps={{
+        backdrop: {
+          sx: {
+            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      }}
+      sx={{
+        '& .MuiBackdrop-root': {
+          backdropFilter: 'blur(4px)',
+        },
+      }}
+    >
       <DialogTitle sx={{ pr: 7 }}>
         <Typography sx={{ fontWeight: 800 }}>JD Parser</Typography>
         <IconButton
@@ -456,7 +487,7 @@ export const JDParserDialog = ({
           onClick={handleSave}
           disabled={loading || selectedCount === 0 || !user}
         >
-          {loading ? 'Saving...' : isOnline ? 'Save' : 'Queue Save'}
+          {loading ? 'Processing...' : onParsedData && selectedCount === 1 ? 'Fill Form' : (isOnline ? 'Save' : 'Queue Save')}
         </BrandButton>
         <BrandButton variant="secondary" onClick={onClose} disabled={loading}>
           Close

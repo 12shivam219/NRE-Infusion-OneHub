@@ -24,7 +24,6 @@ export function useOfflineCache() {
     // Initialize from navigator.onLine immediately
     return navigator.onLine;
   });
-  const [offlineStartTime, setOfflineStartTime] = useState<number | null>(null);
 
   // Only sync state values directly via closure
   // Remove unnecessary ref synchronization
@@ -86,21 +85,20 @@ export function useOfflineCache() {
     }
   }, []);
 
-  // Initialize offline state and register event listeners
+  // One-time initialization of event listeners (runs once on mount)
   useEffect(() => {
-    console.log(`[Offline Hook] Initialized with online status: ${navigator.onLine}`);
+    // Register background sync once
+    void registerBackgroundSync();
+  }, []);
 
+  // Register online/offline and interaction handlers - only depends on syncPendingItems
+  useEffect(() => {
     const handleOnline = () => {
       console.log('App is online - syncing cache');
       setIsOnline(true);
 
-      // Log offline duration if we were offline
-      if (offlineStartTime) {
-        const durationMs = Date.now() - offlineStartTime;
-        const durationMinutes = Math.round(durationMs / 60000);
-        void recordAnalytics('offline_time', { minutes: durationMinutes });
-        setOfflineStartTime(null);
-      }
+      // Log offline duration if we were offline (tracked via closure in handleOffline)
+      // This would need to be refactored to use refs if offline duration tracking is needed
 
       // Auto sync pending items immediately when coming back online
       void syncPendingItems();
@@ -109,27 +107,24 @@ export function useOfflineCache() {
     const handleOffline = () => {
       console.log('App is offline - using cache');
       setIsOnline(false);
-      const now = Date.now();
-      setOfflineStartTime(now);
     };
 
     // Handle window focus to sync when user comes back to app
     const handleFocus = () => {
-      if (isOnline) {
-        console.log('[Offline Hook] Window focused - checking for pending sync items');
+      // Check current online state directly instead of relying on state value
+      if (navigator.onLine) {
         void syncPendingItems();
       }
     };
 
     const handleRetrySync = () => {
-      if (isOnline && navigator.onLine) {
-        console.log('[Offline Hook] Manual retry requested - syncing pending items');
+      if (navigator.onLine) {
         void syncPendingItems();
       }
     };
 
     const handleQueueChanged = () => {
-      if (isOnline && navigator.onLine) {
+      if (navigator.onLine) {
         void syncPendingItems();
       }
     };
@@ -138,12 +133,7 @@ export function useOfflineCache() {
     window.addEventListener('offline', handleOffline);
     window.addEventListener('focus', handleFocus);
     window.addEventListener('retry-sync', handleRetrySync as EventListener);
-
-    // Process queue whenever it changes (no polling)
     window.addEventListener('sync-queue-changed', handleQueueChanged as EventListener);
-
-    // Register background sync
-    void registerBackgroundSync();
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -152,7 +142,7 @@ export function useOfflineCache() {
       window.removeEventListener('retry-sync', handleRetrySync as EventListener);
       window.removeEventListener('sync-queue-changed', handleQueueChanged as EventListener);
     };
-  }, [isOnline, offlineStartTime, syncPendingItems]);
+  }, [syncPendingItems]);
 
   // Listen for messages from the service worker (background sync trigger)
   useEffect(() => {

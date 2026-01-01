@@ -1,13 +1,10 @@
 import { useState, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from '../common/ErrorBoundary';
-import { Briefcase, Calendar, Users } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
-import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
+import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
 import { LogoLoader } from '../common/LogoLoader';
+import type { JdExtractionResult } from '../../lib/jdParser';
 
 // Lazy load CRM sub-components to reduce initial load time
 const RequirementsManagement = lazy(() => import('./RequirementsManagement').then(m => ({ default: m.RequirementsManagement })));
@@ -27,11 +24,43 @@ export const CRMPage = () => {
   const [showCreateInterview, setShowCreateInterview] = useState(false);
   const [selectedRequirementIdForInterview, setSelectedRequirementIdForInterview] = useState<string | undefined>();
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
+  const [parsedFormData, setParsedFormData] = useState<{
+    title?: string;
+    company?: string;
+    primary_tech_stack?: string;
+    rate?: string;
+    remote?: string;
+    location?: string;
+    duration?: string;
+    vendor_company?: string;
+    vendor_person_name?: string;
+    vendor_phone?: string;
+    vendor_email?: string;
+    description?: string;
+  } | undefined>();
 
   // Define all callbacks at top level (before any conditional rendering)
   const handleCreateInterview = useCallback((requirementId: string) => {
     setSelectedRequirementIdForInterview(requirementId);
     setShowCreateInterview(true);
+  }, []);
+
+  const handleParsedJDData = useCallback((extraction: JdExtractionResult, cleanedText: string) => {
+    setParsedFormData({
+      title: extraction.jobTitle ?? undefined,
+      company: extraction.hiringCompany ?? undefined,
+      primary_tech_stack: extraction.keySkills.length > 0 ? extraction.keySkills.join(', ') : undefined,
+      rate: extraction.rate ?? undefined,
+      remote: extraction.workLocationType ?? undefined,
+      location: extraction.location ?? undefined,
+      duration: extraction.duration ?? undefined,
+      vendor_company: extraction.vendor ?? undefined,
+      vendor_person_name: extraction.vendorContact ?? undefined,
+      vendor_phone: extraction.vendorPhone ?? undefined,
+      vendor_email: extraction.vendorEmail ?? undefined,
+      description: cleanedText || undefined,
+    });
+    setShowCreateForm(true);
   }, []);
 
   // Sync currentView with query parameter
@@ -61,12 +90,6 @@ export const CRMPage = () => {
     };
   }, [currentView]);
 
-  const navTabs: Array<{ id: View; label: string; icon: LucideIcon }> = [
-    { id: 'requirements', label: 'Requirements', icon: Briefcase },
-    { id: 'interviews', label: 'Interviews', icon: Calendar },
-    { id: 'consultants', label: 'Consultants', icon: Users },
-  ];
-
   useEffect(() => {
     let cancelled = false;
 
@@ -91,40 +114,6 @@ export const CRMPage = () => {
   return (
     <ScopedCssBaseline>
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <AppBar
-            position="sticky"
-            elevation={0}
-            color="inherit"
-            sx={{ borderBottom: 1, borderColor: 'rgba(234,179,8,0.2)', zIndex: 30, bgcolor: 'var(--darkbg-surface)' }}
-          >
-            <Box sx={{ px: 2, py: 1.5 }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 2,
-                  flexWrap: { xs: 'wrap', md: 'nowrap' },
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: 700, minWidth: 0, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
-                  {navTabs.find(tab => tab.id === currentView)?.label || 'Marketing & CRM'}
-                </Typography>
-
-                <Box
-                  id="crm-requirements-actions"
-                  sx={{
-                    display: currentView === 'requirements' ? 'flex' : 'none',
-                    alignItems: 'center',
-                    gap: 1,
-                    width: { xs: '100%', md: 'auto' },
-                    justifyContent: { xs: 'flex-start', md: 'flex-end' },
-                  }}
-                />
-              </Box>
-            </Box>
-          </AppBar>
-
           <Box
             sx={{
               flex: 1,
@@ -144,6 +133,7 @@ export const CRMPage = () => {
                   <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
                     <RequirementsManagement
                       onCreateInterview={handleCreateInterview}
+                      onParsedJDData={handleParsedJDData}
                       toolbarPortalTargetId="crm-requirements-actions"
                     />
                   </Suspense>
@@ -167,10 +157,15 @@ export const CRMPage = () => {
           {showCreateForm && (
             <Suspense fallback={null}>
               <CreateRequirementForm
-                onClose={() => setShowCreateForm(false)}
+                onClose={() => {
+                  setShowCreateForm(false);
+                  setParsedFormData(undefined);
+                }}
                 onSuccess={() => {
                   setShowCreateForm(false);
+                  setParsedFormData(undefined);
                 }}
+                initialData={parsedFormData}
               />
             </Suspense>
           )}

@@ -358,6 +358,8 @@ export interface Database {
           job_description_excerpt: string | null;
           feedback_notes: string | null;
           notes: string | null;
+          created_by: string | null;
+          updated_by: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -386,6 +388,8 @@ export interface Database {
           job_description_excerpt?: string | null;
           feedback_notes?: string | null;
           notes?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -414,6 +418,8 @@ export interface Database {
           job_description_excerpt?: string | null;
           feedback_notes?: string | null;
           notes?: string | null;
+          created_by?: string | null;
+          updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
         };

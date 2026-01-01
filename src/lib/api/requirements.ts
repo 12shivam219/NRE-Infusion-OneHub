@@ -1,14 +1,46 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
 import { logActivity } from './audit';
+import { getCacheValue, setCacheValue, generateRequirementsCacheKey } from '../redis';
+import { searchRequirements, indexRequirement } from '../elasticsearch';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type RequirementInsert = Database['public']['Tables']['requirements']['Insert'];
 
 export type RequirementWithLogs = Requirement;
 
+const VALID_REQUIREMENT_STATUSES: Requirement['status'][] = ['NEW', 'IN_PROGRESS', 'SUBMITTED', 'INTERVIEW', 'OFFER', 'REJECTED', 'CLOSED'];
+
 // Cache for user lookups to prevent repeated queries
 const userCache = new Map<string, { full_name: string; email: string } | null>();
+
+// ⚡ OPTIMIZATION: In-memory cache for paginated queries to prevent duplicate API calls
+// Stores response for up to 30 seconds to handle rapid filter changes
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const queryCache = new Map<string, { data: any; timestamp: number }>();
+const QUERY_CACHE_TTL = 30_000;  // 30 seconds
+
+const getCachedQuery = (cacheKey: string) => {
+  const cached = queryCache.get(cacheKey);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > QUERY_CACHE_TTL) {
+    queryCache.delete(cacheKey);
+    return null;
+  }
+  return cached.data;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const setCachedQuery = (cacheKey: string, data: any) => {
+  queryCache.set(cacheKey, { data, timestamp: Date.now() });
+  // Cleanup old entries if cache gets too large
+  if (queryCache.size > 100) {
+    const oldest = Array.from(queryCache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp)
+      .slice(0, 50);
+    oldest.forEach(([key]) => queryCache.delete(key));
+  }
+};
 
 export const getUserName = async (userId: string): Promise<{ full_name: string; email: string } | null> => {
   // Check cache first
@@ -130,6 +162,9 @@ export const getRequirementsPage = async (
     dateTo?: string;
     orderBy?: string;
     orderDir?: 'asc' | 'desc';
+    minRate?: string;
+    maxRate?: string;
+    remoteFilter?: 'ALL' | 'REMOTE' | 'ONSITE';
   }
 ): Promise<{ success: boolean; requirements?: RequirementWithLogs[]; total?: number; error?: string }> => {
   const {
@@ -144,21 +179,177 @@ export const getRequirementsPage = async (
     dateTo,
     orderBy = 'created_at',
     orderDir = 'desc',
+    minRate,
+    maxRate,
+    remoteFilter,
   } = options;
 
   try {
+    const cacheKey = JSON.stringify({
+      userId, limit, offset, search, status, dateFrom, dateTo,
+      orderBy, orderDir, minRate, maxRate, remoteFilter
+    });
+
+    // ⚡ ADVANCED: Try Redis cache first (distributed caching)
+    const redisCacheKey = generateRequirementsCacheKey({
+      userId: userId || '',
+      page: offset ? Math.floor(offset / limit) : 0,
+      pageSize: limit,
+      search,
+      status,
+      minRate,
+      maxRate,
+      remoteFilter,
+      sortBy: orderBy,
+      sortOrder: orderDir,
+    });
+
+    const redisResult = await getCacheValue<any>(redisCacheKey);  // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (redisResult) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Redis Cache Hit] Requirements query');
+      }
+      return redisResult;
+    }
+
+    // Fallback to in-memory cache
+    const cachedResult = getCachedQuery(cacheKey);
+    if (cachedResult) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Cache Hit] Requirements query:', { userId, search, status });
+      }
+      return cachedResult;
+    }
+
+    // ⚡ ADVANCED: Try Elasticsearch first for better performance on 100K+ records
+    if (search) {
+      const esResult = await searchRequirements({
+        query: search,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        status: status as any,
+        minRate: minRate ? parseFloat(minRate) : undefined,
+        maxRate: maxRate ? parseFloat(maxRate) : undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        remoteFilter: remoteFilter as any,
+        dateFrom,
+        dateTo,
+        limit,
+        offset,
+        sortBy: orderBy,
+        sortOrder: orderDir,
+      });
+
+      if (esResult) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[Elasticsearch] Search successful:', {
+            results: esResult.hits.length,
+            total: esResult.total,
+          });
+        }
+
+        const result = { success: true, requirements: esResult.hits, total: esResult.total };
+        // Cache Elasticsearch result
+        await setCacheValue(redisCacheKey, result, { ttl: 1800 });
+        setCachedQuery(cacheKey, result);
+        return result;
+      }
+    }
+
+    // ⚡ Performance tracking for 50K+ record queries
+    const queryStartTime = performance.now();
+
     const countMode = includeCount ? 'exact' : undefined;
     let query = supabase.from('requirements').select('*', { count: countMode as 'exact' | undefined });
 
     if (userId) query = query.eq('user_id', userId);
-    if (status && status !== 'ALL') query = query.eq('status', status);
+    if (status && status !== 'ALL' && VALID_REQUIREMENT_STATUSES.includes(status as Requirement['status'])) query = query.eq('status', status);
 
     if (search && search.trim()) {
-      const term = `%${search.trim()}%`;
-      // Uses pg_trgm extension for fast substring search on large datasets
-      // For best performance with 10K+ records, enable GIN indexes on searched columns
-      // Prefer trigram search for single-term substring matches; full-text search (search_vector) can be used via migration.
-      query = query.or(`title.ilike.${term},company.ilike.${term},primary_tech_stack.ilike.${term},vendor_company.ilike.${term}`);
+      const raw = search.trim().slice(0, 120);
+      const cleaned = raw
+        .replace(/[(),]/g, ' ')
+        .replace(/[%_]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (cleaned) {
+        const like = cleaned;
+
+        const orFilters: string[] = [
+          `title.ilike.%${like}%`,
+          `company.ilike.%${like}%`,
+          `vendor_company.ilike.%${like}%`,
+          `primary_tech_stack.ilike.%${like}%`,
+          `location.ilike.%${like}%`,
+          `description.ilike.%${like}%`,
+          `applied_for.ilike.%${like}%`,
+          `imp_name.ilike.%${like}%`,
+          `client_website.ilike.%${like}%`,
+          `imp_website.ilike.%${like}%`,
+          `vendor_website.ilike.%${like}%`,
+          `vendor_person_name.ilike.%${like}%`,
+          `vendor_phone.ilike.%${like}%`,
+          `vendor_email.ilike.%${like}%`,
+          `next_step.ilike.%${like}%`,
+          `duration.ilike.%${like}%`,
+          `remote.ilike.%${like}%`,
+          `rate.ilike.%${like}%`,
+        ];
+
+        const num = Number(cleaned);
+        if (Number.isFinite(num) && /^\d+$/.test(cleaned)) {
+          orFilters.push(`requirement_number.eq.${cleaned}`);
+        }
+
+        const upper = cleaned.toUpperCase();
+        if (VALID_REQUIREMENT_STATUSES.includes(upper as Requirement['status'])) {
+          orFilters.push(`status.eq.${upper}`);
+        }
+
+        if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cleaned)) {
+          orFilters.push(`id.eq.${cleaned}`);
+        }
+
+        const isoMonth = cleaned.match(/^(\d{4})-(\d{2})$/);
+        const isoDay = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        const isoYear = cleaned.match(/^(\d{4})$/);
+        if (isoDay) {
+          const from = new Date(`${isoDay[1]}-${isoDay[2]}-${isoDay[3]}T00:00:00.000Z`);
+          const to = new Date(from);
+          to.setUTCDate(to.getUTCDate() + 1);
+          orFilters.push(`and(created_at.gte.${from.toISOString()},created_at.lt.${to.toISOString()})`);
+        } else if (isoMonth) {
+          const from = new Date(`${isoMonth[1]}-${isoMonth[2]}-01T00:00:00.000Z`);
+          const to = new Date(from);
+          to.setUTCMonth(to.getUTCMonth() + 1);
+          orFilters.push(`and(created_at.gte.${from.toISOString()},created_at.lt.${to.toISOString()})`);
+        } else if (isoYear) {
+          const from = new Date(`${isoYear[1]}-01-01T00:00:00.000Z`);
+          const to = new Date(from);
+          to.setUTCFullYear(to.getUTCFullYear() + 1);
+          orFilters.push(`and(created_at.gte.${from.toISOString()},created_at.lt.${to.toISOString()})`);
+        }
+
+        query = query.or(orFilters.join(','));
+      }
+    }
+
+    if (minRate) {
+      const minNum = parseFloat(minRate);
+      if (!isNaN(minNum)) {
+        query = query.gte('rate', minNum.toString());
+      }
+    }
+    if (maxRate) {
+      const maxNum = parseFloat(maxRate);
+      if (!isNaN(maxNum)) {
+        query = query.lte('rate', maxNum.toString());
+      }
+    }
+
+    // ⚡ OPTIMIZATION: Push remote filter to database
+    if (remoteFilter && remoteFilter !== 'ALL') {
+      query = query.eq('remote', remoteFilter);
     }
 
     if (dateFrom) {
@@ -192,10 +383,8 @@ export const getRequirementsPage = async (
       // apply page size
       query = query.limit(limit);
     } else {
-      // fallback to offset/range pagination
-      const start = offset;
-      const end = offset + limit - 1;
-      query = query.range(start, end);
+      // fallback to offset pagination using range
+      query = query.range(offset, offset + limit - 1);
     }
 
     const { data, count, error } = await query;
@@ -207,7 +396,30 @@ export const getRequirementsPage = async (
       return { success: false, error: error.message };
     }
 
-    return { success: true, requirements: data || [], total: count ?? 0 };
+    const result = { success: true, requirements: data || [], total: count ?? 0 };
+    
+    // ⚡ OPTIMIZATION: Store successful result in both Redis and in-memory cache
+    setCachedQuery(cacheKey, result);
+    await setCacheValue(redisCacheKey, result, { ttl: 1800 });
+
+    // Index in Elasticsearch if available
+    if (data && data.length > 0) {
+      for (const req of data) {
+        await indexRequirement(req).catch(err => {
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('[Elasticsearch] Index failed for', req.id, err);
+          }
+        });
+      }
+    }
+
+    // ⚡ Performance logging for optimization tracking
+    const queryDuration = performance.now() - queryStartTime;
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[Query Performance] Search="${search}" Status="${status}" Duration=${queryDuration.toFixed(2)}ms Results=${(data || []).length}`);
+    }
+    
+    return result;
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
     if (process.env.NODE_ENV === 'development') {
@@ -266,6 +478,13 @@ export const createRequirement = async (
     if (error) {
       return { success: false, error: error.message };
     }
+
+    // ⚡ Index in Elasticsearch for advanced search
+    await indexRequirement(data).catch(err => {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Elasticsearch] Indexing failed:', err);
+      }
+    });
 
     // Write audit entry (best effort)
     await logActivity({

@@ -3,6 +3,7 @@ import { GripVertical } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { getRequirements, updateRequirement } from '../../lib/api/requirements';
+import { getLatestNextStepComment } from '../../lib/api/nextStepComments';
 import { useToast } from '../../contexts/ToastContext';
 import { calculateDaysOpen } from '../../lib/requirementUtils';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
@@ -31,6 +32,24 @@ const statusConfig: Record<RequirementStatus, { title: string; color: string; bg
 
 const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; onDragStart: (e: React.DragEvent<HTMLDivElement>, req: Requirement) => void }) => {
   const daysOpen = calculateDaysOpen(requirement.created_at);
+  const [latestNextStep, setLatestNextStep] = useState<{ comment_text: string; created_at: string } | null>(null);
+  const [isLoadingNextStep, setIsLoadingNextStep] = useState(false);
+
+  useEffect(() => {
+    const fetchLatestNextStep = async () => {
+      setIsLoadingNextStep(true);
+      try {
+        const latest = await getLatestNextStepComment(requirement.id);
+        setLatestNextStep(latest ? { comment_text: latest.comment_text, created_at: latest.created_at } : null);
+      } catch (err) {
+        console.error('Failed to fetch latest next step:', err);
+      } finally {
+        setIsLoadingNextStep(false);
+      }
+    };
+
+    fetchLatestNextStep();
+  }, [requirement.id]);
 
   return (
     <div
@@ -57,7 +76,11 @@ const KanbanCard = ({ requirement, onDragStart }: { requirement: Requirement; on
       <div className="text-xs text-[color:var(--text-secondary)] space-y-1.5 border-t border-[color:var(--gold)] border-opacity-10 pt-2.5">
         {requirement.rate && <p className="font-medium text-[color:var(--gold)]">💰 {requirement.rate}</p>}
         <p>⏳ {daysOpen} days open</p>
-        {requirement.next_step && <p title={requirement.next_step} className="line-clamp-1 md:line-clamp-none md:overflow-visible md:whitespace-normal text-[color:var(--text-secondary)] italic">→ {requirement.next_step}</p>}
+        {latestNextStep && !isLoadingNextStep && (
+          <p title={latestNextStep.comment_text} className="line-clamp-1 md:line-clamp-none md:overflow-visible md:whitespace-normal text-[color:var(--text-secondary)] italic">
+            → {latestNextStep.comment_text}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import { validateRequirementForm } from '../../lib/formValidation';
 import { sanitizeText } from '../../lib/utils';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
+import { supabase } from '../../lib/supabase';
 import type { Database } from '../../lib/database.types';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -62,34 +63,40 @@ const FormField = memo(function FormField({
           onChange={onChange}
           required={required}
           error={Boolean(error)}
-          helperText={error || ' '}
+          helperText={error}
           size="small"
           fullWidth
           InputLabelProps={{
             shrink: true,
             sx: {
-              fontSize: '0.9rem',
+              fontSize: '0.85rem',
               color: '#666',
               '&.Mui-focused': { color: '#007bff' },
             }
           }}
           sx={{
+            mb: 0.5,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '6px',
+              borderRadius: '5px',
               backgroundColor: '#fff',
+              fontSize: '0.9rem',
               '& fieldset': {
-                borderColor: '#ccc',
+                borderColor: '#ddd',
               },
               '&:hover fieldset': {
                 borderColor: '#999',
               },
               '&.Mui-focused fieldset': {
                 borderColor: '#007bff',
-                boxShadow: '0 0 0 3px rgba(0, 123, 255, 0.3)',
+                boxShadow: '0 0 0 2px rgba(0, 123, 255, 0.15)',
               },
             },
+            '& .MuiFormHelperText-root': {
+              fontSize: '0.75rem',
+              mt: 0.25,
+            },
             '& .MuiOutlinedInput-input::placeholder': {
-              color: '#666',
+              color: '#999',
               opacity: 1,
               fontSize: '0.9rem',
             },
@@ -112,36 +119,42 @@ const FormField = memo(function FormField({
           placeholder={placeholder}
           required={required}
           error={Boolean(error)}
-          helperText={error || ' '}
+          helperText={error}
           size="small"
           fullWidth
           multiline={type === 'textarea'}
-          rows={type === 'textarea' ? 4 : undefined}
+          rows={type === 'textarea' ? 2 : undefined}
           InputLabelProps={{
             shrink: true,
             sx: {
-              fontSize: '0.9rem',
+              fontSize: '0.85rem',
               color: '#666',
               '&.Mui-focused': { color: '#007bff' },
             }
           }}
           sx={{
+            mb: 0.5,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '6px',
+              borderRadius: '5px',
               backgroundColor: '#fff',
+              fontSize: '0.9rem',
               '& fieldset': {
-                borderColor: '#ccc',
+                borderColor: '#ddd',
               },
               '&:hover fieldset': {
                 borderColor: '#999',
               },
               '&.Mui-focused fieldset': {
                 borderColor: '#007bff',
-                boxShadow: '0 0 0 3px rgba(0, 123, 255, 0.3)',
+                boxShadow: '0 0 0 2px rgba(0, 123, 255, 0.15)',
               },
             },
+            '& .MuiFormHelperText-root': {
+              fontSize: '0.75rem',
+              mt: 0.25,
+            },
             '& .MuiOutlinedInput-input::placeholder': {
-              color: '#666',
+              color: '#999',
               opacity: 1,
               fontSize: '0.9rem',
             },
@@ -155,28 +168,42 @@ const FormField = memo(function FormField({
 interface CreateRequirementFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: {
+    title?: string;
+    company?: string;
+    primary_tech_stack?: string;
+    rate?: string;
+    remote?: string;
+    location?: string;
+    duration?: string;
+    vendor_company?: string;
+    vendor_person_name?: string;
+    vendor_phone?: string;
+    vendor_email?: string;
+    description?: string;
+  };
 }
 
 const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section
     style={{
       background: '#fafafa',
-      border: '1px solid #eee',
-      borderRadius: '8px',
-      padding: '1.5rem',
-      marginBottom: '1.5rem',
+      border: '1px solid #e8e8e8',
+      borderRadius: '6px',
+      padding: '0.875rem',
+      marginBottom: '0.875rem',
     }}
   >
-    <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#333', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#333', marginBottom: '0.625rem', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
       {title}
     </h3>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.625rem' }}>
       {children}
     </div>
   </section>
 );
 
-export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementFormProps) => {
+export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: CreateRequirementFormProps) => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
@@ -188,26 +215,26 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    title: '',
-    company: '',
+    title: initialData?.title || '',
+    company: initialData?.company || '',
     status: 'NEW' as const,
     consultant_id: '',
     applied_for: '',
-    rate: '',
-    primary_tech_stack: '',
+    rate: initialData?.rate || '',
+    primary_tech_stack: initialData?.primary_tech_stack || '',
     imp_name: '',
     client_website: '',
     imp_website: '',
-    vendor_company: '',
+    vendor_company: initialData?.vendor_company || '',
     vendor_website: '',
-    vendor_person_name: '',
-    vendor_phone: '',
-    vendor_email: '',
-    description: '',
+    vendor_person_name: initialData?.vendor_person_name || '',
+    vendor_phone: initialData?.vendor_phone || '',
+    vendor_email: initialData?.vendor_email || '',
+    description: initialData?.description || '',
     next_step: '',
-    remote: '',
-    duration: '',
-    location: '',
+    remote: initialData?.remote || '',
+    duration: initialData?.duration || '',
+    location: initialData?.location || '',
   });
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
@@ -354,7 +381,25 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
       const result = await createRequirement(requirementData, user.id);
 
       setLoading(false);
-      if (result.success) {
+      if (result.success && result.requirement) {
+        // Create initial next step comment if next_step has a value
+        if (formData.next_step.trim()) {
+          try {
+            await supabase
+              .from('next_step_comments')
+              .insert([
+                {
+                  requirement_id: result.requirement.id,
+                  user_id: user.id,
+                  comment_text: formData.next_step.trim(),
+                },
+              ]);
+          } catch (commentError) {
+            console.error('Failed to create initial next step comment:', commentError);
+            // Don't fail the whole operation if comment creation fails
+          }
+        }
+
         showToast({
           type: 'success',
           title: 'Requirement Created',
@@ -384,13 +429,15 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
   };
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
-      <DialogTitle sx={{ pr: 7, pb: 2 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: '1.5rem', color: '#333', mb: 1 }}>
+    <Dialog open onClose={onClose} fullWidth maxWidth="sm" scroll="paper" PaperProps={{
+      sx: { maxHeight: '95vh' }
+    }}>
+      <DialogTitle sx={{ pr: 7, pb: 1.5 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#333', mb: 0.5 }}>
           Create New Requirement
         </Typography>
-        <Typography sx={{ fontSize: '0.9rem', color: '#666' }}>
-          Add a new job requirement to your requirements list
+        <Typography sx={{ fontSize: '0.85rem', color: '#888' }}>
+          Add job requirement details
         </Typography>
         <IconButton
           onClick={onClose}
@@ -402,11 +449,11 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers sx={{ backgroundColor: '#fff', p: 3 }}>
+      <DialogContent dividers sx={{ backgroundColor: '#fff', p: 2 }}>
         <form onSubmit={handleSubmit}>
           {/* Submit Error Alert */}
           {submitError && (
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1rem' }}>
               <ErrorAlert
                 title="Failed to Create Requirement"
                 message={submitError}
@@ -418,12 +465,12 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
 
           {/* Similar Requirements Warning */}
           {similarRequirements.length > 0 && (
-            <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem' }}>
-              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p style={{ fontWeight: 600, color: '#856404', marginBottom: '0.5rem' }}>Similar Requirements Found</p>
-                <p style={{ fontSize: '0.85rem', color: '#856404' }}>
-                  We found {similarRequirements.length} similar requirement(s) already in your system. Consider reviewing them before creating a new one.
+            <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '5px', padding: '0.75rem', marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <AlertCircle className="w-4 h-4 text-yellow-700 flex-shrink-0 mt-0.5" />
+              <div style={{ fontSize: '0.85rem' }}>
+                <p style={{ fontWeight: 600, color: '#856404', marginBottom: '0.25rem' }}>Similar requirements found</p>
+                <p style={{ color: '#856404' }}>
+                  {similarRequirements.length} similar requirement(s) exist. Review before creating.
                 </p>
               </div>
             </div>
@@ -432,25 +479,25 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
           {/* Core Details */}
           <FormSection title="Core Details">
             <FormField
-              label="What's the job title?"
+              label="Job Title"
               name="title"
-              placeholder="Senior Java Developer"
+              placeholder="e.g., Senior Java Developer"
               value={formData.title}
               onChange={handleChange}
               required
               error={formErrors.title}
             />
             <FormField
-              label="Which company is hiring?"
+              label="Company Name"
               name="company"
-              placeholder="TechCorp Inc"
+              placeholder="e.g., TechCorp Inc"
               value={formData.company}
               onChange={handleChange}
               required
               error={formErrors.company}
             />
             <FormField
-              label="What's the current status?"
+              label="Status"
               name="status"
               type="select"
               value={formData.status}
@@ -466,7 +513,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               ]}
             />
             <FormField
-              label="Who's assigned to this role?"
+              label="Assigned Consultant"
               name="consultant_id"
               type="select"
               value={formData.consultant_id}
@@ -474,9 +521,9 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               options={consultantOptions}
             />
             <FormField
-              label="What's the next action needed?"
+              label="Next Action"
               name="next_step"
-              placeholder="Send profile, Confirm interview, Follow up, etc."
+              placeholder="e.g., Send profile, Schedule interview"
               value={formData.next_step}
               onChange={handleChange}
             />
@@ -485,54 +532,54 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
           {/* Work Details */}
           <FormSection title="Work Details">
             <FormField
-              label="What are the key skills needed?"
+              label="Key Skills"
               name="primary_tech_stack"
-              placeholder="Java, Spring Boot, AWS"
+              placeholder="e.g., Java, Spring Boot, AWS"
               value={formData.primary_tech_stack}
               onChange={handleChange}
             />
             <FormField
-              label="What's the target rate or range?"
+              label="Rate / Salary"
               name="rate"
-              placeholder="$80k - $120k"
+              placeholder="e.g., $80k - $120k"
               value={formData.rate}
               onChange={handleChange}
               error={formErrors.rate}
             />
             <FormField
-              label="What's the work location type?"
+              label="Work Type"
               name="remote"
-              placeholder="Remote, Hybrid, or Onsite"
+              placeholder="e.g., Remote, Hybrid, Onsite"
               value={formData.remote}
               onChange={handleChange}
             />
             <FormField
-              label="What's the contract duration or timeline?"
+              label="Duration"
               name="duration"
-              placeholder="6 months, Full-time, etc."
+              placeholder="e.g., 6 months, Full-time"
               value={formData.duration}
               onChange={handleChange}
             />
           </FormSection>
 
           {/* Client Information */}
-          <FormSection title="Client Information">
+          <FormSection title="Client">
             <FormField
-              label="Who's your internal contact?"
+              label="Internal Contact"
               name="imp_name"
-              placeholder="John Smith"
+              placeholder="e.g., John Smith"
               value={formData.imp_name}
               onChange={handleChange}
             />
             <FormField
-              label="Where was it submitted?"
+              label="Source"
               name="applied_for"
-              placeholder="LinkedIn, Direct, Referral, etc."
+              placeholder="e.g., LinkedIn, Referral"
               value={formData.applied_for}
               onChange={handleChange}
             />
             <FormField
-              label="What's the client's website?"
+              label="Client Website"
               name="client_website"
               type="url"
               placeholder="https://example.com"
@@ -540,26 +587,33 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               onChange={handleChange}
             />
             <FormField
-              label="What's your partner/support website?"
+              label="Partner Website"
               name="imp_website"
               type="url"
               placeholder="https://partner.com"
               value={formData.imp_website}
               onChange={handleChange}
             />
+            <FormField
+              label="Work Location"
+              name="location"
+              placeholder="e.g., 123 Main St, New York, NY"
+              value={formData.location}
+              onChange={handleChange}
+            />
           </FormSection>
 
           {/* Vendor Information */}
-          <FormSection title="Vendor Information">
+          <FormSection title="Vendor">
             <FormField
-              label="Which vendor is involved?"
+              label="Vendor Company"
               name="vendor_company"
-              placeholder="ABC Staffing"
+              placeholder="e.g., ABC Staffing"
               value={formData.vendor_company}
               onChange={handleChange}
             />
             <FormField
-              label="What's the vendor's website?"
+              label="Vendor Website"
               name="vendor_website"
               type="url"
               placeholder="https://vendor.com"
@@ -568,14 +622,14 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               error={formErrors.vendor_website}
             />
             <FormField
-              label="Who's your primary vendor contact?"
+              label="Vendor Contact"
               name="vendor_person_name"
-              placeholder="Jane Doe"
+              placeholder="e.g., Jane Doe"
               value={formData.vendor_person_name}
               onChange={handleChange}
             />
             <FormField
-              label="What's the vendor's phone number?"
+              label="Vendor Phone"
               name="vendor_phone"
               type="tel"
               placeholder="(555) 123-4567"
@@ -583,7 +637,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
               onChange={handleChange}
             />
             <FormField
-              label="What's the vendor's email?"
+              label="Vendor Email"
               name="vendor_email"
               type="email"
               placeholder="vendor@example.com"
@@ -595,45 +649,36 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
 
           {/* Description */}
           <FormSection title="Description">
-            <FormField
-              label="Describe the role and requirements"
-              name="description"
-              type="textarea"
-              placeholder="Full job description and key responsibilities..."
-              value={formData.description}
-              onChange={handleChange}
-            />
-          </FormSection>
-
-          {/* Additional Info */}
-          <FormSection title="Additional Information">
-            <FormField
-              label="Work location address (if needed)"
-              name="location"
-              placeholder="123 Main St, New York, NY"
-              value={formData.location}
-              onChange={handleChange}
-            />
+            <div style={{ gridColumn: '1 / -1' }}>
+              <FormField
+                label="Role Description"
+                name="description"
+                type="textarea"
+                placeholder="Full job description and key responsibilities..."
+                value={formData.description}
+                onChange={handleChange}
+              />
+            </div>
           </FormSection>
 
           {/* Form Actions */}
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #eee' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
             <button
               type="button"
               onClick={onClose}
               style={{
-                backgroundColor: '#ccc',
-                color: '#000',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '6px',
+                backgroundColor: '#f0f0f0',
+                color: '#333',
+                border: '1px solid #ddd',
+                padding: '0.625rem 1.25rem',
+                borderRadius: '5px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontSize: '0.9rem',
-                transition: 'background-color 0.2s ease',
+                transition: 'all 0.2s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#aaa')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ccc')}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e0e0e0')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f0f0f0')}
             >
               Cancel
             </button>
@@ -644,18 +689,18 @@ export const CreateRequirementForm = ({ onClose, onSuccess }: CreateRequirementF
                 backgroundColor: loading ? '#0056b3' : '#007bff',
                 color: '#fff',
                 border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '6px',
+                padding: '0.625rem 1.25rem',
+                borderRadius: '5px',
                 fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 fontSize: '0.9rem',
-                transition: 'background-color 0.2s ease',
+                transition: 'all 0.2s ease',
                 opacity: loading ? 0.8 : 1,
               }}
               onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#0056b3')}
               onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = '#007bff')}
             >
-              {loading ? 'Creating...' : 'Create Requirement'}
+              {loading ? 'Creating...' : 'Create'}
             </button>
           </div>
         </form>

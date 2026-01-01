@@ -59,6 +59,9 @@ const fetchPage = async (q: RequirementsQuery): Promise<RequirementsPageData> =>
     orderBy: orderByColumn,
     orderDir: q.sortOrder,
     includeCount: false,
+    minRate: q.minRate || undefined,
+    maxRate: q.maxRate || undefined,
+    remoteFilter: q.remoteFilter || undefined,
   });
 
   if (!res.success) {
@@ -73,10 +76,13 @@ export function useRequirementsPage(query: RequirementsQuery) {
   const key = useMemo(() => buildKey(query), [query]);
 
   const swr = useSWR<RequirementsPageData>(key, () => fetchPage(query), {
-    dedupingInterval: 15_000,
-    revalidateOnFocus: false,
-    revalidateOnReconnect: true,
-    keepPreviousData: true,
+    dedupingInterval: 30_000,  // 30s - increased from 15s to reduce duplicate requests
+    revalidateOnFocus: false,  // Don't refetch on window focus
+    revalidateOnReconnect: true,  // Refetch when reconnected
+    keepPreviousData: true,  // Keep showing old data while new data loads
+    shouldRetryOnError: true,  // Retry failed requests
+    errorRetryCount: 2,  // Retry up to 2 times on error
+    errorRetryInterval: 1000,  // Wait 1s between retries
   });
 
   useEffect(() => {

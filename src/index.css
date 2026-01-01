@@ -1,3 +1,8 @@
+/* Prevent layout shift when scrollbar appears/disappears */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Custom: Table density, row backgrounds, and badge contrast improvements */
 .table-row-compact {
   @apply py-1 sm:py-2 md:py-2;

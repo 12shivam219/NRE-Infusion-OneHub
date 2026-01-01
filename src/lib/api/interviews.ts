@@ -5,9 +5,9 @@ import { logActivity } from './audit';
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type InterviewInsert = Database['public']['Tables']['interviews']['Insert'];
 
-export interface InterviewWithLogs extends Interview {
-  created_by?: { id: string; full_name: string; email: string } | null;
-  updated_by?: { id: string; full_name: string; email: string } | null;
+export interface InterviewWithLogs extends Omit<Interview, 'created_by' | 'updated_by'> {
+  created_by?: { id: string; full_name: string; email: string } | null | undefined;
+  updated_by?: { id: string; full_name: string; email: string } | null | undefined;
 }
 
 export const getInterviewsPage = async (options: {

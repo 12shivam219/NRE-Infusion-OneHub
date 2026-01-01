@@ -98,7 +98,7 @@ export const ExportOptionsModal = ({ isOpen, onClose, onExport }: ExportOptionsM
   if (!isOpen) return null;
 
   return (
-    <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="md" scroll="paper">
+    <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="md" scroll="paper" disableScrollLock>
       <DialogTitle sx={{ pr: 7 }}>
         <Typography variant="h6" sx={{ fontWeight: 800 }}>
           Export Requirements
@@ -429,7 +429,7 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
 
   return (
     <>
-      <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper">
+      <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper" disableScrollLock>
         <DialogTitle sx={{ pr: 7 }}>
           <Typography variant="h6" sx={{ fontWeight: 800 }}>
             Requirements Report

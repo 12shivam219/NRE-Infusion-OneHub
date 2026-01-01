@@ -42,8 +42,12 @@ const CreateDropdownComponent = ({
   }, []);
 
   const handleMenuItemClick = useCallback((callback: () => void) => {
-    callback();
-    handleClose();
+    // Return focus to button before closing menu
+    buttonRef.current?.focus();
+    setTimeout(() => {
+      callback();
+      handleClose();
+    }, 0);
   }, [handleClose]);
 
   // Handle keyboard navigation
@@ -136,6 +140,8 @@ const CreateDropdownComponent = ({
           open={open}
           onClose={handleClose}
           disableScrollLock={true}
+          keepMounted
+          autoFocus={false}
           anchorOrigin={{
             vertical: 'bottom',
             horizontal: 'right',
@@ -160,6 +166,10 @@ const CreateDropdownComponent = ({
             timeout: {
               enter: 150,
               exit: 100,
+            },
+            onExited: () => {
+              // Ensure focus is moved back to button when menu closes
+              buttonRef.current?.focus();
             },
           }}
         >

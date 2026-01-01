@@ -8,6 +8,7 @@ import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { RequirementEmailManager } from './RequirementEmailManager';
 import EmailHistoryPanel from './EmailHistoryPanel';
 import { LogoLoader } from '../common/LogoLoader';
+import NextStepThread from './NextStepThread';
 import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
@@ -171,6 +172,7 @@ export const RequirementDetailModal = ({
       }}
       fullWidth
       maxWidth={false}
+      disableScrollLock
       PaperProps={{
         sx: {
           width: { xs: '100%', sm: 'calc(100% - 32px)' },
@@ -227,19 +229,109 @@ export const RequirementDetailModal = ({
           {/* Details Tab */}
           {activeTab === 'details' && (
             <>
-              <div className="p-3 sm:p-5 lg:p-8 space-y-6 sm:space-y-8">
+              <div className="p-3 sm:p-4 space-y-4">
                 {/* Form Section Header */}
-                <div className="border-b-2 border-primary-200 pb-3 sm:pb-4 mb-4 sm:mb-6">
-                  <h3 className="text-xs font-medium text-gray-900 flex items-center gap-2 mb-1">
-                    <div className="w-1 h-5 sm:h-6 bg-primary-600 rounded-full"></div>
-                    Requirement Information
+                <div className="border-b border-gray-200 pb-2 mb-3">
+                  <h3 className="text-xs font-semibold text-gray-900 flex items-center gap-2">
+                    <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
+                    Requirement Details
                   </h3>
-                  <p className="text-xs text-gray-600 mt-2 ml-3">Edit and manage all requirement details below</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 bg-white p-4 sm:p-5 lg:p-6 rounded-lg sm:rounded-xl shadow-sm border border-gray-200">
-                  <div>
-                    {isEditing ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-3">
+                  {!isEditing ? (
+                    // View Mode - Organized Grid
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Title</p>
+                          <p className="text-sm text-gray-700">{formData.title || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Company</p>
+                          <p className="text-sm text-gray-700">{formData.company || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Status</p>
+                          <p className="text-sm text-gray-700">{formData.status || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Rate</p>
+                          <p className="text-sm text-gray-700">{formData.rate || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Location</p>
+                          <p className="text-sm text-gray-700">{formData.location || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Work Type</p>
+                          <p className="text-sm text-gray-700">{formData.remote || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Duration</p>
+                          <p className="text-sm text-gray-700">{formData.duration || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Source</p>
+                          <p className="text-sm text-gray-700">{formData.applied_for || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Vendor Email</p>
+                          <p className="text-sm text-gray-700">{formData.vendor_email || '-'}</p>
+                        </div>
+                      </div>
+
+                      {/* Next Step moved to dedicated tab */}
+
+                      <div className="pt-2 border-t border-gray-200">
+                        <p className="text-xs font-medium text-gray-500 mb-3">Next Steps</p>
+                        {requirement && <NextStepThread requirementId={requirement.id} readOnly={false} />}
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-200">
+                        <p className="text-xs font-medium text-gray-500 mb-1">Tech Stack</p>
+                        <p className="text-sm text-gray-700">{formData.primary_tech_stack || '-'}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-200">
+                        <p className="text-xs font-medium text-gray-500 mb-1">Description</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{formData.description || '-'}</p>
+                      </div>
+
+                      <div className="pt-2 border-t border-gray-200 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Vendor Company</p>
+                          <p className="text-sm text-gray-700">{formData.vendor_company || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Vendor Contact</p>
+                          <p className="text-sm text-gray-700">{formData.vendor_person_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Vendor Phone</p>
+                          <p className="text-sm text-gray-700">{formData.vendor_phone || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Internal Contact</p>
+                          <p className="text-sm text-gray-700">{formData.imp_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Client Website</p>
+                          <p className="text-sm text-blue-600 truncate">{formData.client_website ? <a href={formData.client_website} target="_blank" rel="noopener noreferrer">{formData.client_website}</a> : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Partner Website</p>
+                          <p className="text-sm text-blue-600 truncate">{formData.imp_website ? <a href={formData.imp_website} target="_blank" rel="noopener noreferrer">{formData.imp_website}</a> : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500">Vendor Website</p>
+                          <p className="text-sm text-blue-600 truncate">{formData.vendor_website ? <a href={formData.vendor_website} target="_blank" rel="noopener noreferrer">{formData.vendor_website}</a> : '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Edit Mode - Compact Grid
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <TextField
                         label="Title"
                         value={formData.title || ''}
@@ -247,307 +339,172 @@ export const RequirementDetailModal = ({
                         size="small"
                         fullWidth
                       />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.title}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Company"
-                  value={formData.company || ''}
-                  onChange={(e) => handleFieldChange('company', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.company || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  select
-                  label="Status"
-                  value={String(formData.status || 'NEW')}
-                  onChange={(e) => handleFieldChange('status', e.target.value)}
-                  size="small"
-                  fullWidth
-                >
-                  <MenuItem value="NEW">New</MenuItem>
-                  <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                  <MenuItem value="SUBMITTED">Submitted</MenuItem>
-                  <MenuItem value="INTERVIEW">Interview</MenuItem>
-                  <MenuItem value="OFFER">Offer</MenuItem>
-                  <MenuItem value="REJECTED">Rejected</MenuItem>
-                  <MenuItem value="CLOSED">Closed</MenuItem>
-                </TextField>
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.status || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Location"
-                  value={formData.location || ''}
-                  onChange={(e) => handleFieldChange('location', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.location || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Rate"
-                  value={formData.rate || ''}
-                  onChange={(e) => handleFieldChange('rate', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.rate || '-'}</p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              {isEditing ? (
-                <TextField
-                  label="Next Step"
-                  value={formData.next_step || ''}
-                  onChange={(e) => handleFieldChange('next_step', e.target.value)}
-                  size="small"
-                  fullWidth
-                  multiline
-                  rows={2}
-                  placeholder="e.g., Follow up on Monday, Send proposal"
-                />
-              ) : (
-                <p className="text-gray-600 whitespace-pre-wrap">{formData.next_step || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Vendor Email"
-                  type="email"
-                  value={formData.vendor_email || ''}
-                  onChange={(e) => handleFieldChange('vendor_email', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.vendor_email || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Vendor Phone"
-                  type="tel"
-                  value={formData.vendor_phone || ''}
-                  onChange={(e) => handleFieldChange('vendor_phone', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.vendor_phone || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Duration"
-                  value={formData.duration || ''}
-                  onChange={(e) => handleFieldChange('duration', e.target.value)}
-                  size="small"
-                  fullWidth
-                  placeholder="e.g., 6 months, 1 year"
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.duration || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  select
-                  label="Work Type (Remote)"
-                  value={String(formData.remote || '')}
-                  onChange={(e) => handleFieldChange('remote', e.target.value)}
-                  size="small"
-                  fullWidth
-                >
-                  <MenuItem value="">Select Work Type</MenuItem>
-                  <MenuItem value="Remote">Remote</MenuItem>
-                  <MenuItem value="Hybrid">Hybrid</MenuItem>
-                  <MenuItem value="Onsite">Onsite</MenuItem>
-                </TextField>
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.remote || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Source/Applied For"
-                  value={formData.applied_for || ''}
-                  onChange={(e) => handleFieldChange('applied_for', e.target.value)}
-                  size="small"
-                  fullWidth
-                  placeholder="e.g., LinkedIn, Referral, Portal"
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.applied_for || '-'}</p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              {isEditing ? (
-                <TextField
-                  label="Tech Stack"
-                  value={formData.primary_tech_stack || ''}
-                  onChange={(e) => handleFieldChange('primary_tech_stack', e.target.value)}
-                  size="small"
-                  fullWidth
-                  multiline
-                  rows={2}
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.primary_tech_stack || '-'}</p>
-              )}
-            </div>
-
-            <div className="md:col-span-2">
-              {isEditing ? (
-                <TextField
-                  label="Description"
-                  value={formData.description || ''}
-                  onChange={(e) => handleFieldChange('description', e.target.value)}
-                  size="small"
-                  fullWidth
-                  multiline
-                  rows={3}
-                />
-              ) : (
-                <p className="text-gray-600 whitespace-pre-wrap">{formData.description || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Vendor Company"
-                  value={formData.vendor_company || ''}
-                  onChange={(e) => handleFieldChange('vendor_company', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.vendor_company || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Internal Contact (Name)"
-                  value={formData.imp_name || ''}
-                  onChange={(e) => handleFieldChange('imp_name', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.imp_name || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Client Website"
-                  type="url"
-                  value={formData.client_website || ''}
-                  onChange={(e) => handleFieldChange('client_website', e.target.value)}
-                  size="small"
-                  fullWidth
-                  placeholder="https://example.com"
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.client_website || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="IMP Website"
-                  type="url"
-                  value={formData.imp_website || ''}
-                  onChange={(e) => handleFieldChange('imp_website', e.target.value)}
-                  size="small"
-                  fullWidth
-                  placeholder="https://example.com"
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.imp_website || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Vendor Website"
-                  type="url"
-                  value={formData.vendor_website || ''}
-                  onChange={(e) => handleFieldChange('vendor_website', e.target.value)}
-                  size="small"
-                  fullWidth
-                  placeholder="https://example.com"
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.vendor_website || '-'}</p>
-              )}
-            </div>
-
-            <div>
-              {isEditing ? (
-                <TextField
-                  label="Vendor Person Name"
-                  value={formData.vendor_person_name || ''}
-                  onChange={(e) => handleFieldChange('vendor_person_name', e.target.value)}
-                  size="small"
-                  fullWidth
-                />
-              ) : (
-                <p className="text-gray-600 text-xs py-2">{formData.vendor_person_name || '-'}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Audit Log - Admin Only */}
-          {isAdmin && (
-            <Paper variant="outlined" sx={{ p: 3, mt: 3 }}>
-              <ResourceAuditTimeline
-                resourceType="requirement"
-                resourceId={requirement.id}
-                title="Recent admin + CRM actions"
-              />
-            </Paper>
-          )}
+                      <TextField
+                        label="Company"
+                        value={formData.company || ''}
+                        onChange={(e) => handleFieldChange('company', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        select
+                        label="Status"
+                        value={String(formData.status || 'NEW')}
+                        onChange={(e) => handleFieldChange('status', e.target.value)}
+                        size="small"
+                        fullWidth
+                      >
+                        <MenuItem value="NEW">New</MenuItem>
+                        <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+                        <MenuItem value="SUBMITTED">Submitted</MenuItem>
+                        <MenuItem value="INTERVIEW">Interview</MenuItem>
+                        <MenuItem value="OFFER">Offer</MenuItem>
+                        <MenuItem value="REJECTED">Rejected</MenuItem>
+                        <MenuItem value="CLOSED">Closed</MenuItem>
+                      </TextField>
+                      <TextField
+                        label="Rate"
+                        value={formData.rate || ''}
+                        onChange={(e) => handleFieldChange('rate', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Location"
+                        value={formData.location || ''}
+                        onChange={(e) => handleFieldChange('location', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        select
+                        label="Work Type"
+                        value={String(formData.remote || '')}
+                        onChange={(e) => handleFieldChange('remote', e.target.value)}
+                        size="small"
+                        fullWidth
+                      >
+                        <MenuItem value="">Select</MenuItem>
+                        <MenuItem value="Remote">Remote</MenuItem>
+                        <MenuItem value="Hybrid">Hybrid</MenuItem>
+                        <MenuItem value="Onsite">Onsite</MenuItem>
+                      </TextField>
+                      <TextField
+                        label="Duration"
+                        value={formData.duration || ''}
+                        onChange={(e) => handleFieldChange('duration', e.target.value)}
+                        size="small"
+                        fullWidth
+                        placeholder="e.g., 6 months"
+                      />
+                      <TextField
+                        label="Source"
+                        value={formData.applied_for || ''}
+                        onChange={(e) => handleFieldChange('applied_for', e.target.value)}
+                        size="small"
+                        fullWidth
+                        placeholder="e.g., LinkedIn"
+                      />
+                      <TextField
+                        label="Vendor Email"
+                        type="email"
+                        value={formData.vendor_email || ''}
+                        onChange={(e) => handleFieldChange('vendor_email', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Vendor Phone"
+                        type="tel"
+                        value={formData.vendor_phone || ''}
+                        onChange={(e) => handleFieldChange('vendor_phone', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      {/* Next Step moved to dedicated tab */}
+                      <TextField
+                        label="Tech Stack"
+                        value={formData.primary_tech_stack || ''}
+                        onChange={(e) => handleFieldChange('primary_tech_stack', e.target.value)}
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                      />
+                      <TextField
+                        label="Vendor Company"
+                        value={formData.vendor_company || ''}
+                        onChange={(e) => handleFieldChange('vendor_company', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Internal Contact"
+                        value={formData.imp_name || ''}
+                        onChange={(e) => handleFieldChange('imp_name', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Vendor Contact"
+                        value={formData.vendor_person_name || ''}
+                        onChange={(e) => handleFieldChange('vendor_person_name', e.target.value)}
+                        size="small"
+                        fullWidth
+                      />
+                      <TextField
+                        label="Client Website"
+                        type="url"
+                        value={formData.client_website || ''}
+                        onChange={(e) => handleFieldChange('client_website', e.target.value)}
+                        size="small"
+                        fullWidth
+                        placeholder="https://example.com"
+                      />
+                      <TextField
+                        label="Partner Website"
+                        type="url"
+                        value={formData.imp_website || ''}
+                        onChange={(e) => handleFieldChange('imp_website', e.target.value)}
+                        size="small"
+                        fullWidth
+                        placeholder="https://example.com"
+                      />
+                      <TextField
+                        label="Vendor Website"
+                        type="url"
+                        value={formData.vendor_website || ''}
+                        onChange={(e) => handleFieldChange('vendor_website', e.target.value)}
+                        size="small"
+                        fullWidth
+                        placeholder="https://example.com"
+                      />
+                      <TextField
+                        label="Description"
+                        value={formData.description || ''}
+                        onChange={(e) => handleFieldChange('description', e.target.value)}
+                        size="small"
+                        fullWidth
+                        multiline
+                        rows={2}
+                        placeholder="Role description and requirements..."
+                        sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}
+                      />
+                    </div>
+                  )}
                 </div>
+
+                {/* Audit Log - Admin Only */}
+                {isAdmin && (
+                  <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
+                    <ResourceAuditTimeline
+                      resourceType="requirement"
+                      resourceId={requirement.id}
+                      title="Admin & CRM actions"
+                    />
+                  </Paper>
+                )}
+              </div>
             </>
           )}
 

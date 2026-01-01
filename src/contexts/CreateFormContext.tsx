@@ -42,6 +42,7 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
         onClose={closeCreateForm}
         maxWidth="lg"
         fullWidth
+        disableScrollLock
         PaperProps={{
           sx: {
             borderRadius: '1rem',
@@ -89,13 +90,13 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
         onClose={closeCreateForm}
         maxWidth="lg"
         fullWidth
+        disableScrollLock
         PaperProps={{
           sx: {
             borderRadius: '1rem',
-            backgroundColor: 'var(--darkbg-surface)',
-            backgroundImage: 'linear-gradient(135deg, var(--darkbg-surface) 0%, var(--darkbg) 100%)',
-            border: '1px solid rgba(234, 179, 8, 0.2)',
-            boxShadow: '0 0 30px rgba(234, 179, 8, 0.1)',
+            backgroundColor: '#ffffff',
+            border: '1px solid #e0e0e0',
+            boxShadow: '0 0 30px rgba(0, 0, 0, 0.1)',
           },
         }}
       >
@@ -103,11 +104,11 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
           sx={{
             fontWeight: 700,
             fontFamily: '"Poppins", sans-serif',
-            color: '#FFFFFF',
+            color: '#1a1a1a',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            borderBottom: '1px solid rgba(234, 179, 8, 0.1)',
+            borderBottom: '1px solid #e0e0e0',
           }}
         >
           Create Interview
@@ -115,18 +116,19 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
             onClick={closeCreateForm}
             size="small"
             sx={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              '&:hover': { color: '#FFFFFF' },
+              color: '#666666',
+              '&:hover': { color: '#1a1a1a' },
             }}
           >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ pt: 3, pb: 2 }}>
+        <DialogContent sx={{ pt: 3, pb: 2, backgroundColor: '#ffffff' }}>
           <CreateInterviewForm
             requirementId={selectedRequirementId}
             onClose={closeCreateForm}
             onSuccess={closeCreateForm}
+            showDialog={false}
           />
         </DialogContent>
       </Dialog>
@@ -137,6 +139,7 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
         onClose={closeCreateForm}
         maxWidth="lg"
         fullWidth
+        disableScrollLock
         PaperProps={{
           sx: {
             borderRadius: '1rem',

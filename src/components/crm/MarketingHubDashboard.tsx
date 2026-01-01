@@ -141,7 +141,7 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
     });
 
     if (recentReqRes.success && recentReqRes.requirements) setRequirements(recentReqRes.requirements);
-    if (interviewsPreviewRes.success && interviewsPreviewRes.interviews) setInterviews(interviewsPreviewRes.interviews);
+    if (interviewsPreviewRes.success && interviewsPreviewRes.interviews) setInterviews(interviewsPreviewRes.interviews as Interview[]);
     if (consultantsPreviewRes.success && consultantsPreviewRes.consultants) setConsultants(consultantsPreviewRes.consultants);
 
     setLoading(false);
