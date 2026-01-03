@@ -282,9 +282,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
     const { name, value } = e.target as { name: string; value: string };
-    // Trim string values to prevent leading/trailing whitespace issues
-    const trimmedValue = typeof value === 'string' ? value.trim() : value;
-    setFormData(prevState => ({ ...prevState, [name]: trimmedValue }));
+    // Don't trim during typing - only set the value as-is
+    setFormData(prevState => ({ ...prevState, [name]: value }));
   }, []);
 
   const loadData = useCallback(async () => {
@@ -702,62 +701,167 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
 
         {/* Interview Notes & Feedback */}
         <AccordionSection title="Notes & Feedback" defaultOpen={false}>
-          <Stack spacing={2}>
-            <Box sx={{ position: 'relative' }}>
-              <FormField
-                label="Interview Focus"
-                name="interview_focus"
-                type="textarea"
-                placeholder="AI-generated key areas to discuss, focus areas, etc."
+          <Stack spacing={2.5}>
+            {/* Interview Focus - Enhanced UI */}
+            <Box>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: 1.5,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                    Interview Focus
+                  </Typography>
+                  <Box sx={{
+                    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid rgba(212, 175, 55, 0.3)',
+                  }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'rgba(212, 175, 55, 0.9)' }}>
+                      AI-Powered
+                    </Typography>
+                  </Box>
+                </Box>
+                {aiGenerating && (
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.8,
+                    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                  }}>
+                    <Sparkles size={16} style={{ color: '#3b82f6' }} />
+                    <Typography variant="caption" sx={{ color: '#3b82f6', fontWeight: 600, fontSize: '0.75rem' }}>
+                      Generating...
+                    </Typography>
+                  </Box>
+                )}
+                {formData.interview_focus && !aiGenerating && (
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.6,
+                    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(34, 197, 94, 0.2)',
+                  }}>
+                    <CheckCircle2 size={14} style={{ color: '#22c55e' }} />
+                    <Typography variant="caption" sx={{ color: '#22c55e', fontWeight: 600, fontSize: '0.72rem' }}>
+                      Generated
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+              <TextField
+                fullWidth
+                multiline
+                minRows={5}
+                maxRows={20}
+                placeholder="AI will generate key areas to discuss, technical focus areas, and preparation points based on the job description and tech stack..."
                 value={formData.interview_focus}
                 onChange={handleChange}
+                name="interview_focus"
+                disabled={aiGenerating}
+                slotProps={{
+                  input: {
+                    sx: {
+                      fontFamily: 'inherit',
+                      fontSize: '0.9rem',
+                      lineHeight: 1.6,
+                      color: formData.interview_focus ? 'text.primary' : 'text.secondary',
+                      backgroundColor: formData.interview_focus 
+                        ? 'rgba(212, 175, 55, 0.03)' 
+                        : aiGenerating 
+                          ? 'rgba(59, 130, 246, 0.02)' 
+                          : 'background.paper',
+                      transition: 'all 0.3s ease',
+                      resize: 'vertical',
+                      '&:hover': {
+                        backgroundColor: formData.interview_focus 
+                          ? 'rgba(212, 175, 55, 0.05)' 
+                          : 'background.paper',
+                        borderColor: formData.interview_focus ? 'rgba(212, 175, 55, 0.4)' : 'action.hover',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: formData.interview_focus 
+                          ? 'rgba(212, 175, 55, 0.05)' 
+                          : 'background.paper',
+                        borderColor: 'primary.main',
+                        boxShadow: '0 0 0 3px rgba(212, 175, 55, 0.1)',
+                      },
+                      '&.Mui-disabled': {
+                        backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                        opacity: 1,
+                      },
+                    },
+                  },
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderColor: formData.interview_focus ? 'rgba(212, 175, 55, 0.3)' : 'divider',
+                    '& fieldset': {
+                      borderColor: formData.interview_focus ? 'rgba(212, 175, 55, 0.3)' : 'divider',
+                      transition: 'border-color 0.3s ease',
+                    },
+                  },
+                }}
               />
-              {aiGenerating && (
-                <Box sx={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  padding: '4px 12px',
-                  borderRadius: '6px',
-                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              {formData.interview_focus && (
+                <Typography variant="caption" sx={{ 
+                  display: 'block',
+                  mt: 1,
+                  color: 'text.secondary',
+                  fontSize: '0.8rem',
                 }}>
-                  <Sparkles size={16} style={{ color: '#3b82f6' }} />
-                  <Typography variant="caption" sx={{ color: '#3b82f6', fontWeight: 600, fontSize: '0.75rem' }}>
-                    AI Generating...
-                  </Typography>
-                </Box>
-              )}
-              {formData.interview_focus && !aiGenerating && (
-                <Box sx={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.5,
-                  backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                }}>
-                  <CheckCircle2 size={14} style={{ color: '#22c55e' }} />
-                  <Typography variant="caption" sx={{ color: '#22c55e', fontWeight: 600, fontSize: '0.7rem' }}>
-                    AI Generated
-                  </Typography>
-                </Box>
+                  💡 Tip: This AI-generated content is editable. Customize it to match your interview style.
+                </Typography>
               )}
             </Box>
-            <FormField
-              label="Special Note"
-              name="special_note"
-              type="textarea"
-              placeholder="Any special instructions or notes"
-              value={formData.special_note}
-              onChange={handleChange}
-            />
+
+            {/* Special Note */}
+            {/* Special Note */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
+                Special Note
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                maxRows={8}
+                placeholder="Any special instructions, red flags to discuss, or notes about the candidate..."
+                value={formData.special_note}
+                onChange={handleChange}
+                name="special_note"
+                slotProps={{
+                  input: {
+                    sx: {
+                      fontFamily: 'inherit',
+                      fontSize: '0.9rem',
+                      lineHeight: 1.6,
+                      backgroundColor: formData.special_note 
+                        ? 'rgba(168, 85, 247, 0.03)' 
+                        : 'background.paper',
+                      '&:hover': {
+                        backgroundColor: formData.special_note 
+                          ? 'rgba(168, 85, 247, 0.05)' 
+                          : 'background.paper',
+                      },
+                      '&.Mui-focused': {
+                        boxShadow: '0 0 0 3px rgba(168, 85, 247, 0.1)',
+                      },
+                    },
+                  },
+                }}
+              />
+            </Box>
             <FormField
               label="Job Description Excerpt"
               name="job_description_excerpt"

@@ -82,7 +82,7 @@ const TableRow = memo(({
     <tr
       ref={rowRef}
       data-index={dataIndex}
-        className={`transition-all duration-150 ${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10`}
+        className={`${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10 transition-colors duration-150`}
     > 
       <td className="px-2 py-3 text-center align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
         <div className="flex items-center justify-center">
@@ -382,11 +382,12 @@ export const RequirementsTable = memo(({
           pb: 1,
           scrollbarGutter: 'stable',
           width: '100%',
-          WebkitOverflowScrolling: 'touch',
+          willChange: 'transform',
+          contain: 'content',
           '& table': {
             width: '100%',
             minWidth: { xs: '1200px', sm: '1200px', md: '100%' },
-            tableLayout: 'fixed',
+            tableLayout: 'auto',
             borderCollapse: 'collapse',
           },
           '& thead': {
