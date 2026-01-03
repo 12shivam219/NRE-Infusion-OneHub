@@ -76,8 +76,8 @@ export function useRequirementsPage(query: RequirementsQuery) {
   const key = useMemo(() => buildKey(query), [query]);
 
   const swr = useSWR<RequirementsPageData>(key, () => fetchPage(query), {
-    dedupingInterval: 30_000,  // 30s - increased from 15s to reduce duplicate requests
-    revalidateOnFocus: false,  // Don't refetch on window focus
+    dedupingInterval: 3_000,  // 3s (reduced from 10s) - more responsive to user input
+    revalidateOnFocus: true,  // Refetch on window focus to catch new data
     revalidateOnReconnect: true,  // Refetch when reconnected
     keepPreviousData: true,  // Keep showing old data while new data loads
     shouldRetryOnError: true,  // Retry failed requests

@@ -846,6 +846,7 @@ export const DocumentsPage = () => {
     getScrollElement: () => document.getElementById("main-content"),
     estimateSize: () => 76,
     overscan: 10,
+    measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
   });
 
   const virtualRows = rowVirtualizer.getVirtualItems();

@@ -38,6 +38,8 @@ interface FormFieldProps {
   required?: boolean;
   options?: FormFieldOption[];
   error?: string;
+  id?: string;
+  autoComplete?: string;
 }
 
 // Create FormField component outside the parent component for stability
@@ -51,14 +53,20 @@ const FormField = memo(function FormField({
   required = false,
   options,
   error,
+  id,
+  autoComplete,
 }: FormFieldProps) {
+  // Generate a unique ID if one isn't provided to ensure accessibility
+  const fieldId = id || `field-${name}`;
+
   return (
     <div>
       {type === 'select' ? (
         <TextField
           select
-          label={label}
+          id={fieldId}
           name={name}
+          label={label}
           value={value}
           onChange={onChange}
           required={required}
@@ -66,6 +74,8 @@ const FormField = memo(function FormField({
           helperText={error}
           size="small"
           fullWidth
+          // MUI handles accessibility automatically when 'id' is provided.
+          // Manually setting htmlFor in InputLabelProps can cause mismatches, especially with Select.
           InputLabelProps={{
             shrink: true,
             sx: {
@@ -111,8 +121,9 @@ const FormField = memo(function FormField({
         </TextField>
       ) : (
         <TextField
-          label={label}
+          id={fieldId}
           name={name}
+          label={label}
           type={type === 'textarea' ? 'text' : type}
           value={value}
           onChange={onChange as unknown as (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void}
@@ -122,8 +133,10 @@ const FormField = memo(function FormField({
           helperText={error}
           size="small"
           fullWidth
+          autoComplete={autoComplete}
           multiline={type === 'textarea'}
           rows={type === 'textarea' ? 2 : undefined}
+          // Rely on MUI's default label-input association via the 'id' prop
           InputLabelProps={{
             shrink: true,
             sx: {
@@ -481,6 +494,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Job Title"
               name="title"
+              id="req-title"
+              autoComplete="organization-title"
               placeholder="e.g., Senior Java Developer"
               value={formData.title}
               onChange={handleChange}
@@ -490,6 +505,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Company Name"
               name="company"
+              id="req-company"
+              autoComplete="organization"
               placeholder="e.g., TechCorp Inc"
               value={formData.company}
               onChange={handleChange}
@@ -499,6 +516,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Status"
               name="status"
+              id="req-status"
               type="select"
               value={formData.status}
               onChange={handleChange}
@@ -515,6 +533,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Assigned Consultant"
               name="consultant_id"
+              id="req-consultant"
               type="select"
               value={formData.consultant_id}
               onChange={handleChange}
@@ -523,6 +542,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Next Action"
               name="next_step"
+              id="req-next-step"
+              autoComplete="off"
               placeholder="e.g., Send profile, Schedule interview"
               value={formData.next_step}
               onChange={handleChange}
@@ -534,6 +555,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Key Skills"
               name="primary_tech_stack"
+              id="req-tech-stack"
+              autoComplete="off"
               placeholder="e.g., Java, Spring Boot, AWS"
               value={formData.primary_tech_stack}
               onChange={handleChange}
@@ -541,6 +564,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Rate / Salary"
               name="rate"
+              id="req-rate"
+              autoComplete="off"
               placeholder="e.g., $80k - $120k"
               value={formData.rate}
               onChange={handleChange}
@@ -549,6 +574,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Work Type"
               name="remote"
+              id="req-remote"
+              autoComplete="off"
               placeholder="e.g., Remote, Hybrid, Onsite"
               value={formData.remote}
               onChange={handleChange}
@@ -556,6 +583,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Duration"
               name="duration"
+              id="req-duration"
+              autoComplete="off"
               placeholder="e.g., 6 months, Full-time"
               value={formData.duration}
               onChange={handleChange}
@@ -567,6 +596,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Internal Contact"
               name="imp_name"
+              id="req-internal-contact"
+              autoComplete="name"
               placeholder="e.g., John Smith"
               value={formData.imp_name}
               onChange={handleChange}
@@ -574,6 +605,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Source"
               name="applied_for"
+              id="req-source"
+              autoComplete="off"
               placeholder="e.g., LinkedIn, Referral"
               value={formData.applied_for}
               onChange={handleChange}
@@ -581,6 +614,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Client Website"
               name="client_website"
+              id="req-client-website"
+              autoComplete="url"
               type="url"
               placeholder="https://example.com"
               value={formData.client_website}
@@ -589,6 +624,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Partner Website"
               name="imp_website"
+              id="req-partner-website"
+              autoComplete="url"
               type="url"
               placeholder="https://partner.com"
               value={formData.imp_website}
@@ -597,6 +634,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Work Location"
               name="location"
+              id="req-location"
+              autoComplete="address-level2"
               placeholder="e.g., 123 Main St, New York, NY"
               value={formData.location}
               onChange={handleChange}
@@ -608,6 +647,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Vendor Company"
               name="vendor_company"
+              id="req-vendor-company"
+              autoComplete="organization"
               placeholder="e.g., ABC Staffing"
               value={formData.vendor_company}
               onChange={handleChange}
@@ -615,6 +656,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Vendor Website"
               name="vendor_website"
+              id="req-vendor-website"
+              autoComplete="url"
               type="url"
               placeholder="https://vendor.com"
               value={formData.vendor_website}
@@ -624,6 +667,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Vendor Contact"
               name="vendor_person_name"
+              id="req-vendor-contact"
+              autoComplete="name"
               placeholder="e.g., Jane Doe"
               value={formData.vendor_person_name}
               onChange={handleChange}
@@ -631,6 +676,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Vendor Phone"
               name="vendor_phone"
+              id="req-vendor-phone"
+              autoComplete="tel"
               type="tel"
               placeholder="(555) 123-4567"
               value={formData.vendor_phone}
@@ -639,6 +686,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             <FormField
               label="Vendor Email"
               name="vendor_email"
+              id="req-vendor-email"
+              autoComplete="email"
               type="email"
               placeholder="vendor@example.com"
               value={formData.vendor_email}
@@ -653,7 +702,9 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
               <FormField
                 label="Role Description"
                 name="description"
+                id="req-description"
                 type="textarea"
+                autoComplete="off"
                 placeholder="Full job description and key responsibilities..."
                 value={formData.description}
                 onChange={handleChange}

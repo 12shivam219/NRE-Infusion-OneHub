@@ -337,6 +337,7 @@ const ConsultantGridVirtualizer = ({ consultants, onViewDetails, onDelete, onSta
     getScrollElement: () => parentRef.current,
     estimateSize: () => 350,
     overscan: 5,
+    measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
   });
 
   const virtualItems = virtualizer.getVirtualItems();

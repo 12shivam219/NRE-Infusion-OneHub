@@ -339,6 +339,7 @@ export const RequirementsTable = memo(({
     getScrollElement: () => parentRef.current,
     estimateSize: () => 72,
     overscan: 10,
+    measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
   });
 
   const virtualItems = rowVirtualizer.getVirtualItems();
@@ -468,7 +469,6 @@ export const RequirementsTable = memo(({
                       isAdmin={isAdmin}
                       rowIndex={virtualRow.index}
                       dataIndex={virtualRow.index}
-                      rowRef={rowVirtualizer.measureElement}
                       selectedStatusFilter={selectedStatusFilter}
                       onStatusFilterChange={onStatusFilterChange}
                     />

@@ -476,6 +476,7 @@ const InterviewListVirtualizer = ({ interviews, getRequirementTitle, onStatusCha
     getScrollElement: () => parentRef.current,
     estimateSize: () => 280,
     overscan: 10,
+    measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
   });
 
   const virtualItems = virtualizer.getVirtualItems();

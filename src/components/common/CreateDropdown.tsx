@@ -1,8 +1,12 @@
-import { useState, useRef, useCallback, useEffect, ReactNode, memo } from 'react';
+import { useState, useRef, useCallback, ReactNode, memo } from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
+import Popover from '@mui/material/Popover';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
 import { useThemeSync } from '../../contexts/ThemeSyncContext';
 
@@ -41,177 +45,57 @@ const CreateDropdownComponent = ({
     setAnchorEl(null);
   }, []);
 
-  const handleMenuItemClick = useCallback((callback: () => void) => {
-    // Return focus to button before closing menu
-    buttonRef.current?.focus();
-    setTimeout(() => {
-      callback();
-      handleClose();
-    }, 0);
-  }, [handleClose]);
+  const handleItemClick = useCallback((callback: () => void) => {
+    // 1. Close the popover immediately
+    setAnchorEl(null);
 
-  // Handle keyboard navigation
+    // 2. Return focus to the trigger button safely
+    // This prevents the "aria-hidden" error by ensuring focus is NOT 
+    // inside the unmounting/hiding Popover when the new Modal opens.
+    if (buttonRef.current) {
+      buttonRef.current.focus();
+    }
+
+    // 3. Execute the action (e.g., opening the Requirement Modal)
+    // We use a microtask/timeout to allow the focus shift to register
+    requestAnimationFrame(() => {
+        callback();
+    });
+  }, []);
+
+  // Handle keyboard navigation for the trigger
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      const target = event.currentTarget;
-      setAnchorEl(target);
+      setAnchorEl(event.currentTarget);
     }
     if (event.key === 'Escape') {
       handleClose();
     }
   }, [handleClose]);
 
-  // Close on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
-        handleClose();
-      }
-    };
+  // Styles for the header variant to match original design
+  const headerPaperSx = {
+    minWidth: 200,
+    boxShadow: `0 8px 24px rgba(0, 255, 208, 0.15), 0 4px 8px rgba(0, 0, 0, 0.4)`,
+    borderRadius: '0.5rem',
+    bgcolor: '#0e2a30',
+    border: '1px solid #12393f',
+    mt: 1, 
+  };
 
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [open, handleClose]);
+  // Styles for the standalone variant to match original design
+  const standalonePaperSx = {
+    minWidth: 200,
+    boxShadow: 'var(--shadow-gold-glow)',
+    borderRadius: '0.75rem',
+    bgcolor: 'var(--darkbg-surface)',
+    border: '1px solid rgba(234, 179, 8, 0.2)',
+    mt: 1,
+  };
 
-  // Header variant styling
-  if (variant === 'header') {
-    return (
-      <>
-        <button
-          ref={buttonRef}
-          onClick={handleClick}
-          onKeyDown={handleKeyDown}
-          disabled={disabled}
-          aria-haspopup="true"
-          aria-expanded={open}
-          aria-controls={open ? 'create-menu' : undefined}
-          className={`
-            flex flex-shrink-0 items-center gap-1
-            px-3 py-2
-            rounded-md
-            bg-[#0b252b]
-            border border-[#12393f]
-            text-gray-300
-            transition-colors duration-200 ease-in-out
-            hover:bg-[#0e2a30]
-            hover:border-[#00ffd0]
-            hover:text-[#00ffd0]
-            focus:outline-none
-            active:outline-none
-            disabled:opacity-50
-            disabled:cursor-not-allowed
-            ${className}
-          `}
-          title={`${label || 'Create'} menu`}
-        >
-          <AddRoundedIcon
-            sx={{
-              fontSize: 20,
-              transition: 'color 200ms ease-in-out',
-            }}
-          />
-          <Box
-            component="span"
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 200ms ease-in-out',
-              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
-          >
-            <ExpandMoreRoundedIcon
-              sx={{
-                fontSize: 18,
-                transition: 'color 200ms ease-in-out',
-              }}
-            />
-          </Box>
-        </button>
+  const isHeader = variant === 'header';
 
-        <Menu
-          id="create-menu"
-          anchorEl={anchorEl}
-          open={open}
-          onClose={handleClose}
-          disableScrollLock={true}
-          keepMounted
-          autoFocus={false}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'right',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'right',
-          }}
-          slotProps={{
-            paper: {
-              sx: {
-                minWidth: 200,
-                boxShadow: `0 8px 24px rgba(0, 255, 208, 0.15), 0 4px 8px rgba(0, 0, 0, 0.4)`,
-                borderRadius: '0.5rem',
-                bgcolor: '#0e2a30',
-                border: '1px solid #12393f',
-                position: 'absolute',
-              },
-            },
-          }}
-          TransitionProps={{
-            timeout: {
-              enter: 150,
-              exit: 100,
-            },
-            onExited: () => {
-              // Ensure focus is moved back to button when menu closes
-              buttonRef.current?.focus();
-            },
-          }}
-        >
-          {items.map((item, index) => (
-            <MenuItem
-              key={index}
-              onClick={() => handleMenuItemClick(item.onClick)}
-              sx={{
-                py: 1,
-                px: 2,
-                color: '#CBD5E1',
-                fontSize: '0.875rem',
-                fontFamily: '"Inter", sans-serif',
-                '&:hover': {
-                  bgcolor: '#12393f',
-                  color: accent,
-                },
-                transition: 'all 150ms ease-in-out',
-              }}
-            >
-              {item.icon && (
-                <Box
-                  component="span"
-                  sx={{
-                    mr: 1.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    color: 'inherit',
-                  }}
-                >
-                  {item.icon}
-                </Box>
-              )}
-              {item.label}
-            </MenuItem>
-          ))}
-        </Menu>
-      </>
-    );
-  }
-
-  // Standalone variant (original styling)
   return (
     <>
       <button
@@ -221,8 +105,24 @@ const CreateDropdownComponent = ({
         disabled={disabled}
         aria-haspopup="true"
         aria-expanded={open}
-        aria-controls={open ? 'create-menu' : undefined}
-        className={`
+        aria-controls={open ? 'create-popover' : undefined}
+        className={isHeader ? `
+          flex flex-shrink-0 items-center gap-1
+          px-3 py-2
+          rounded-md
+          bg-[#0b252b]
+          border border-[#12393f]
+          text-gray-300
+          transition-colors duration-200 ease-in-out
+          hover:bg-[#0e2a30]
+          hover:border-[#00ffd0]
+          hover:text-[#00ffd0]
+          focus:outline-none
+          active:outline-none
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+          ${className}
+        ` : `
           flex items-center justify-center gap-1
           px-3 py-2
           bg-[color:var(--gold)]
@@ -238,26 +138,36 @@ const CreateDropdownComponent = ({
         `}
         title={`${label || 'Create'} menu`}
       >
-        <AddRoundedIcon fontSize="small" />
+        <AddRoundedIcon
+          sx={{
+            fontSize: isHeader ? 20 : 'small',
+            transition: 'color 200ms ease-in-out',
+          }}
+        />
         <Box
           component="span"
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'transform 0.2s ease-in-out',
+            transition: 'transform 200ms ease-in-out',
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
           }}
         >
-          <ExpandMoreRoundedIcon fontSize="small" />
+          <ExpandMoreRoundedIcon
+            sx={{
+              fontSize: isHeader ? 18 : 'small',
+              transition: 'color 200ms ease-in-out',
+            }}
+          />
         </Box>
-        {label && <span className="text-sm font-heading">{label}</span>}
+        {!isHeader && label && <span className="text-sm font-heading">{label}</span>}
       </button>
 
-      <Menu
-        id="create-menu"
-        anchorEl={anchorEl}
+      <Popover
+        id="create-popover"
         open={open}
+        anchorEl={anchorEl}
         onClose={handleClose}
         anchorOrigin={{
           vertical: 'bottom',
@@ -269,70 +179,69 @@ const CreateDropdownComponent = ({
         }}
         slotProps={{
           paper: {
-            sx: {
-              minWidth: 200,
-              boxShadow: 'var(--shadow-gold-glow)',
-              borderRadius: '0.75rem',
-              bgcolor: 'var(--darkbg-surface)',
-              border: '1px solid rgba(234, 179, 8, 0.2)',
-            },
+            sx: isHeader ? headerPaperSx : standalonePaperSx,
           },
         }}
-        TransitionProps={{
-          timeout: {
-            enter: 200,
-            exit: 150,
-          },
-        }}
+        // Disable scroll lock to prevent layout shifts
+        disableScrollLock
       >
-        {items.map((item, index) => (
-          <MenuItem
-            key={index}
-            onClick={() => handleMenuItemClick(item.onClick)}
-            sx={{
-              py: 1,
-              px: 2,
-              color: 'var(--text-secondary)',
-              fontSize: '0.875rem',
-              fontFamily: 'var(--font-body)',
-              '&:hover': {
-                bgcolor: 'var(--darkbg-surface-light)',
-                color: 'var(--gold)',
-              },
-              transition: 'all 0.2s ease-in-out',
-            }}
-          >
-            {item.icon && (
-              <Box
-                component="span"
+        <List disablePadding>
+          {items.map((item, index) => (
+            <ListItem key={index} disablePadding>
+              <ListItemButton
+                onClick={() => handleItemClick(item.onClick)}
                 sx={{
-                  mr: 1.5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: 'inherit',
+                  py: 1,
+                  px: 2,
+                  transition: 'all 150ms ease-in-out',
+                  ...(isHeader ? {
+                    color: '#CBD5E1',
+                    '&:hover': {
+                      bgcolor: '#12393f',
+                      color: accent,
+                    },
+                  } : {
+                    color: 'var(--text-secondary)',
+                    '&:hover': {
+                      bgcolor: 'var(--darkbg-surface-light)',
+                      color: 'var(--gold)',
+                    },
+                  }),
                 }}
               >
-                {item.icon}
-              </Box>
-            )}
-            {item.label}
-          </MenuItem>
-        ))}
-      </Menu>
+                {item.icon && (
+                  <ListItemIcon sx={{ 
+                    minWidth: 32,
+                    color: 'inherit',
+                    mr: 0.5
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                )}
+                <ListItemText 
+                  primary={item.label} 
+                  primaryTypographyProps={{
+                    fontSize: '0.875rem',
+                    fontFamily: isHeader ? '"Inter", sans-serif' : 'var(--font-body)',
+                    fontWeight: 500,
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Popover>
     </>
   );
 };
 
-// Memoize component to prevent re-renders when parent updates
 export const CreateDropdown = memo(CreateDropdownComponent, (prevProps, nextProps) => {
-  // Custom comparison: only re-render if props with actual value changes occur
   return (
     prevProps.label === nextProps.label &&
     prevProps.disabled === nextProps.disabled &&
     prevProps.className === nextProps.className &&
     prevProps.variant === nextProps.variant &&
     prevProps.items.length === nextProps.items.length &&
-    // Compare item labels to detect changes
     prevProps.items.every((item, index) => item.label === nextProps.items[index]?.label)
   );
 });

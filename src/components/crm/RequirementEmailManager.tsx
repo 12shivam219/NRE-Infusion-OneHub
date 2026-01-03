@@ -1059,6 +1059,7 @@ const VirtualEmailList = ({
     getScrollElement: () => parentRef.current,
     estimateSize: () => 120,
     overscan: 5,
+    measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
   });
 
   const virtualItems = virtualizer.getVirtualItems();

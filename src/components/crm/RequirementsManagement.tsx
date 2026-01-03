@@ -5,7 +5,6 @@ import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { useToast } from '../../contexts/ToastContext';
 import { useSearchFilters } from '../../hooks/useSearchFilters';
 import { useRequirementsPage } from '../../hooks/useRequirementsPage';
-import { debounce } from '../../lib/utils';
 import { deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
@@ -141,7 +140,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
   const { filters: savedFilters, updateFilters, clearFilters, isLoaded } = useSearchFilters();
 
   const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm || '');
-  const [debouncedValue, setDebouncedValue] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [filterStatus, setFilterStatus] = useState<RequirementStatus | 'ALL'>((savedFilters?.filterStatus as RequirementStatus | 'ALL') || 'ALL');
   const [sortBy, setSortBy] = useState<'date' | 'company' | 'daysOpen'>((savedFilters?.sortBy as 'date' | 'company' | 'daysOpen') || 'date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>((savedFilters?.sortOrder as 'asc' | 'desc') || 'desc');
@@ -192,7 +191,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     userId: user?.id,
     page,
     pageSize,
-    search: debouncedValue,
+    search: searchTerm,
     status: filterStatus,
     dateFrom: dateFromIso,
     dateTo: dateToIso,
@@ -260,8 +259,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
           inputRef={searchInputRef}
           value={searchTerm}
           onChange={(e) => {
-            setSearchTerm(e.target.value);
-            handleDebouncedSearch(e.target.value);
+            handleSearchChange(e.target.value);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -271,7 +269,6 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
             if (e.key === 'Escape') {
               if (searchTerm) {
                 setSearchTerm('');
-                setDebouncedValue('');
               }
               searchInputRef.current?.blur();
             }
@@ -289,7 +286,6 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
               onClick={() => {
                 if (searchTerm) {
                   setSearchTerm('');
-                  setDebouncedValue('');
                 }
               }}
               aria-label="Clear search"
@@ -312,41 +308,47 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     </Box>
   );
 
-  // Initialize debounced search with saved value
+  // ⚡ OPTIMIZATION: Instant search with request cancellation (AbortController)
+  // - Updates UI immediately (no debounce delay)
+  // - Cancels outdated requests automatically
+  // - Prevents race conditions
+  // - Much better UX than debounce
+  const handleSearchChange = useCallback((value: string) => {
+    // Cancel any previous search requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    // Create new abort controller for this search
+    abortControllerRef.current = new AbortController();
+
+    // Update search immediately (no delay)
+    setSearchTerm(value);
+    setPage(0);
+  }, []);
+
+  // Initialize search with saved value
   useEffect(() => {
     if (isLoaded && savedFilters?.searchTerm) {
-      setDebouncedValue(savedFilters.searchTerm);
+      setSearchTerm(savedFilters.searchTerm);
     }
   }, [isLoaded, savedFilters]);
 
-  // Save filters only on debounced search changes - cleanup timeout properly
+  // Save filters with search term changes (no debounce delay)
   useEffect(() => {
     if (!isLoaded) return;
 
-    const timeoutId = setTimeout(() => {
-      updateFilters({
-        searchTerm: debouncedValue,
-        sortBy,
-        sortOrder,
-        filterStatus: filterStatus.toString(),
-        minRate,
-        maxRate,
-        remoteFilter,
-        dateRangeFrom: dateRange.from,
-        dateRangeTo: dateRange.to,
-      });
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [debouncedValue, sortBy, sortOrder, filterStatus, minRate, maxRate, remoteFilter, dateRange, isLoaded, updateFilters]);
-
-  const handleDebouncedSearch = useMemo(
-    () => debounce((value: unknown) => {
-      setDebouncedValue(value as string);
-      setPage(0);
-    }, 300),
-    []
-  );
+    updateFilters({
+      searchTerm: searchTerm,
+      sortBy,
+      sortOrder,
+      filterStatus: filterStatus.toString(),
+      minRate,
+      maxRate,
+      remoteFilter,
+      dateRangeFrom: dateRange.from,
+      dateRangeTo: dateRange.to,
+    });
+  }, [searchTerm, sortBy, sortOrder, filterStatus, minRate, maxRate, remoteFilter, dateRange, isLoaded, updateFilters]);
 
   // ⚡ OPTIMIZATION: Client-side filters removed - now handled server-side in getRequirementsPage()
   // This eliminates the overhead of filtering potentially 50K+ records in JavaScript
@@ -355,7 +357,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
   // Effect to handle filter changes - resets to page 0
   useEffect(() => {
     setPage(0);
-  }, [debouncedValue, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to, rowsPerPage]);
+  }, [searchTerm, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to, rowsPerPage]);
 
   useEffect(() => {
     // Subscribe to real-time changes
@@ -363,7 +365,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     if (user) {
       const dateFrom = dateRange.from ? new Date(`${dateRange.from}T00:00:00`).getTime() : null;
       const dateTo = dateRange.to ? new Date(`${dateRange.to}T23:59:59.999`).getTime() : null;
-      const searchLower = debouncedValue.trim().toLowerCase();
+      const searchLower = searchTerm.trim().toLowerCase();
       const matchesServerSideFilters = (record: Requirement) => {
         const matchesStatus = filterStatus === 'ALL' || record.status === filterStatus;
 
@@ -372,7 +374,19 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
           (record.title || '').toLowerCase().includes(searchLower) ||
           (record.company || '').toLowerCase().includes(searchLower) ||
           (record.primary_tech_stack || '').toLowerCase().includes(searchLower) ||
-          (record.vendor_company || '').toLowerCase().includes(searchLower);
+          (record.description || '').toLowerCase().includes(searchLower) ||
+          (record.location || '').toLowerCase().includes(searchLower) ||
+          (record.end_client || '').toLowerCase().includes(searchLower) ||
+          (record.vendor_company || '').toLowerCase().includes(searchLower) ||
+          (record.vendor_person_name || '').toLowerCase().includes(searchLower) ||
+          (record.vendor_phone || '').toLowerCase().includes(searchLower) ||
+          (record.vendor_email || '').toLowerCase().includes(searchLower) ||
+          (record.vendor_website || '').toLowerCase().includes(searchLower) ||
+          (record.imp_name || '').toLowerCase().includes(searchLower) ||
+          (record.client_website || '').toLowerCase().includes(searchLower) ||
+          (record.imp_website || '').toLowerCase().includes(searchLower) ||
+          (record.next_step || '').toLowerCase().includes(searchLower) ||
+          (record.status || '').toLowerCase().includes(searchLower);
 
         let matchesDate = true;
         if (dateFrom || dateTo) {
@@ -460,7 +474,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     return () => {
       unsubscribe?.();
     };
-  }, [user, selectedRequirement?.id, showToast, debouncedValue, filterStatus, dateRange.from, dateRange.to, page, pageSize, mutateRequirements]);
+  }, [user, selectedRequirement?.id, showToast, searchTerm, filterStatus, dateRange.from, dateRange.to, page, pageSize, mutateRequirements]);
 
   // Listen for requirement creation event to immediately reload
   useEffect(() => {
@@ -932,14 +946,13 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
                       />
                     </Box>
 
-                    {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || debouncedValue || filterStatus !== 'ALL') ? (
+                    {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || searchTerm || filterStatus !== 'ALL') ? (
                       <Button
                         variant="text"
                         color="primary"
                         size="small"
                         onClick={() => {
                           setSearchTerm('');
-                          setDebouncedValue('');
                           setFilterStatus('ALL');
                           setMinRate('');
                           setMaxRate('');
@@ -964,13 +977,13 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
       {/* Search and Filter */}
       <Stack spacing={2}>
         {/* Active Filters Summary */}
-        {(debouncedValue || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
+        {(searchTerm || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
           <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
                 Active filters:
               </Typography>
-              {debouncedValue ? <Chip size="small" label={`Search: "${debouncedValue}"`} /> : null}
+              {searchTerm ? <Chip size="small" label={`Search: "${searchTerm}"`} /> : null}
               {filterStatus !== 'ALL' ? <Chip size="small" label={`Status: ${filterStatus}`} /> : null}
               {minRate ? <Chip size="small" label={`Min: $${minRate}`} /> : null}
               {maxRate ? <Chip size="small" label={`Max: $${maxRate}`} /> : null}
@@ -989,7 +1002,6 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
                 size="small"
                 onClick={() => {
                   setSearchTerm('');
-                  setDebouncedValue('');
                   setFilterStatus('ALL');
                   setMinRate('');
                   setMaxRate('');
@@ -1136,6 +1148,33 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
             />
           </Box>
         )}
+
+        {/* Empty State - When no requirements match filters */}
+        {requirements.length === 0 && !loading && (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 3,
+              mb: 3,
+              bgcolor: 'rgba(59, 130, 246, 0.05)',
+              borderColor: 'rgba(59, 130, 246, 0.3)',
+              borderRadius: 2,
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+              {searchTerm ? '🔍 No requirements found' : '📝 No requirements yet'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {searchTerm 
+                ? `No requirements match "${searchTerm}". Try a different search term or adjust filters.`
+                : 'You haven\'t added any requirements yet. Click "New Requirement" to get started.'}
+            </Typography>
+          </Paper>
+        )}
+
+        {/* Performance Info - When showing results without explicit search */}
+        {/* Removed: Showing recent requirements info message */}
 
         <RequirementsTable
           requirements={filteredRequirements}

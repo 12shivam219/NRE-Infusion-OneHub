@@ -2,7 +2,6 @@ import { supabase } from '../supabase';
 import type { Database } from '../database.types';
 import { logActivity } from './audit';
 import { getCacheValue, setCacheValue, generateRequirementsCacheKey } from '../redis';
-import { searchRequirements, indexRequirement } from '../elasticsearch';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type RequirementInsert = Database['public']['Tables']['requirements']['Insert'];
@@ -15,10 +14,10 @@ const VALID_REQUIREMENT_STATUSES: Requirement['status'][] = ['NEW', 'IN_PROGRESS
 const userCache = new Map<string, { full_name: string; email: string } | null>();
 
 // ⚡ OPTIMIZATION: In-memory cache for paginated queries to prevent duplicate API calls
-// Stores response for up to 30 seconds to handle rapid filter changes
+// Stores response for up to 5 seconds to handle rapid filter changes without stale data
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const queryCache = new Map<string, { data: any; timestamp: number }>();
-const QUERY_CACHE_TTL = 30_000;  // 30 seconds
+const QUERY_CACHE_TTL = 5_000;  // 5 seconds (reduced from 30s to prevent stale results)
 
 const getCachedQuery = (cacheKey: string) => {
   const cached = queryCache.get(cacheKey);
@@ -221,40 +220,6 @@ export const getRequirementsPage = async (
       return cachedResult;
     }
 
-    // ⚡ ADVANCED: Try Elasticsearch first for better performance on 100K+ records
-    if (search) {
-      const esResult = await searchRequirements({
-        query: search,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        status: status as any,
-        minRate: minRate ? parseFloat(minRate) : undefined,
-        maxRate: maxRate ? parseFloat(maxRate) : undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        remoteFilter: remoteFilter as any,
-        dateFrom,
-        dateTo,
-        limit,
-        offset,
-        sortBy: orderBy,
-        sortOrder: orderDir,
-      });
-
-      if (esResult) {
-        if (process.env.NODE_ENV === 'development') {
-          console.debug('[Elasticsearch] Search successful:', {
-            results: esResult.hits.length,
-            total: esResult.total,
-          });
-        }
-
-        const result = { success: true, requirements: esResult.hits, total: esResult.total };
-        // Cache Elasticsearch result
-        await setCacheValue(redisCacheKey, result, { ttl: 1800 });
-        setCachedQuery(cacheKey, result);
-        return result;
-      }
-    }
-
     // ⚡ Performance tracking for 50K+ record queries
     const queryStartTime = performance.now();
 
@@ -264,6 +229,7 @@ export const getRequirementsPage = async (
     if (userId) query = query.eq('user_id', userId);
     if (status && status !== 'ALL' && VALID_REQUIREMENT_STATUSES.includes(status as Requirement['status'])) query = query.eq('status', status);
 
+    // ⚡ OPTIMIZATION: Use optimized search strategy based on search term presence
     if (search && search.trim()) {
       const raw = search.trim().slice(0, 120);
       const cleaned = raw
@@ -273,61 +239,42 @@ export const getRequirementsPage = async (
         .trim();
 
       if (cleaned) {
-        const like = cleaned;
-
+        // Search across ALL fields for comprehensive coverage
+        // Primary fields (most important for relevance)
         const orFilters: string[] = [
-          `title.ilike.%${like}%`,
-          `company.ilike.%${like}%`,
-          `vendor_company.ilike.%${like}%`,
-          `primary_tech_stack.ilike.%${like}%`,
-          `location.ilike.%${like}%`,
-          `description.ilike.%${like}%`,
-          `applied_for.ilike.%${like}%`,
-          `imp_name.ilike.%${like}%`,
-          `client_website.ilike.%${like}%`,
-          `imp_website.ilike.%${like}%`,
-          `vendor_website.ilike.%${like}%`,
-          `vendor_person_name.ilike.%${like}%`,
-          `vendor_phone.ilike.%${like}%`,
-          `vendor_email.ilike.%${like}%`,
-          `next_step.ilike.%${like}%`,
-          `duration.ilike.%${like}%`,
-          `remote.ilike.%${like}%`,
-          `rate.ilike.%${like}%`,
+          `title.ilike.%${cleaned}%`,
+          `company.ilike.%${cleaned}%`,
+          `primary_tech_stack.ilike.%${cleaned}%`,
+          // Secondary fields (additional context)
+          `description.ilike.%${cleaned}%`,
+          `location.ilike.%${cleaned}%`,
+          `end_client.ilike.%${cleaned}%`,
+          `vendor_company.ilike.%${cleaned}%`,
+          `vendor_person_name.ilike.%${cleaned}%`,
+          `vendor_phone.ilike.%${cleaned}%`,
+          `vendor_website.ilike.%${cleaned}%`,
+          // Additional fields
+          `imp_name.ilike.%${cleaned}%`,
+          `client_website.ilike.%${cleaned}%`,
+          `imp_website.ilike.%${cleaned}%`,
+          `next_step.ilike.%${cleaned}%`,
+          `status.ilike.%${cleaned}%`,
         ];
 
+        // Try email search only if input looks like email
+        if (cleaned.includes('@')) {
+          orFilters.push(`vendor_email.ilike.%${cleaned}%`);
+        }
+
+        // Try numeric search only if input looks numeric
         const num = Number(cleaned);
         if (Number.isFinite(num) && /^\d+$/.test(cleaned)) {
           orFilters.push(`requirement_number.eq.${cleaned}`);
         }
 
-        const upper = cleaned.toUpperCase();
-        if (VALID_REQUIREMENT_STATUSES.includes(upper as Requirement['status'])) {
-          orFilters.push(`status.eq.${upper}`);
-        }
-
+        // Try UUID search only if input looks like UUID
         if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(cleaned)) {
           orFilters.push(`id.eq.${cleaned}`);
-        }
-
-        const isoMonth = cleaned.match(/^(\d{4})-(\d{2})$/);
-        const isoDay = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        const isoYear = cleaned.match(/^(\d{4})$/);
-        if (isoDay) {
-          const from = new Date(`${isoDay[1]}-${isoDay[2]}-${isoDay[3]}T00:00:00.000Z`);
-          const to = new Date(from);
-          to.setUTCDate(to.getUTCDate() + 1);
-          orFilters.push(`and(created_at.gte.${from.toISOString()},created_at.lt.${to.toISOString()})`);
-        } else if (isoMonth) {
-          const from = new Date(`${isoMonth[1]}-${isoMonth[2]}-01T00:00:00.000Z`);
-          const to = new Date(from);
-          to.setUTCMonth(to.getUTCMonth() + 1);
-          orFilters.push(`and(created_at.gte.${from.toISOString()},created_at.lt.${to.toISOString()})`);
-        } else if (isoYear) {
-          const from = new Date(`${isoYear[1]}-01-01T00:00:00.000Z`);
-          const to = new Date(from);
-          to.setUTCFullYear(to.getUTCFullYear() + 1);
-          orFilters.push(`and(created_at.gte.${from.toISOString()},created_at.lt.${to.toISOString()})`);
         }
 
         query = query.or(orFilters.join(','));
@@ -400,18 +347,7 @@ export const getRequirementsPage = async (
     
     // ⚡ OPTIMIZATION: Store successful result in both Redis and in-memory cache
     setCachedQuery(cacheKey, result);
-    await setCacheValue(redisCacheKey, result, { ttl: 1800 });
-
-    // Index in Elasticsearch if available
-    if (data && data.length > 0) {
-      for (const req of data) {
-        await indexRequirement(req).catch(err => {
-          if (process.env.NODE_ENV === 'development') {
-            console.debug('[Elasticsearch] Index failed for', req.id, err);
-          }
-        });
-      }
-    }
+    await setCacheValue(redisCacheKey, result, { ttl: 300 });  // 5 minutes (reduced from 30min)
 
     // ⚡ Performance logging for optimization tracking
     const queryDuration = performance.now() - queryStartTime;
@@ -478,13 +414,6 @@ export const createRequirement = async (
     if (error) {
       return { success: false, error: error.message };
     }
-
-    // ⚡ Index in Elasticsearch for advanced search
-    await indexRequirement(data).catch(err => {
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Elasticsearch] Indexing failed:', err);
-      }
-    });
 
     // Write audit entry (best effort)
     await logActivity({

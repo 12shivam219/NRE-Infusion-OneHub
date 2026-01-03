@@ -95,6 +95,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 aria-required="true"
+                autoComplete="email"
                 className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                 placeholder="you@example.com"
               />
@@ -111,6 +112,7 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 aria-required="true"
+                autoComplete="current-password"
                 className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
                 placeholder="••••••••"
               />
