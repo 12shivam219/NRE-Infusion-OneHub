@@ -24,9 +24,10 @@ type RequirementsPageData = {
 };
 
 const buildKey = (q: RequirementsQuery) => {
-  if (!q.userId) return null;
+  // Return unique key even if userId is missing - SWR will handle the null/undefined scenario
+  // This prevents the hook from being in a perpetual loading state
   return `requirements-page:${JSON.stringify({
-    userId: q.userId,
+    userId: q.userId || 'anonymous',
     page: q.page,
     pageSize: q.pageSize,
     search: q.search,
@@ -42,6 +43,8 @@ const buildKey = (q: RequirementsQuery) => {
 };
 
 const fetchPage = async (q: RequirementsQuery): Promise<RequirementsPageData> => {
+  // If userId is not available yet, return empty state rather than hanging
+  // This allows the component to show the proper empty state instead of infinite loading
   if (!q.userId) {
     return { requirements: [], hasNextPage: false };
   }
@@ -75,15 +78,29 @@ const fetchPage = async (q: RequirementsQuery): Promise<RequirementsPageData> =>
 export function useRequirementsPage(query: RequirementsQuery) {
   const key = useMemo(() => buildKey(query), [query]);
 
-  const swr = useSWR<RequirementsPageData>(key, () => fetchPage(query), {
-    dedupingInterval: 3_000,  // 3s (reduced from 10s) - more responsive to user input
-    revalidateOnFocus: true,  // Refetch on window focus to catch new data
-    revalidateOnReconnect: true,  // Refetch when reconnected
-    keepPreviousData: true,  // Keep showing old data while new data loads
-    shouldRetryOnError: true,  // Retry failed requests
-    errorRetryCount: 2,  // Retry up to 2 times on error
-    errorRetryInterval: 1000,  // Wait 1s between retries
-  });
+  const swr = useSWR<RequirementsPageData>(
+    key,
+    () => fetchPage(query),
+    {
+      dedupingInterval: 3_000,  // 3s (reduced from 10s) - more responsive to user input
+      revalidateOnFocus: true,  // Refetch on window focus to catch new data
+      revalidateOnReconnect: true,  // Refetch when reconnected
+      keepPreviousData: true,  // Keep showing old data while new data loads
+      shouldRetryOnError: true,  // Retry failed requests
+      errorRetryCount: 2,  // Retry up to 2 times on error
+      errorRetryInterval: 1000,  // Wait 1s between retries
+    }
+  );
+
+  // If userId is missing, set data immediately to empty state to prevent infinite loading
+  useEffect(() => {
+    if (!query.userId && !swr.data) {
+      swr.mutate(
+        { requirements: [], hasNextPage: false },
+        { revalidate: false }
+      );
+    }
+  }, [query.userId, swr]);
 
   useEffect(() => {
     const maybeHydrateFromCache = async () => {

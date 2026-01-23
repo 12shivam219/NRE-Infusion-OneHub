@@ -12,6 +12,21 @@ interface InterviewFocusInput {
   company: string;
 }
 
+// Error type discriminator
+interface APIError {
+  status: number;
+  isRetryable: boolean;
+  message: string;
+}
+
+function createAPIError(
+  status: number,
+  message: string,
+  isRetryable: boolean
+): APIError {
+  return { status, message, isRetryable };
+}
+
 async function generateHash(text: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text.trim());
@@ -139,7 +154,74 @@ Keep each point to 1-2 sentences maximum.`;
           .json()
           .catch(() => ({ error: 'Unknown error' }));
         console.error('Groq API error:', error);
-        return jsonResponse(500, { error: 'Failed to generate interview focus' });
+
+        // Distinguish between different error types
+        const status = groqResponse.status;
+        let apiError: APIError;
+
+        // Rate limit or quota errors (429, 503) - should be retried
+        if (status === 429) {
+          apiError = createAPIError(
+            429,
+            'AI API rate limit exceeded. Please try again later.',
+            true
+          );
+          return jsonResponse(429, {
+            success: false,
+            error: apiError.message,
+            retryable: apiError.isRetryable,
+          } as Record<string, unknown>);
+        }
+
+        // Server errors (5xx except 503 handled above) - may be retried
+        if (status >= 500 && status !== 503) {
+          apiError = createAPIError(
+            503,
+            'AI service temporarily unavailable. Please try again later.',
+            true
+          );
+          return jsonResponse(503, {
+            success: false,
+            error: apiError.message,
+            retryable: apiError.isRetryable,
+          } as Record<string, unknown>);
+        }
+
+        // Service unavailable - retryable
+        if (status === 503) {
+          apiError = createAPIError(
+            503,
+            'AI service temporarily unavailable. Please try again later.',
+            true
+          );
+          return jsonResponse(503, {
+            success: false,
+            error: apiError.message,
+            retryable: apiError.isRetryable,
+          } as Record<string, unknown>);
+        }
+
+        // Client errors (4xx) - should not be retried
+        if (status >= 400 && status < 500) {
+          apiError = createAPIError(
+            400,
+            'Invalid request to AI service. Please check your input.',
+            false
+          );
+          return jsonResponse(400, {
+            success: false,
+            error: apiError.message,
+            retryable: apiError.isRetryable,
+          } as Record<string, unknown>);
+        }
+
+        // Unknown error
+        apiError = createAPIError(500, 'Failed to generate interview focus', false);
+        return jsonResponse(500, {
+          success: false,
+          error: apiError.message,
+          retryable: apiError.isRetryable,
+        } as Record<string, unknown>);
       }
 
       const groqData = await groqResponse.json();
@@ -172,12 +254,25 @@ Keep each point to 1-2 sentences maximum.`;
       } as Record<string, unknown>);
     } catch (error) {
       console.error('Interview focus generation error:', error);
+
+      // Distinguish between validation errors and other errors
+      if (error instanceof SyntaxError) {
+        // JSON parsing error - client error, not retryable
+        return jsonResponse(400, {
+          success: false,
+          error: 'Invalid JSON input',
+          retryable: false,
+        } as Record<string, unknown>);
+      }
+
+      // Generic error - may be retryable
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to generate interview focus';
+      
       return jsonResponse(500, {
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Failed to generate interview focus',
+        error: errorMessage,
+        retryable: true,
       } as Record<string, unknown>);
     }
   }

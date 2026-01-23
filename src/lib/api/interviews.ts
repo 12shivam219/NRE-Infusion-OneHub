@@ -10,6 +10,87 @@ export interface InterviewWithLogs extends Omit<Interview, 'created_by' | 'updat
   updated_by?: { id: string; full_name: string; email: string } | null | undefined;
 }
 
+export const getInterviewsPageCursor = async (options: {
+  userId: string;
+  limit?: number;
+  cursor?: string; // ISO timestamp cursor for efficient pagination
+  includCount?: boolean;
+  status?: string;
+  excludeStatus?: string;
+  scheduledFrom?: string;
+  scheduledTo?: string;
+  orderBy?: 'scheduled_date' | 'updated_at' | 'created_at';
+  orderDir?: 'asc' | 'desc';
+}): Promise<{ success: boolean; interviews?: InterviewWithLogs[]; nextCursor?: string; error?: string }> => {
+  const {
+    userId,
+    limit = 20,
+    cursor,
+    status,
+    excludeStatus,
+    scheduledFrom,
+    scheduledTo,
+    orderBy = 'scheduled_date',
+    orderDir = 'asc',
+  } = options;
+
+  try {
+    let query = supabase
+      .from('interviews')
+      .select('*')
+      .eq('user_id', userId)
+      .order(orderBy, { ascending: orderDir === 'asc' });
+
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+    if (excludeStatus) {
+      query = query.neq('status', excludeStatus);
+    }
+    if (scheduledFrom) {
+      query = query.gte('scheduled_date', scheduledFrom);
+    }
+    if (scheduledTo) {
+      query = query.lte('scheduled_date', scheduledTo);
+    }
+
+    // Cursor-based pagination - more efficient than offset for large datasets
+    if (cursor) {
+      if (orderDir === 'asc') {
+        query = query.gte(orderBy, cursor);
+      } else {
+        query = query.lte(orderBy, cursor);
+      }
+    }
+
+    // Fetch limit + 1 to determine if there's a next page
+    const { data, error } = await query.limit(limit + 1);
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching cursor-paged interviews:', error.message);
+      }
+      return { success: false, error: error.message };
+    }
+
+    const hasNextPage = (data?.length ?? 0) > limit;
+    const interviews = hasNextPage ? data?.slice(0, limit) : data;
+    const nextCursor = hasNextPage ? interviews?.[interviews.length - 1]?.[orderBy as keyof typeof interviews[0]] : undefined;
+
+    return {
+      success: true,
+      interviews: (interviews || []) as InterviewWithLogs[],
+      nextCursor: nextCursor ? String(nextCursor) : undefined,
+    };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching cursor-paged interviews:', errorMsg);
+    }
+    return { success: false, error: 'Failed to fetch interviews' };
+  }
+};
+
 export const getInterviewsPage = async (options: {
   userId: string;
   limit?: number;

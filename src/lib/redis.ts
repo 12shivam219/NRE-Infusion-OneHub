@@ -93,6 +93,11 @@ export const deleteCacheKey = async (key: string): Promise<void> => {
 };
 
 /**
+ * Alias for deleteCacheKey for consistency
+ */
+export const deleteCacheValue = deleteCacheKey;
+
+/**
  * Clear all cache keys with pattern
  */
 export const clearCachePattern = async (pattern: string): Promise<void> => {

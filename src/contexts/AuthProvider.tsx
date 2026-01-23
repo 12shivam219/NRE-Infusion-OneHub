@@ -7,63 +7,17 @@ import { AuthContext } from './AuthContextDef';
 
 const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // ⚡ PERFORMANCE: Initialize isLoading to false to unblock initial render
+  const [isLoading, setIsLoading] = useState(false);
 
   const lastUserRefreshAtRef = useRef<number>(0);
 
-  // Load the current user, preferring fresh data from Supabase over any cached localStorage copy.
-  const loadUser = async () => {
+  // Load the current user, preferring cached data for instant display.
+  // Validates and refreshes in background without blocking initial render.
+  const loadUser = useCallback(async () => {
     try {
-      // First, validate there is a usable Supabase session. If refresh fails (e.g. invalid refresh token),
-      // we must clear any stale cached state so we don't loop on failing refresh attempts.
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        if (import.meta.env.DEV) console.error('Error reading Supabase session:', sessionError);
-
-        if (/invalid refresh token/i.test(sessionError.message)) {
-          try {
-            await supabase.auth.signOut({ scope: 'local' });
-          } catch {
-            // Ignore
-          }
-        }
-
-        setUser(null);
-        clearSentryUser();
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('user');
-
-        if (supabaseAuthStorageKey) {
-          sessionStorage.removeItem(supabaseAuthStorageKey);
-          localStorage.removeItem(supabaseAuthStorageKey);
-        }
-        return;
-      }
-
-      if (!sessionData.session) {
-        setUser(null);
-        clearSentryUser();
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('user');
-
-        if (supabaseAuthStorageKey) {
-          sessionStorage.removeItem(supabaseAuthStorageKey);
-          localStorage.removeItem(supabaseAuthStorageKey);
-        }
-        return;
-      }
-
-      // Try to get a fresh user profile from the database first.
-      const freshUser = await getFreshUserData();
-      if (freshUser) {
-        setUser(freshUser);
-        // Set Sentry user context for error tracking
-        setSentryUser(freshUser.id, freshUser.email, freshUser.full_name);
-        return;
-      }
-
-      // Fall back to any cached user stored locally (from a previous login).
-      // SECURITY: Check sessionStorage (cleared on tab close) before localStorage
+      // ⚡ PERFORMANCE: Check cache FIRST (instant, no network)
+      // This allows the UI to render immediately with the user's previous session
       let cachedUser = getCurrentUser();
       
       // Fallback to localStorage only if sessionStorage is empty (for session recovery)
@@ -82,37 +36,99 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(cachedUser);
         // Set Sentry user context for error tracking
         setSentryUser(cachedUser.id, cachedUser.email, cachedUser.full_name);
-        return;
+        // Continue to validate in background
+      } else {
+        // No cached user - proceed with validation
+        // (falls through to validation logic below)
       }
 
-      // As a final check, see if Supabase still has an auth user; if not, clear stale state.
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        setUser(null);
-        clearSentryUser();
-        sessionStorage.removeItem('user');
-        localStorage.removeItem('user');
+      // Validate Supabase session and refresh user data in background
+      try {
+        // Validate there is a usable Supabase session. If refresh fails (e.g. invalid refresh token),
+        // we must clear any stale cached state so we don't loop on failing refresh attempts.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          if (import.meta.env.DEV) console.error('Error reading Supabase session:', sessionError);
 
-        if (supabaseAuthStorageKey) {
-          sessionStorage.removeItem(supabaseAuthStorageKey);
-          localStorage.removeItem(supabaseAuthStorageKey);
+          if (/invalid refresh token/i.test(sessionError.message)) {
+            try {
+              await supabase.auth.signOut({ scope: 'local' });
+            } catch {
+              // Ignore
+            }
+          }
+
+          setUser(null);
+          clearSentryUser();
+          sessionStorage.removeItem('user');
+          localStorage.removeItem('user');
+
+          if (supabaseAuthStorageKey) {
+            sessionStorage.removeItem(supabaseAuthStorageKey);
+            localStorage.removeItem(supabaseAuthStorageKey);
+          }
+          setIsLoading(false);
+          return;
         }
-        return;
-      }
 
-      // Construct a minimal user shape from the auth user if the profile row is not yet available.
-      const minimalUser: User = {
-        id: authUser.id,
-        email: authUser.email || '',
-        full_name: authUser.user_metadata?.full_name || '',
-        role: 'user',
-        status: 'pending_verification',
-        email_verified: authUser.email_confirmed_at ? true : false,
-        origin_ip: null,
-      };
-      setUser(minimalUser);
-      // Set Sentry user context for error tracking
-      setSentryUser(minimalUser.id, minimalUser.email, minimalUser.full_name);
+        if (!sessionData.session) {
+          setUser(null);
+          clearSentryUser();
+          sessionStorage.removeItem('user');
+          localStorage.removeItem('user');
+
+          if (supabaseAuthStorageKey) {
+            sessionStorage.removeItem(supabaseAuthStorageKey);
+            localStorage.removeItem(supabaseAuthStorageKey);
+          }
+          setIsLoading(false);
+          return;
+        }
+
+        // Try to get fresh user profile from the database (background refresh)
+        const freshUser = await getFreshUserData();
+        if (freshUser) {
+          setUser(freshUser);
+          // Set Sentry user context for error tracking
+          setSentryUser(freshUser.id, freshUser.email, freshUser.full_name);
+          setIsLoading(false);
+          return;
+        }
+
+        // As a final check, see if Supabase still has an auth user; if not, clear stale state.
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) {
+          setUser(null);
+          clearSentryUser();
+          sessionStorage.removeItem('user');
+          localStorage.removeItem('user');
+
+          if (supabaseAuthStorageKey) {
+            sessionStorage.removeItem(supabaseAuthStorageKey);
+            localStorage.removeItem(supabaseAuthStorageKey);
+          }
+          setIsLoading(false);
+          return;
+        }
+
+        // Construct a minimal user shape from the auth user if the profile row is not yet available.
+        const minimalUser: User = {
+          id: authUser.id,
+          email: authUser.email || '',
+          full_name: authUser.user_metadata?.full_name || '',
+          role: 'user',
+          status: 'pending_verification',
+          email_verified: authUser.email_confirmed_at ? true : false,
+          origin_ip: null,
+        };
+        setUser(minimalUser);
+        // Set Sentry user context for error tracking
+        setSentryUser(minimalUser.id, minimalUser.email, minimalUser.full_name);
+        setIsLoading(false);
+      } catch (validationError) {
+        if (import.meta.env.DEV) console.error('Error validating session:', validationError);
+        setIsLoading(false);
+      }
     } catch (error) {
       if (import.meta.env.DEV) console.error('Error loading authenticated user:', error);
       setUser(null);
@@ -124,10 +140,9 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
         sessionStorage.removeItem(supabaseAuthStorageKey);
         localStorage.removeItem(supabaseAuthStorageKey);
       }
-    } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   /**
    * Refresh user data from database (use when role/status changes by admin)
@@ -153,7 +168,8 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    // Initial load (async; we intentionally don't await inside useEffect)
+    // Load user data in background (non-blocking)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadUser();
 
     // Listen for Supabase auth changes so UI stays in sync with session events.
@@ -179,7 +195,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       subscription?.unsubscribe();
     };
-  }, [refreshUserData]);
+  }, [loadUser]);
 
   // Refresh the user when the app becomes active again (cheap, event-driven alternative to polling)
   useEffect(() => {
@@ -241,7 +257,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = useCallback(() => {
     loadUser();
-  }, []);
+  }, [loadUser]);
 
   const isAdmin = user?.role === 'admin';
   const isMarketing = user?.role === 'marketing' || user?.role === 'admin';

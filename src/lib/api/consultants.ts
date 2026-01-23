@@ -10,6 +10,75 @@ export interface ConsultantWithLogs extends Consultant {
   updated_by?: { id: string; full_name: string; email: string } | null;
 }
 
+/**
+ * Get consultants with cursor-based pagination
+ * More efficient than offset-based for very large datasets (10K+ records)
+ */
+export const getConsultantsPageCursor = async (options: {
+  userId: string;
+  limit?: number;
+  cursor?: string; // ISO timestamp cursor for efficient pagination
+  search?: string;
+  status?: string;
+}): Promise<{ success: boolean; consultants?: ConsultantWithLogs[]; nextCursor?: string; error?: string }> => {
+  const {
+    userId,
+    limit = 20,
+    cursor,
+    search,
+    status,
+  } = options;
+
+  try {
+    let query = supabase
+      .from('consultants')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+
+    // Server-side filtering
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      query = query.or(`name.ilike.${term},email.ilike.${term},primary_skills.ilike.${term}`);
+    }
+
+    // Cursor-based pagination
+    if (cursor) {
+      query = query.lt('updated_at', cursor);
+    }
+
+    // Fetch limit + 1 to determine if there's a next page
+    const { data, error } = await query.limit(limit + 1);
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching cursor-paged consultants:', error.message);
+      }
+      return { success: false, error: error.message };
+    }
+
+    const hasNextPage = (data?.length ?? 0) > limit;
+    const consultants = hasNextPage ? data?.slice(0, limit) : data;
+    const nextCursor = hasNextPage ? consultants?.[consultants.length - 1]?.updated_at : undefined;
+
+    return {
+      success: true,
+      consultants: (consultants || []) as ConsultantWithLogs[],
+      nextCursor: nextCursor ? String(nextCursor) : undefined,
+    };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception fetching cursor-paged consultants:', errorMsg);
+    }
+    return { success: false, error: 'Failed to fetch consultants' };
+  }
+};
+
 export const getConsultants = async (
   userId?: string
 ): Promise<{ success: boolean; consultants?: ConsultantWithLogs[]; error?: string }> => {
@@ -137,8 +206,6 @@ export const createConsultant = async (
   try {
     const dataToInsert = {
       ...consultant,
-      created_by: userId || null,
-      updated_by: userId || null,
     };
 
     const { data, error } = await supabase
@@ -174,7 +241,6 @@ export const updateConsultant = async (
     const dataToUpdate = {
       ...updates,
       updated_at: new Date().toISOString(),
-      updated_by: userId || null,
     };
 
     const { data, error } = await supabase
@@ -226,5 +292,39 @@ export const deleteConsultant = async (
     return { success: true };
   } catch {
     return { success: false, error: 'Failed to delete consultant' };
+  }
+};
+/**
+ * ⚡ OPTIMIZED: Use RPC function for full-text search with relevance ranking
+ * Prioritizes exact matches, then substring matches
+ * Result: Better relevance ranking, faster search performance
+ */
+export const searchConsultants = async (
+  userId: string,
+  searchTerm: string,
+  limit: number = 50
+): Promise<{ success: boolean; consultants?: Consultant[]; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .rpc('search_consultants', {
+        p_user_id: userId,
+        p_search_term: searchTerm,
+        p_limit: limit,
+      });
+
+    if (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error searching consultants:', error.message);
+      }
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, consultants: data || [] };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Exception searching consultants:', errorMsg);
+    }
+    return { success: false, error: 'Failed to search consultants' };
   }
 };

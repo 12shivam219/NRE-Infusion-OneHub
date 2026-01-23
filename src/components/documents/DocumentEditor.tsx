@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Download, AlertCircle } from 'lucide-react';
-import '@harbour-enterprises/superdoc/style.css';
 import { LogoLoader } from '../common/LogoLoader';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
 import { downloadDocument } from '../../lib/api/documents';
-import { SuperDoc } from '@harbour-enterprises/superdoc';
+// Note: SuperDoc is lazy-loaded inside the editor init to avoid heavy startup cost
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -558,6 +557,18 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
 
         console.log(`Phase 3: Initializing SuperDoc for ${documentsToDisplay.length} document(s)...`);
 
+        // Lazy-load SuperDoc library and styles once
+        let SuperDocLib: any = null;
+        try {
+          const mod = await import('@harbour-enterprises/superdoc');
+          // Module may export as named or default
+          SuperDocLib = mod.SuperDoc || mod.default || mod;
+          await import('@harbour-enterprises/superdoc/style.css');
+        } catch (err) {
+          console.error('Failed to load SuperDoc module or styles:', err);
+          return;
+        }
+
         // SPEED OPTIMIZATION: Parallel initialization instead of sequential
         const initPromises = documentsToDisplay.map(async (doc: Document, i: number) => {
           if (!isMounted) return;
@@ -604,7 +615,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             console.log(`File size: ${file.size} bytes`);
 
             // SPEED OPTIMIZATION: Initialize SuperDoc with minimal settings
-            const superdoc = new SuperDoc({
+            const superdoc = new SuperDocLib({
               selector,
               toolbar: toolbarSelector,
               documents: [

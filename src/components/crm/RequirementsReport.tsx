@@ -99,10 +99,8 @@ export const ExportOptionsModal = ({ isOpen, onClose, onExport }: ExportOptionsM
 
   return (
     <Dialog open={isOpen} onClose={onClose} fullWidth maxWidth="md" scroll="paper" disableScrollLock>
-      <DialogTitle sx={{ pr: 7 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800 }}>
-          Export Requirements
-        </Typography>
+      <DialogTitle sx={{ pr: 7, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontWeight: 800, fontSize: '1.25rem' }}>Export Requirements</span>
         <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
           <X className="w-5 h-5" />
         </IconButton>
@@ -174,9 +172,14 @@ export const ExportOptionsModal = ({ isOpen, onClose, onExport }: ExportOptionsM
 
           {/* Summary */}
           <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(212,175,55,0.08)' }}>
-            <Typography variant="body2">
-              You are about to export requirements with <strong>{selectedColumns.length}</strong> columns.
-            </Typography>
+            <Stack spacing={1}>
+              <Typography variant="body2">
+                You are about to export requirements with <strong>{selectedColumns.length}</strong> columns.
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                💡 <strong>Tip:</strong> Leave the date range empty in the report to export all data. If you set a date range before opening this dialog, only data within that range will be exported.
+              </Typography>
+            </Stack>
           </Paper>
         </Stack>
       </DialogContent>
@@ -368,6 +371,7 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
 
       csvParts.push(`${opts.columns.join(',')}\n`);
 
+      // Export all data if no date range is selected, otherwise respect the date filters
       while (true) {
         if (exportCancelRef.current) {
           showToast({ type: 'info', title: 'Export canceled', message: 'CSV export was canceled.' });
@@ -378,8 +382,8 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
           userId: user.id,
           limit,
           cursor: cursorCreatedAt ? { created_at: cursorCreatedAt, direction: 'after' } : undefined,
-          dateFrom: dateFromIso,
-          dateTo: dateToIso,
+          dateFrom: dateFromIso, // undefined if no date selected
+          dateTo: dateToIso, // undefined if no date selected
           orderBy: 'created_at',
           orderDir: 'desc',
           includeCount: false,
@@ -430,10 +434,8 @@ export const RequirementsReport = ({ onClose }: RequirementsReportProps) => {
   return (
     <>
       <Dialog open onClose={onClose} fullWidth maxWidth="lg" scroll="paper" disableScrollLock>
-        <DialogTitle sx={{ pr: 7 }}>
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
-            Requirements Report
-          </Typography>
+        <DialogTitle sx={{ pr: 7, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 800, fontSize: '1.25rem' }}>Requirements Report</span>
           <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }} aria-label="Close">
             <X className="w-5 h-5" />
           </IconButton>

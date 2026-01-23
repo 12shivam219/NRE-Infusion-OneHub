@@ -21,6 +21,7 @@ type SortOrder = 'asc' | 'desc';
 interface RequirementsTableProps {
   requirements: RequirementWithLogs[];
   onViewDetails: (req: Requirement) => void;
+  onRowClick?: (req: Requirement) => void; // Direct row click handler
   onCreateInterview?: (id: string) => void;
   onDelete: (id: string) => void;
   statusColors: Record<RequirementStatus, { badge: string; label: string }>;
@@ -55,6 +56,7 @@ const TableRow = memo(({
   colors,
   toggleRowSelected,
   onViewDetails,
+  onRowClick,
   onCreateInterview,
   onDelete,
   isAdmin,
@@ -69,6 +71,7 @@ const TableRow = memo(({
   colors: { bg: string; text: string; border: string; dot: string };
   toggleRowSelected: (id: string) => void;
   onViewDetails: (req: Requirement) => void;
+  onRowClick?: (req: Requirement) => void;
   onCreateInterview?: (id: string) => void;
   onDelete: (id: string) => void;
   isAdmin: boolean;
@@ -82,7 +85,8 @@ const TableRow = memo(({
     <tr
       ref={rowRef}
       data-index={dataIndex}
-        className={`${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10 transition-colors duration-150`}
+      onClick={() => onRowClick?.(req)}
+        className={`${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10 transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''}`}
     > 
       <td className="px-2 py-3 text-center align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
         <div className="flex items-center justify-center">
@@ -257,6 +261,7 @@ const TableRow = memo(({
 export const RequirementsTable = memo(({
   requirements,
   onViewDetails,
+  onRowClick,
   onCreateInterview,
   onDelete,
   isAdmin,
@@ -465,6 +470,7 @@ export const RequirementsTable = memo(({
                       colors={colors}
                       toggleRowSelected={toggleRowSelected}
                       onViewDetails={onViewDetails}
+                      onRowClick={onRowClick}
                       onCreateInterview={onCreateInterview}
                       onDelete={onDelete}
                       isAdmin={isAdmin}

@@ -169,7 +169,23 @@ class OfflineDatabase extends Dexie {
   }
 }
 
-export const db = new OfflineDatabase();
+// ⚡ PERFORMANCE: Lazy-load Dexie database to avoid blocking app startup
+// The database is only initialized when first accessed, not at module load time
+let dbInstance: OfflineDatabase | null = null;
+
+function getDB(): OfflineDatabase {
+  if (!dbInstance) {
+    dbInstance = new OfflineDatabase();
+  }
+  return dbInstance;
+}
+
+export const db = new Proxy({} as OfflineDatabase, {
+  get(_, prop) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (getDB() as any)[prop];
+  },
+});
 
 // Cache TTL in milliseconds
 const CACHE_DURATIONS = {

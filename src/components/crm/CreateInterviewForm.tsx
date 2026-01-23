@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X, AlertCircle, CheckCircle2, Info, Sparkles } from 'lucide-react';
+import { X, AlertCircle, CheckCircle2, Info, Sparkles, Calendar, Clock, Users, Briefcase, MessageSquare, MapPin, FileText, CheckCircle } from 'lucide-react';
+import { keyframes } from '@mui/system';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { createInterview } from '../../lib/api/interviews';
@@ -27,6 +28,53 @@ import FormHelperText from '@mui/material/FormHelperText';
 import FormControl from '@mui/material/FormControl';
 import type { SelectChangeEvent } from '@mui/material/Select';
 
+// Animation keyframes
+const slideIn = keyframes`
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+`;
+
+const successPulse = keyframes`
+  0% { 
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+`;
+
+const fadeInOut = keyframes`
+  0%, 10% { 
+    opacity: 0;
+  }
+  20%, 80% {
+    opacity: 1;
+  }
+  90%, 100% {
+    opacity: 0;
+  }
+`;
+
+const glow = keyframes`
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  50% { 
+    box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+  }
+`;
+
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 
@@ -46,7 +94,69 @@ interface FormFieldProps {
   readOnly?: boolean;
   options?: FormFieldOption[];
   error?: string;
+  icon?: React.ReactNode;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
+
+// Success animation overlay component
+const SuccessOverlay = ({ isVisible }: { isVisible: boolean }) => {
+  if (!isVisible) return null;
+  
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2000,
+        pointerEvents: 'none',
+      }}
+    >
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 2,
+          animation: `${successPulse} 0.6s ease-out forwards`,
+        }}
+      >
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            borderRadius: '50%',
+            backgroundColor: '#22c55e',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 20px 25px -5px rgba(34, 197, 94, 0.3)',
+            animation: `${glow} 1.5s ease-in-out infinite`,
+          }}
+        >
+          <CheckCircle size={48} color="white" strokeWidth={1.5} />
+        </Box>
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            color: '#22c55e',
+            fontWeight: 700,
+            fontSize: '1.25rem',
+            textAlign: 'center',
+            animation: `${fadeInOut} 2s ease-in-out`,
+          }}
+        >
+          Interview Scheduled Successfully! 🎉
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
 
 // Create FormField component outside the parent component for stability
 const FormField = memo(function FormField({
@@ -60,6 +170,8 @@ const FormField = memo(function FormField({
   readOnly = false,
   options,
   error,
+  icon,
+  onKeyDown,
 }: FormFieldProps) {
   // Helper text based on field type
   const getHelperText = () => {
@@ -83,96 +195,113 @@ const FormField = memo(function FormField({
 
   const commonInputSx = {
     transition: 'all 0.2s ease',
+    borderRadius: 1,
+    backgroundColor: 'background.paper',
+    padding: '6px',
     '&:hover': {
       borderColor: 'primary.main',
-      boxShadow: '0 0 8px rgba(234, 179, 8, 0.1)',
+      boxShadow: '0 6px 18px rgba(15, 23, 42, 0.06)',
     },
     '&.Mui-focused': {
-      boxShadow: '0 0 12px rgba(234, 179, 8, 0.25)',
+      boxShadow: '0 8px 22px rgba(15, 23, 42, 0.08)',
+    },
+    '& .MuiOutlinedInput-notchedOutline': {
+      borderWidth: '1px',
+      borderColor: 'rgba(0,0,0,0.08)'
     },
   };
 
   return (
     <FormControl fullWidth variant="outlined" error={Boolean(error)} size="small">
-      {type === 'select' ? (
-        <TextField
-          select
-          label={label}
-          name={name}
-          value={value}
-          onChange={onChange}
-          disabled={readOnly}
-          required={required}
-          error={Boolean(error)}
-          placeholder={placeholder}
-          size="small"
-          fullWidth
-          variant="outlined"
-          sx={{
-            '& .MuiOutlinedInput-root': commonInputSx,
-            '& .MuiInputBase-input': {
-              fontFamily: '"Poppins", sans-serif',
-            },
-          }}
-        >
-          <MenuItem value="">
-            <span style={{ color: '#999' }}>Select {label.toLowerCase()}</span>
-          </MenuItem>
-          {options?.map((opt: FormFieldOption) => (
-            <MenuItem key={opt.value} value={opt.value}>
-              {opt.label}
-            </MenuItem>
-          ))}
-        </TextField>
-      ) : (
-        <TextField
-          label={label}
-          name={name}
-          type={type === 'textarea' ? 'text' : type}
-          value={value}
-          onChange={onChange as unknown as (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void}
-          placeholder={placeholder}
-          required={required}
-          disabled={readOnly}
-          error={Boolean(error)}
-          size="small"
-          fullWidth
-          variant="outlined"
-          multiline={type === 'textarea'}
-          rows={type === 'textarea' ? 3 : undefined}
-          InputLabelProps={type === 'date' || type === 'time' ? { shrink: true } : undefined}
-          inputProps={type === 'date' || type === 'time' ? getInputProps() : undefined}
-          sx={{
-            '& .MuiOutlinedInput-root': commonInputSx,
-            '& .MuiInputBase-input': {
-              fontFamily: '"Poppins", sans-serif',
-              fontSize: '0.95rem',
-              letterSpacing: type === 'time' ? '0.05em' : 'normal',
-            },
-            ...(type === 'date' || type === 'time' ? {
-              '& input[type="date"]::-webkit-calendar-picker-indicator': {
-                cursor: 'pointer',
-                filter: 'invert(0.7)',
-              },
-              '& input[type="time"]::-webkit-calendar-picker-indicator': {
-                cursor: 'pointer',
-                filter: 'invert(0.7)',
-              },
-            } : {}),
-          }}
-        />
-      )}
-      {error && (
-        <FormHelperText sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, color: '#ef4444' }}>
-          <AlertCircle size={14} />
-          {error}
-        </FormHelperText>
-      )}
-      {!error && getHelperText() && (
-        <FormHelperText sx={{ mt: 0.5, color: '#6b7280' }}>
-          {getHelperText()}
-        </FormHelperText>
-      )}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {icon && (
+          <Box sx={{ display: 'flex', alignItems: 'center', color: 'primary.main', mt: 1 }}>
+            {icon}
+          </Box>
+        )}
+        <Box sx={{ flex: 1 }}>
+          {type === 'select' ? (
+            <TextField
+              select
+              label={label}
+              name={name}
+              value={value}
+              onChange={onChange}
+              disabled={readOnly}
+              required={required}
+              error={Boolean(error)}
+              placeholder={placeholder}
+              size="small"
+              fullWidth
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': commonInputSx,
+                '& .MuiInputBase-input': {
+                  fontFamily: '"Poppins", sans-serif',
+                },
+              }}
+              inputProps={{ 'aria-label': label, onKeyDown }}
+            >
+              <MenuItem value="">
+                <span style={{ color: '#999' }}>Select {label.toLowerCase()}</span>
+              </MenuItem>
+              {options?.map((opt: FormFieldOption) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <TextField
+              label={label}
+              name={name}
+              type={type === 'textarea' ? 'text' : type}
+              value={value}
+              onChange={onChange as unknown as (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void}
+              placeholder={placeholder}
+              required={required}
+              disabled={readOnly}
+              error={Boolean(error)}
+              size="small"
+              fullWidth
+              variant="outlined"
+              multiline={type === 'textarea'}
+              rows={type === 'textarea' ? 3 : undefined}
+              InputLabelProps={type === 'date' || type === 'time' ? { shrink: true } : undefined}
+              inputProps={type === 'date' || type === 'time' ? getInputProps() : { 'aria-label': label, onKeyDown }}
+              sx={{
+                '& .MuiOutlinedInput-root': commonInputSx,
+                '& .MuiInputBase-input': {
+                  fontFamily: '"Poppins", sans-serif',
+                  fontSize: '0.95rem',
+                  letterSpacing: type === 'time' ? '0.05em' : 'normal',
+                },
+                ...(type === 'date' || type === 'time' ? {
+                  '& input[type="date"]::-webkit-calendar-picker-indicator': {
+                    cursor: 'pointer',
+                    filter: 'invert(0.7)',
+                  },
+                  '& input[type="time"]::-webkit-calendar-picker-indicator': {
+                    cursor: 'pointer',
+                    filter: 'invert(0.7)',
+                  },
+                } : {}),
+              }}
+            />
+          )}
+          {error && (
+            <FormHelperText sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5, color: '#ef4444' }}>
+              <AlertCircle size={14} />
+              {error}
+            </FormHelperText>
+          )}
+          {!error && getHelperText() && (
+            <FormHelperText sx={{ mt: 0.5, color: '#6b7280' }}>
+              {getHelperText()}
+            </FormHelperText>
+          )}
+        </Box>
+      </Box>
     </FormControl>
   );
 });
@@ -255,9 +384,11 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+
 
   const [formData, setFormData] = useState({
-    requirement_id: requirementId || '',
+    requirement_id: '',
     scheduled_date: '',
     scheduled_time: '',
     timezone: 'UTC',
@@ -315,6 +446,30 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
       cancelled = true;
     };
   }, [loadData]);
+
+  // Set the passed requirementId only after requirements have loaded
+  useEffect(() => {
+    if (requirementId && requirements.length > 0) {
+      const requirementExists = requirements.some(r => r.id === requirementId);
+      if (requirementExists) {
+        setFormData(prev => ({ ...prev, requirement_id: requirementId }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requirements]);
+
+  // Validate requirement_id exists in available options, reset if not found
+  // This effect validates the selected requirement still exists after requirements load/change
+  useEffect(() => {
+    if (formData.requirement_id && requirements.length > 0) {
+      const requirementExists = requirements.some(r => r.id === formData.requirement_id);
+      // Only update if the current selection is invalid
+      if (!requirementExists) {
+        setFormData(prev => ({ ...prev, requirement_id: '' }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requirements]);
 
   // Auto-populate fields from requirement data and generate interview focus with AI
   useEffect(() => {
@@ -382,6 +537,18 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
     [consultants]
   );
 
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    // Tab to move forward, Shift+Tab to move backward
+    if (e.key === 'Enter' && e.ctrlKey) {
+      // Ctrl+Enter to submit form - capture as form event
+      const formElement = (e.target as HTMLElement).closest('form');
+      if (formElement) {
+        formElement.dispatchEvent(new Event('submit', { bubbles: true }));
+      }
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || loading) return; // Prevent double-submit
@@ -436,12 +603,18 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
 
     setLoading(false);
     if (result.success) {
+      // Show success animation
+      setShowSuccessAnimation(true);
       showToast({
         type: 'success',
         title: 'Interview Scheduled',
         message: 'The interview has been created successfully',
       });
-      onSuccess();
+      
+      // Close dialog and trigger callback after animation completes
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
     } else if (result.error) {
       showToast({
         type: 'error',
@@ -481,6 +654,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
             display: 'grid',
             gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
             gap: 2,
+            animation: `${slideIn} 0.4s ease-out`,
           }}>
             <FormField
               label="Requirement *"
@@ -491,6 +665,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               options={requirementOptions}
               required
               error={formErrors.requirement_id}
+              icon={<Briefcase size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Interview Date *"
@@ -500,6 +676,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               onChange={handleChange}
               required
               error={formErrors.scheduled_date}
+              icon={<Calendar size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Interviewee Name *"
@@ -509,6 +687,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               onChange={handleChange}
               required
               error={formErrors.interview_with}
+              icon={<Users size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Interview Time"
@@ -516,6 +696,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               type="time"
               value={formData.scheduled_time}
               onChange={handleChange}
+              icon={<Clock size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
           </Box>
           <Box sx={{
@@ -540,6 +722,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
             display: 'grid',
             gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
             gap: 2,
+            animation: `${slideIn} 0.4s ease-out 0.1s backwards`,
           }}>
             <FormField
               label="Interview Type"
@@ -554,6 +737,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 { label: 'Final Round', value: 'Final Round' },
                 { label: 'Screening', value: 'Screening' },
               ]}
+              icon={<Briefcase size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Round"
@@ -567,6 +752,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 { label: '3rd Round', value: '3rd Round' },
                 { label: 'Final Round', value: 'Final Round' },
               ]}
+              icon={<MessageSquare size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Status"
@@ -575,6 +762,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               value={formData.status}
               onChange={handleChange}
               options={getAllInterviewStatuses()}
+              icon={<CheckCircle size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Result (optional)"
@@ -588,6 +777,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 { label: 'On Hold', value: 'On Hold' },
                 { label: 'Pending', value: 'Pending' },
               ]}
+              icon={<CheckCircle2 size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
           </Box>
         </AccordionSection>
@@ -598,6 +789,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
             display: 'grid',
             gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
             gap: 2,
+            animation: `${slideIn} 0.4s ease-out 0.2s backwards`,
           }}>
             <FormField
               label="Mode"
@@ -611,6 +803,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 { label: 'In Person', value: 'In Person' },
                 { label: 'Panel Interview', value: 'Panel Interview' },
               ]}
+              icon={<MessageSquare size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Duration (minutes)"
@@ -619,6 +813,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               placeholder="60"
               value={formData.duration_minutes}
               onChange={handleChange}
+              icon={<Clock size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Timezone"
@@ -634,6 +830,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 { label: 'PST (UTC-8)', value: 'PST' },
                 { label: 'IST (UTC+5:30)', value: 'IST' },
               ]}
+              icon={<Clock size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Platform"
@@ -647,6 +845,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 { label: 'Webex', value: 'Webex' },
                 { label: 'MS Teams', value: 'MS Teams' },
               ]}
+              icon={<Briefcase size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <Box sx={{ gridColumn: { xs: 'auto', sm: 'span 2' } }}>
               <FormField
@@ -655,6 +855,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 placeholder="Enter Zoom link, Meeting room, or Address"
                 value={formData.location}
                 onChange={handleChange}
+                icon={<MapPin size={18} />}
+                onKeyDown={(e) => handleKeyDown(e)}
               />
             </Box>
           </Box>
@@ -666,6 +868,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
             display: 'grid',
             gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
             gap: 2,
+            animation: `${slideIn} 0.4s ease-out 0.3s backwards`,
           }}>
             <FormField
               label="Consultant"
@@ -674,6 +877,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               value={formData.consultant_id}
               onChange={handleChange}
               options={consultantOptions}
+              icon={<Users size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Interviewer"
@@ -681,6 +886,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               placeholder="Enter interviewer name"
               value={formData.interviewer}
               onChange={handleChange}
+              icon={<Users size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Vendor Company"
@@ -688,6 +895,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               placeholder="e.g., ABC Staffing"
               value={formData.vendor_company}
               onChange={handleChange}
+              icon={<Briefcase size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Subject Line"
@@ -695,13 +904,15 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               placeholder="Will auto-generate if left blank"
               value={formData.subject_line}
               onChange={handleChange}
+              icon={<MessageSquare size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
           </Box>
         </AccordionSection>
 
         {/* Interview Notes & Feedback */}
         <AccordionSection title="Notes & Feedback" defaultOpen={false}>
-          <Stack spacing={2.5}>
+          <Stack spacing={2.5} sx={{ animation: `${slideIn} 0.4s ease-out 0.4s backwards` }}>
             {/* Interview Focus - Enhanced UI */}
             <Box>
               <Box sx={{
@@ -711,9 +922,9 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 mb: 1.5,
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <MessageSquare size={18} style={{ color: '#eab308' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                    Interview Focus
-                  </Typography>
+                    Interview Focus                  </Typography>
                   <Box sx={{
                     backgroundColor: 'rgba(212, 175, 55, 0.15)',
                     padding: '2px 8px',
@@ -826,11 +1037,13 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
             </Box>
 
             {/* Special Note */}
-            {/* Special Note */}
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary', mb: 1 }}>
-                Special Note
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <FileText size={18} style={{ color: '#eab308' }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  Special Note
+                </Typography>
+              </Box>
               <TextField
                 fullWidth
                 multiline
@@ -869,6 +1082,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               placeholder="Key job requirements or description"
               value={formData.job_description_excerpt}
               onChange={handleChange}
+              icon={<FileText size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
             <FormField
               label="Feedback Notes"
@@ -877,6 +1092,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               placeholder="Post-interview feedback and observations"
               value={formData.feedback_notes}
               onChange={handleChange}
+              icon={<MessageSquare size={18} />}
+              onKeyDown={(e) => handleKeyDown(e)}
             />
           </Stack>
         </AccordionSection>
@@ -889,6 +1106,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
           display: 'flex',
           gap: 2,
           flexDirection: { xs: 'column', sm: 'row' },
+          animation: `${slideIn} 0.4s ease-out 0.5s backwards`,
         }}>
           <Box sx={{ flex: 1 }}>
             <BrandButton
@@ -897,7 +1115,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               size="md"
               disabled={loading}
             >
-              {loading ? 'Scheduling...' : 'Schedule Interview'}
+              {loading ? '⏳ Scheduling...' : '✓ Schedule Interview'}
             </BrandButton>
           </Box>
           <Box sx={{ flex: 1 }}>
@@ -975,6 +1193,8 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
         sx={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
+          minHeight: 520,
+          gap: 16,
           overflowY: 'auto',
           '&::-webkit-scrollbar': {
             width: '8px',
@@ -993,6 +1213,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
       >
         {formContent}
       </DialogContent>
+      <SuccessOverlay isVisible={showSuccessAnimation} />
     </Dialog>
   );
 };

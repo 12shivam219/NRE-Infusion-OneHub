@@ -3,8 +3,23 @@
  * Integrates with Sentry for production error monitoring, crash reporting, and performance insights
  */
 
-import * as Sentry from '@sentry/react';
+// Lazy-load Sentry to avoid heavy module resolution at dev startup
+let Sentry: any = null;
+let SentryLoaded = false;
 
+const loadSentry = async () => {
+  if (SentryLoaded) return Sentry;
+  try {
+    Sentry = await import('@sentry/react');
+    SentryLoaded = true;
+    return Sentry;
+  } catch (e) {
+    // If import fails, keep functions as no-ops
+    Sentry = null;
+    SentryLoaded = false;
+    return null;
+  }
+};
 /**
  * Initialize Sentry for production error tracking
  * Call this as early as possible in your application
@@ -20,45 +35,38 @@ export const initSentry = () => {
     return;
   }
 
-  Sentry.init({
-    dsn: sentryDsn,
-    environment: import.meta.env.MODE,
-    integrations: [
-      new Sentry.Replay({
-        maskAllText: true,
-        blockAllMedia: true,
-      }),
-    ],
-    // ✅ OPTIMIZATION: Reduced tracing overhead in development
-    // Dev: 1% sampling (1 in 100), Prod: 10% sampling (1 in 10)
-    // Prevents dev environment slowdown from Sentry performance tracking
-    tracesSampleRate: import.meta.env.PROD ? 0.1 : 0.01,
-    replaysSessionSampleRate: 0.1, // Session replay 10% of all sessions
-    replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
-    // Release tracking
-    release: import.meta.env.VITE_APP_VERSION || '0.0.0',
-    // Ignore noise and internal errors
-    ignoreErrors: [
-      // Browser extensions
-      'top.GLOBALS',
-      'originalCreateNotification',
-      'canvas.contentDocument',
-      'MyApp_RemoveAllHighlights',
-      // See http://blog.errorception.com/2012/03/tale-of-unfindable-js-error.html
-      'Can\'t find variable: ZiteReader',
-      'jigsaw is not defined',
-      'ComboSearch is not defined',
-      // Network errors
-      'NetworkError',
-      'Network request failed',
-    ],
-    denyUrls: [
-      // Browser extensions
-      /extensions\//i,
-      /^chrome:\/\//i,
-      /^moz-extension:\/\//i,
-    ],
-  });
+  // Initialize Sentry asynchronously so initSentry doesn't block startup
+  void (async () => {
+    const S = await loadSentry();
+    if (!S) return;
+
+    S.init({
+      dsn: sentryDsn,
+      environment: import.meta.env.MODE,
+      integrations: [
+        new S.Replay({
+          maskAllText: true,
+          blockAllMedia: true,
+        }),
+      ],
+      tracesSampleRate: import.meta.env.PROD ? 0.1 : 0.01,
+      replaysSessionSampleRate: 0.1,
+      replaysOnErrorSampleRate: 1.0,
+      release: import.meta.env.VITE_APP_VERSION || '0.0.0',
+      ignoreErrors: [
+        'top.GLOBALS',
+        'originalCreateNotification',
+        'canvas.contentDocument',
+        'MyApp_RemoveAllHighlights',
+        'Can\'t find variable: ZiteReader',
+        'jigsaw is not defined',
+        'ComboSearch is not defined',
+        'NetworkError',
+        'Network request failed',
+      ],
+      denyUrls: [/extensions\//i, /^chrome:\/\//i, /^moz-extension:\/\//i],
+    });
+  })();
 };
 
 /**
@@ -66,9 +74,12 @@ export const initSentry = () => {
  * Use this for error handling in try-catch blocks
  */
 export const captureException = (error: Error | string, context?: Record<string, unknown>) => {
-  Sentry.captureException(error, {
-    contexts: context ? { custom: context } : undefined,
-  });
+  // Fire-and-forget dynamic import to avoid blocking callers
+  void (async () => {
+    const S = await loadSentry();
+    if (!S) return;
+    S.captureException(error, { contexts: context ? { custom: context } : undefined });
+  })();
 };
 
 /**
@@ -76,7 +87,11 @@ export const captureException = (error: Error | string, context?: Record<string,
  * Useful for tracking important events
  */
 export const captureMessage = (message: string, level: 'fatal' | 'error' | 'warning' | 'info' | 'debug' = 'info') => {
-  Sentry.captureMessage(message, level);
+  void (async () => {
+    const S = await loadSentry();
+    if (!S) return;
+    S.captureMessage(message, level);
+  })();
 };
 
 /**
@@ -84,35 +99,46 @@ export const captureMessage = (message: string, level: 'fatal' | 'error' | 'warn
  * Call this after user authentication to track which users are affected by errors
  */
 export const setSentryUser = (userId: string, email?: string, username?: string) => {
-  Sentry.setUser({
-    id: userId,
-    email,
-    username,
-  });
+  void (async () => {
+    const S = await loadSentry();
+    if (!S) return;
+    S.setUser({ id: userId, email, username });
+  })();
 };
 
 /**
  * Clear user context (on logout)
  */
 export const clearSentryUser = () => {
-  Sentry.setUser(null);
+  void (async () => {
+    const S = await loadSentry();
+    if (!S) return;
+    S.setUser(null);
+  })();
 };
 
 /**
  * Add custom context for better error diagnosis
  */
 export const addSentryContext = (name: string, data: Record<string, unknown>) => {
-  Sentry.setContext(name, data);
+  void (async () => {
+    const S = await loadSentry();
+    if (!S) return;
+    S.setContext(name, data);
+  })();
 };
 
 /**
  * Create a transaction for performance monitoring
  */
 export const startSentryTransaction = (name: string, op: string = 'http.request') => {
-  const transaction = Sentry.startTransaction({
-    name,
-    op,
-  });
-  return transaction;
+  // Start a transaction if Sentry is loaded; returns undefined otherwise
+  // This helper returns a Promise resolving to the transaction or undefined
+  return (async () => {
+    const S = await loadSentry();
+    if (!S) return undefined;
+    const transaction = S.startTransaction({ name, op });
+    return transaction;
+  })();
 };
 

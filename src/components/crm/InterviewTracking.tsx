@@ -1,38 +1,23 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { Search, X } from 'lucide-react';
+import { useState, useEffect, useCallback, memo } from 'react';
+import { Search, X, Calendar } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { getInterviews, updateInterview, deleteInterview } from '../../lib/api/interviews';
+import { getInterviewsPage, deleteInterview } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import { subscribeToInterviews } from '../../lib/api/realtimeSync';
 import type { Database } from '../../lib/database.types';
 import { useToast } from '../../contexts/ToastContext';
-import InterviewCard from './InterviewCard';
+import { DataTable, Column } from './DataTable';
 import { InterviewDetailModal } from './InterviewDetailModal';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { ConfirmDialog } from '../common/ConfirmDialog';
-import { EmptyStateNoData } from '../common/EmptyState';
 import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Chip from '@mui/material/Chip';
-import Pagination from '@mui/material/Pagination';
-import Divider from '@mui/material/Divider';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Skeleton from '@mui/material/Skeleton';
 
 type Interview = Database['public']['Tables']['interviews']['Row'];
 type Requirement = Database['public']['Tables']['requirements']['Row'];
-
-type RealtimeUpdate<T> = { type: 'INSERT' | 'UPDATE' | 'DELETE'; record: T };
-
-const ITEMS_PER_PAGE = 12;
 
 export const InterviewTracking = memo(() => {
   const { user, isAdmin } = useAuth();
@@ -41,26 +26,39 @@ export const InterviewTracking = memo(() => {
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [totalResults, setTotalResults] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
   const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
   const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
-  const [jumpToPageInput, setJumpToPageInput] = useState('');
   const [interviewToDelete, setInterviewToDelete] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const itemsPerPage = 20;
 
-  const loadData = useCallback(async () => {
+  const loadInterviews = useCallback(async (page: number = 0) => {
     if (!user) return;
     
     try {
       setError(null);
-      const interviewsResult = await getInterviews(user.id);
+      setLoading(true);
+      
+      const interviewsResult = await getInterviewsPage({
+        userId: user.id,
+        limit: itemsPerPage,
+        offset: page * itemsPerPage,
+        includeCount: true,
+        scheduledFrom: filterDateFrom || undefined,
+        scheduledTo: filterDateTo || undefined,
+        orderBy: 'scheduled_date',
+        orderDir: 'asc',
+      });
+      
       if (interviewsResult.success && interviewsResult.interviews) {
         setInterviews(interviewsResult.interviews as Interview[]);
+        setTotalResults(interviewsResult.total ?? 0);
         
         // Update the selected interview if it exists with the new data
         setSelectedInterview(prev => {
@@ -73,7 +71,17 @@ export const InterviewTracking = memo(() => {
       } else if (interviewsResult.error) {
         setError({ title: 'Failed to load interviews', message: interviewsResult.error });
       }
-      
+    } catch {
+      setError({ title: 'Error loading interviews', message: 'An unexpected error occurred' });
+    } finally {
+      setLoading(false);
+    }
+  }, [user, itemsPerPage, filterDateFrom, filterDateTo]);
+
+  const loadRequirements = useCallback(async () => {
+    if (!user) return;
+    
+    try {
       const reqResult = await getRequirements(user.id);
       if (reqResult.success && reqResult.requirements) {
         setRequirements(reqResult.requirements);
@@ -81,42 +89,75 @@ export const InterviewTracking = memo(() => {
         setError({ title: 'Failed to load requirements', message: reqResult.error });
       }
     } catch {
-      setError({ title: 'Error loading data', message: 'An unexpected error occurred' });
-    } finally {
-      setLoading(false);
-      // Only reset page on initial load, not on data refresh
-      // This prevents pagination reset interrupting user navigation
+      setError({ title: 'Error loading requirements', message: 'An unexpected error occurred' });
     }
   }, [user]);
 
   useEffect(() => {
-    // Initial load only - reset page on first mount
-    setCurrentPage(1);
-    loadData();
+    // Initial load only
+    setCurrentPage(0);
+    loadInterviews(0);
+    loadRequirements();
+    
     let unsubscribe: (() => void) | undefined;
     if (user) {
-      unsubscribe = subscribeToInterviews(user.id, (update: RealtimeUpdate<Interview>) => {
-        if (update.type === 'INSERT') {
-          setInterviews(prev => [update.record, ...prev]);
-        } else if (update.type === 'UPDATE') {
-          setInterviews(prev =>
-            prev.map(i => (i.id === update.record.id ? update.record : i))
-          );
-          // Update selected interview if it matches
-          setSelectedInterview(prev =>
-            prev?.id === update.record.id ? update.record : prev
-          );
-        } else if (update.type === 'DELETE') {
-          setInterviews(prev => prev.filter(i => i.id !== update.record.id));
-          // Clear selected interview if it was deleted
-          setSelectedInterview(prev =>
-            prev?.id === update.record.id ? null : prev
-          );
-        }
+      unsubscribe = subscribeToInterviews(user.id, () => {
+        // Reload current page when changes occur to keep data fresh
+        loadInterviews(currentPage);
       });
     }
     return () => { unsubscribe?.(); };
-  }, [loadData, user]);
+  }, [user, loadInterviews, loadRequirements, currentPage]);
+
+  const handleViewDetails = (interview: Interview) => {
+    setSelectedInterview(interview);
+    setSelectedCreatedBy(null);
+    setSelectedUpdatedBy(null);
+  };
+
+  const getRequirementTitle = (requirementId: string | null) => {
+    if (!requirementId) return 'Unknown';
+    const req = requirements.find(r => r.id === requirementId);
+    return req ? `${req.title} - ${req.company}` : 'Unknown';
+  };
+
+  // Handle filter changes - reset to first page and reload
+  useEffect(() => {
+    setCurrentPage(0);
+    loadInterviews(0);
+  }, [filterDateFrom, filterDateTo, searchTerm, loadInterviews]);
+
+  const columns: Column<Interview>[] = [
+    {
+      key: 'interview_with',
+      label: 'Candidate Name',
+      width: '20%',
+      render: (item) => item.interview_with || '—',
+    },
+    {
+      key: 'requirement_id',
+      label: 'Job Requirement',
+      width: '30%',
+      render: (item) => getRequirementTitle(item.requirement_id),
+    },
+    {
+      key: 'scheduled_date',
+      label: 'Scheduled Date',
+      width: '20%',
+      render: (item) => item.scheduled_date ? new Date(item.scheduled_date).toLocaleDateString() : '—',
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      width: '15%',
+      render: (item) => (
+        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold font-heading bg-blue-50 text-blue-700">
+          <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mr-1.5 animate-pulse" />
+          {item.status}
+        </span>
+      ),
+    },
+  ];
 
   const handleDeleteClick = useCallback((id: string) => {
     if (!isAdmin) {
@@ -139,114 +180,91 @@ export const InterviewTracking = memo(() => {
         showToast({ type: 'success', title: 'Interview deleted', message: 'The interview has been removed.' });
         setShowDeleteConfirm(false);
         setInterviewToDelete(null);
-        await loadData();
+        await loadInterviews(currentPage);
       } else if (result.error) {
         setError({ title: 'Failed to delete', message: result.error });
       }
     } catch {
       setError({ title: 'Error', message: 'Failed to delete interview' });
     }
-  }, [interviewToDelete, loadData, showToast, user?.id]);
-
-  const handleStatusChange = useCallback(async (id: string, status: string) => {
-    if (!user) return;
-    const result = await updateInterview(id, { status }, user?.id);
-    if (result.success) {
-      await loadData();
-      showToast({ type: 'success', title: 'Status updated', message: `Interview marked as ${status}` });
-    } else if (result.error) {
-      showToast({ type: 'error', title: 'Failed to update interview', message: result.error });
-    }
-  }, [loadData, user, showToast]);
-
-  const handleViewDetails = (interview: Interview) => {
-    setSelectedInterview(interview);
-    // Interviews table doesn't currently have created_by/updated_by fields
-    setSelectedCreatedBy(null);
-    setSelectedUpdatedBy(null);
-  };
-
-  const getRequirementTitle = (requirementId: string | null) => {
-    if (!requirementId) return 'Unknown';
-    const req = requirements.find(r => r.id === requirementId);
-    return req ? `${req.title} - ${req.company}` : 'Unknown';
-  };
-
-  const filterInterviews = (status: string) => {
-    let filtered = status === 'all' 
-      ? interviews 
-      : interviews.filter(i => {
-          const lowerStatus = i.status.toLowerCase();
-          return lowerStatus.includes(status.toLowerCase());
-        });
-
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(i => {
-        const candidateName = i.interview_with?.toLowerCase() || '';
-        const requirementInfo = getRequirementTitle(i.requirement_id).toLowerCase();
-        const company = requirementInfo.split(' - ')[1]?.toLowerCase() || '';
-        return candidateName.includes(term) || requirementInfo.includes(term) || company.includes(term);
-      });
-    }
-
-    if (filterDateFrom || filterDateTo) {
-      filtered = filtered.filter(i => {
-        const interviewDate = new Date(i.scheduled_date).getTime();
-        const fromDate = filterDateFrom ? new Date(filterDateFrom).getTime() : 0;
-        const toDate = filterDateTo ? new Date(filterDateTo).getTime() + 86400000 : Infinity;
-        return interviewDate >= fromDate && interviewDate <= toDate;
-      });
-    }
-
-    return filtered;
-  };
-
-  const filteredInterviews = filterInterviews(activeTab);
-  const totalPages = Math.ceil(filteredInterviews.length / ITEMS_PER_PAGE);
-  const paginatedInterviews = filteredInterviews.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, [interviewToDelete, loadInterviews, currentPage, showToast, user?.id]);
 
   if (loading) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-            gap: 2,
-          }}
-        >
-          {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardContent>
-                <Skeleton variant="text" width="60%" />
-                <Skeleton variant="text" width="45%" />
-                <Skeleton variant="rounded" height={140} sx={{ mt: 1 }} />
-                <Skeleton variant="text" sx={{ mt: 1 }} />
-                <Skeleton variant="text" width="80%" />
-              </CardContent>
-            </Card>
-          ))}
-        </Box>
+        <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--font-heading)' }}>
+          Interview Tracking
+        </Typography>
+        <Typography>Loading interviews...</Typography>
       </Box>
     );
   }
 
-  const tabs = [
-    { id: 'all', label: 'All Interviews', count: interviews.length },
-    { id: 'confirmed', label: 'Confirmed', count: interviews.filter(i => i.status.toLowerCase().includes('confirmed')).length },
-    { id: 'rescheduled', label: 'Re-Scheduled', count: interviews.filter(i => i.status.toLowerCase().includes('rescheduled')).length },
-    { id: 'cancelled', label: 'Cancelled', count: interviews.filter(i => i.status.toLowerCase().includes('cancelled')).length },
-    { id: 'completed', label: 'Completed', count: interviews.filter(i => i.status.toLowerCase().includes('completed')).length },
-  ];
+  const headerSearch = (
+    <div className="flex-1 min-w-0 flex flex-col gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
+        <TextField
+          size="small"
+          label="Search Candidate or Company"
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(0);
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search className="w-4 h-4" />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ flex: 1, '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
+        />
+
+        <TextField
+          size="small"
+          label="From Date"
+          type="date"
+          value={filterDateFrom}
+          onChange={(e) => {
+            setFilterDateFrom(e.target.value);
+            setCurrentPage(0);
+          }}
+          InputLabelProps={{ shrink: true }}
+          sx={{ flex: 1, '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
+        />
+
+        <TextField
+          size="small"
+          label="To Date"
+          type="date"
+          value={filterDateTo}
+          onChange={(e) => {
+            setFilterDateTo(e.target.value);
+            setCurrentPage(0);
+          }}
+          InputLabelProps={{ shrink: true }}
+          sx={{ flex: 1, '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
+        />
+      </div>
+
+      {(searchTerm || filterDateFrom || filterDateTo) && (
+        <button
+          onClick={() => {
+            setSearchTerm('');
+            setFilterDateFrom('');
+            setFilterDateTo('');
+            setCurrentPage(0);
+          }}
+          className="text-xs font-body text-[color:var(--text-secondary)] hover:text-[color:var(--gold)] transition-colors flex items-center gap-1 w-fit"
+        >
+          <X className="w-3 h-3" />
+          Clear Filters
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -254,7 +272,11 @@ export const InterviewTracking = memo(() => {
         <ErrorAlert
           title={error.title}
           message={error.message}
-          onRetry={loadData}
+          onRetry={() => {
+            setCurrentPage(0);
+            loadInterviews(0);
+            loadRequirements();
+          }}
           onDismiss={() => setError(null)}
         />
       )}
@@ -270,179 +292,39 @@ export const InterviewTracking = memo(() => {
         </Typography>
       </Stack>
 
-      <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-            gap: 2,
-          }}
-        >
-          <TextField
-            size="small"
-            label="Search Candidate or Company"
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search className="w-4 h-4" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } }, '& .MuiInputBase-input::placeholder': { color: 'var(--text-secondary)', opacity: 0.7 } }}
-          />
-
-          <TextField
-            size="small"
-            label="From Date"
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => {
-              setFilterDateFrom(e.target.value);
-              setCurrentPage(1);
-            }}
-            InputLabelProps={{ shrink: true }}
-            sx={{ '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
-          />
-
-          <TextField
-            size="small"
-            label="To Date"
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => {
-              setFilterDateTo(e.target.value);
-              setCurrentPage(1);
-            }}
-            InputLabelProps={{ shrink: true }}
-            sx={{ '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
-          />
-        </Box>
-
-        {(searchTerm || filterDateFrom || filterDateTo) ? (
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              setFilterDateFrom('');
-              setFilterDateTo('');
-              setCurrentPage(1);
-            }}
-            className="mt-1 text-xs font-body text-[color:var(--text-secondary)] hover:text-[color:var(--gold)] transition-colors flex items-center gap-1"
-          >
-            <X className="w-3 h-3" />
-            Clear Filters
-          </button>
-        ) : null}
-      </Paper>
-
-      <Paper variant="outlined" sx={{ overflow: 'hidden', bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, value) => {
-            setActiveTab(value);
-            setCurrentPage(1);
-          }}
-          variant="scrollable"
-          scrollButtons="auto"
-          sx={{
-            '& .MuiTab-root': { color: 'var(--text-secondary)', '&.Mui-selected': { color: 'var(--gold)' } },
-            '& .MuiTabs-indicator': { backgroundColor: 'var(--gold)' },
-          }}
-        >
-          {tabs.map((tab) => (
-            <Tab
-              key={tab.id}
-              value={tab.id}
-              label={
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Box component="span">{tab.label}</Box>
-                  <Chip size="small" label={tab.count} variant="outlined" sx={{ borderColor: 'rgba(234,179,8,0.3)', color: 'var(--gold)' }} />
-                </Stack>
-              }
-            />
-          ))}
-        </Tabs>
-        <Divider sx={{ borderColor: 'rgba(234,179,8,0.1)' }} />
-
-        <Box sx={{ p: 2 }}>
-          {filteredInterviews.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 3, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
-              <EmptyStateNoData type="interviews" />
-            </Paper>
-          ) : (
-            <Stack spacing={2}>
-              <InterviewListVirtualizer
-                interviews={paginatedInterviews}
-                getRequirementTitle={getRequirementTitle}
-                onStatusChange={handleStatusChange}
-                onDelete={async (id: string) => {
-                  handleDeleteClick(id);
-                  return Promise.resolve();
-                }}
-                onViewDetails={handleViewDetails}
-              />
-
-              {totalPages > 1 ? (
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" justifyContent="space-between">
-                  <Pagination
-                    count={totalPages}
-                    page={currentPage}
-                    onChange={(_, page) => handlePageChange(page)}
-                    sx={{
-                      '& .MuiPaginationItem-root': { color: 'var(--text-secondary)', '&.Mui-selected': { bgcolor: 'var(--gold)', color: 'var(--dark-bg)' }, '&:hover': { bgcolor: 'rgba(234,179,8,0.1)' } },
-                    }}
-                    showFirstButton
-                    showLastButton
-                    siblingCount={1}
-                    boundaryCount={1}
-                  />
-
-                  {totalPages > 5 ? (
-                    <TextField
-                      size="small"
-                      label="Go to"
-                      type="number"
-                      inputProps={{ min: 1, max: totalPages }}
-                      value={jumpToPageInput}
-                      onChange={(e) => setJumpToPageInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const page = parseInt(jumpToPageInput) || currentPage;
-                          handlePageChange(page);
-                          setJumpToPageInput('');
-                        }
-                      }}
-                      sx={{ width: 120 }}
-                    />
-                  ) : null}
-                </Stack>
-              ) : null}
-
-              {totalPages > 1 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredInterviews.length)} of {filteredInterviews.length} interviews ({totalPages} page{totalPages !== 1 ? 's' : ''})
-                </Typography>
-              ) : null}
-            </Stack>
-          )}
-        </Box>
-      </Paper>
+      <DataTable
+        data={interviews}
+        columns={columns}
+        onViewDetails={handleViewDetails}
+        onDelete={handleDeleteClick}
+        onRowClick={handleViewDetails}
+        isAdmin={isAdmin}
+        title="Interviews"
+        page={currentPage}
+        hasNextPage={(totalResults ?? 0) > (currentPage + 1) * itemsPerPage}
+        isFetchingPage={loading}
+        onPageChange={(page) => {
+          setCurrentPage(page);
+          loadInterviews(page);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        headerSearch={headerSearch}
+        emptyStateIcon={Calendar as React.FC<{ className?: string }>}
+        emptyStateMessage="No interviews found"
+      />
 
       <InterviewDetailModal
         isOpen={selectedInterview !== null}
         interview={selectedInterview}
         onClose={() => setSelectedInterview(null)}
-        onUpdate={loadData}
+        onUpdate={() => {
+          setCurrentPage(0);
+          loadInterviews(0);
+        }}
         createdBy={selectedCreatedBy}
         updatedBy={selectedUpdatedBy}
       />
 
-      {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={() => {
@@ -459,54 +341,3 @@ export const InterviewTracking = memo(() => {
     </Box>
   );
 });
-
-interface InterviewListVirtualizerProps {
-  interviews: Interview[];
-  getRequirementTitle: (id: string | null) => string;
-  onStatusChange: (id: string, newStatus: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-  onViewDetails: (interview: Interview) => void;
-}
-
-const InterviewListVirtualizer = ({ interviews, getRequirementTitle, onStatusChange, onDelete, onViewDetails }: InterviewListVirtualizerProps) => {
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  const virtualizer = useVirtualizer({
-    count: interviews.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 280,
-    overscan: 10,
-    measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
-  });
-
-  const virtualItems = virtualizer.getVirtualItems();
-
-  return (
-    <Paper variant="outlined" ref={parentRef} sx={{ maxHeight: 700, overflowY: 'auto', bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '1rem',
-          padding: '0.5rem',
-          height: `${virtualizer.getTotalSize()}px`,
-        }}
-      >
-        {virtualItems.map((virtualItem) => (
-          <div
-            key={virtualItem.key}
-            data-index={virtualItem.index}
-          >
-            <InterviewCard
-              interview={interviews[virtualItem.index]}
-              requirementTitle={getRequirementTitle(interviews[virtualItem.index].requirement_id)}
-              onStatusChange={onStatusChange}
-              onDelete={onDelete}
-              onViewDetails={onViewDetails}
-            />
-          </div>
-        ))}
-      </div>
-    </Paper>
-  );
-};
