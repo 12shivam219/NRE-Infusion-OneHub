@@ -99,7 +99,7 @@ interface BrandCardFooterProps {
  */
 export const BrandCardFooter = ({ children, className = '' }: BrandCardFooterProps) => {
   return (
-    <div className={`flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gold border-opacity-10 ${className}`}>
+    <div className={`flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200 ${className}`}>
       {children}
     </div>
   );

@@ -4,12 +4,15 @@ import {
   Calendar, 
   Trash2, 
   CheckSquare, 
-  Square, 
+  Square,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
+import Tooltip from '@mui/material/Tooltip';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -50,13 +53,22 @@ const statusColorMap: Record<RequirementStatus, { bg: string; text: string; bord
   'SUBMITTED': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border border-indigo-200', dot: 'bg-indigo-500' },
 };
 
+// Enhanced status color map with compact styling
+const enhancedStatusColors: Record<RequirementStatus, { bg: string; text: string }> = {
+  'NEW': { bg: 'bg-blue-100', text: 'text-blue-700' },
+  'IN_PROGRESS': { bg: 'bg-amber-100', text: 'text-amber-700' },
+  'INTERVIEW': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'OFFER': { bg: 'bg-green-100', text: 'text-green-700' },
+  'CLOSED': { bg: 'bg-gray-100', text: 'text-gray-700' },
+  'REJECTED': { bg: 'bg-red-100', text: 'text-red-700' },
+  'SUBMITTED': { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+};
+
 const TableRow = memo(({
   req,
   isSelected,
-  colors,
   toggleRowSelected,
   onViewDetails,
-  onRowClick,
   onCreateInterview,
   onDelete,
   isAdmin,
@@ -71,7 +83,6 @@ const TableRow = memo(({
   colors: { bg: string; text: string; border: string; dot: string };
   toggleRowSelected: (id: string) => void;
   onViewDetails: (req: Requirement) => void;
-  onRowClick?: (req: Requirement) => void;
   onCreateInterview?: (id: string) => void;
   onDelete: (id: string) => void;
   isAdmin: boolean;
@@ -81,177 +92,268 @@ const TableRow = memo(({
   selectedStatusFilter?: RequirementStatus | 'ALL';
   onStatusFilterChange?: (status: RequirementStatus | 'ALL') => void;
 }) => {
+  const isAlternate = rowIndex % 2 === 1;
+  const statusColor = enhancedStatusColors[req.status as RequirementStatus];
+  const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState<HTMLElement | null>(null);
+  const actionMenuOpen = Boolean(actionMenuAnchorEl);
+  
+  const handleActionMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setActionMenuAnchorEl(e.currentTarget);
+  };
+  
+  const handleActionMenuClose = () => {
+    setActionMenuAnchorEl(null);
+  };
+  
+  const handleView = () => {
+    handleActionMenuClose();
+    onViewDetails(req);
+  };
+  
+  const handleCreateInterview = () => {
+    handleActionMenuClose();
+    onCreateInterview?.(req.id);
+  };
+  
+  const handleDelete = () => {
+    handleActionMenuClose();
+    onDelete(req.id);
+  };
+  
   return (
     <tr
       ref={rowRef}
       data-index={dataIndex}
-      onClick={() => onRowClick?.(req)}
-        className={`${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10 transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''}`}
-    > 
-      <td className="px-2 py-3 text-center align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
+      className={`
+        transition-colors duration-150
+        border-b border-[#EAECEF]
+        ${isAlternate ? 'bg-[#FAFBFC]' : 'bg-white'}
+        hover:bg-[#F5F7FA]
+        h-14
+      `}
+    >
+      {/* Checkbox */}
+      <td className="px-4 py-0 text-center align-middle bg-white" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 20 }}>
         <div className="flex items-center justify-center">
           <button
-            onClick={() => toggleRowSelected(req.id)}
-            className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-offset-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowSelected(req.id);
+            }}
+            className="p-1.5 hover:bg-gray-200 hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
             aria-pressed={isSelected}
             title={isSelected ? 'Deselect requirement' : 'Select requirement'}
             aria-label={isSelected ? `Deselect ${req.title}` : `Select ${req.title}`}
           >
             {isSelected ? (
-              <CheckSquare className="w-4 h-4 text-[color:var(--gold)]" />
+              <CheckSquare className="w-4 h-4 text-blue-600" />
             ) : (
-              <Square className="w-4 h-4 text-[color:var(--text-secondary)] hover:text-[color:var(--gold)]" />
+              <Square className="w-4 h-4 text-[#9CA3AF] hover:text-gray-600" />
             )}
           </button>
         </div>
       </td>
       
-      {/* Requirement Number */}
-      <td className="px-2 py-3 text-left align-middle font-mono text-xs font-medium text-[color:var(--text-secondary)] border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '50px' }}>
-        {String(req.requirement_number || 1).padStart(3, '0')}
+      {/* Requirement ID */}
+      <td className="px-4 py-0 text-left align-middle bg-white" style={{ width: '60px', position: 'sticky', left: '44px', zIndex: 20 }}>
+        <span className="font-mono font-medium text-[#6B7280]" style={{ fontSize: '0.8125rem' }}>
+          REQ-{String(req.requirement_number || 1).padStart(3, '0')}
+        </span>
       </td>
       
-      {/* Title */}
-      <td className="px-2 py-3 text-left align-top whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>
-        <div className="min-w-0">
-          <button
-            onClick={() => onViewDetails(req)}
-            className="text-left w-full hover:text-[color:var(--gold)] focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 focus:ring-offset-1 rounded px-1 -mx-1 transition-colors duration-150 group"
-            title={`${req.title}${req.company ? ` - ${req.company}` : ''}`}
-            aria-label={`View details for ${req.title}`}
-          >
-            <div className="font-heading font-bold text-xs text-[color:var(--text)] group-hover:text-[color:var(--gold)] leading-relaxed break-words pr-1 xs:pr-2">
-              {req.title}
+      {/* Title & Company */}
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '24%' }}>
+        <div className="w-full text-left">
+          <div className="font-semibold text-[#0F172A] leading-tight truncate" style={{ fontSize: '0.8125rem' }}>
+            {req.title}
+          </div>
+          {req.company && (
+            <div className="font-normal text-[#64748B] mt-1 truncate" style={{ fontSize: '0.75rem' }}>
+              {req.company}
             </div>
-            {req.company && (
-              <div className="text-xs font-body text-[color:var(--text-secondary)] mt-0.5 xs:mt-1 sm:mt-1.5 break-words pr-1 xs:pr-2" title={req.company}>
-                {req.company}
-              </div>
-            )}
-          </button>
+          )}
         </div>
       </td>
       
-      {/* Status */}
-      <td className="px-2 py-3 text-left align-middle whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>
+      {/* Status Badge */}
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '15%' }}>
         <div className="flex items-center">
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               if (onStatusFilterChange) {
-                // Toggle behavior: click same status to clear, click different to select
                 onStatusFilterChange(req.status === selectedStatusFilter ? 'ALL' : req.status);
               }
             }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold font-heading transition-all duration-150 cursor-pointer ${colors.bg} ${colors.text} hover:shadow-md ${
-              req.status === selectedStatusFilter ? 'ring-2 ring-[color:var(--gold)] ring-offset-1' : 'hover:shadow-sm'
-            }`}
+            className={`
+              inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full
+              font-semibold transition-all duration-150 uppercase
+              ${statusColor.bg} ${statusColor.text}
+              hover:shadow-sm hover:opacity-80
+              ${req.status === selectedStatusFilter ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
+            `}
+            style={{ fontSize: '0.6875rem' }}
             title={`Click to filter by ${req.status} status`}
             aria-label={`Filter by ${req.status} status`}
           >
-            <span className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0 animate-pulse`} />
+            <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
             <span className="whitespace-nowrap">{req.status}</span>
           </button>
         </div>
       </td>
       
       {/* Vendor Company */}
-      <td className="px-2 py-3 text-left align-top font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '18%' }}>
-        <div className="min-w-0">
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '18%' }}>
+        <div className="font-normal text-[#475569] truncate" style={{ fontSize: '0.8125rem' }}>
           {req.vendor_company ? (
-            <div 
-              className="text-xs font-body text-[color:var(--text)] break-words leading-relaxed pr-1 xs:pr-2" 
-              title={req.vendor_company}
-            >
-              {req.vendor_company}
-            </div>
+            <span title={req.vendor_company}>{req.vendor_company}</span>
           ) : (
-            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
+            <span className="text-[#9CA3AF] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Vendor Person */}
-      <td className="px-2 py-3 text-left align-top font-medium whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>
-        <div className="min-w-0">
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '15%' }}>
+        <div className="font-normal text-[#475569] truncate" style={{ fontSize: '0.8125rem' }}>
           {req.vendor_person_name ? (
-            <div 
-              className="text-xs font-body text-[color:var(--text)] break-words leading-relaxed pr-1 xs:pr-2" 
-              title={req.vendor_person_name}
-            >
-              {req.vendor_person_name}
-            </div>
+            <span title={req.vendor_person_name}>{req.vendor_person_name}</span>
           ) : (
-            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
+            <span className="text-[#9CA3AF] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Vendor Phone */}
-      <td className="px-2 py-3 text-left align-top font-mono text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>
-        <div className="min-w-0 max-w-full">
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '15%' }}>
+        <div className="font-mono text-[#475569] truncate" style={{ fontSize: '0.8125rem' }}>
           {req.vendor_phone ? (
             <a 
               href={`tel:${req.vendor_phone}`}
-              className="text-xs font-body text-[color:var(--text)] hover:text-[color:var(--gold)] hover:underline block break-words max-w-full transition-colors"
+              className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
               title={`Call ${req.vendor_phone}`}
               onClick={(e) => e.stopPropagation()}
             >
               {req.vendor_phone}
             </a>
           ) : (
-            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
+            <span className="text-[#9CA3AF] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Vendor Email */}
-      <td className="px-2 py-3 text-left align-top text-xs whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>
-        <div className="min-w-0 max-w-full">
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '18%' }}>
+        <div className="font-normal text-[#475569] truncate" style={{ fontSize: '0.8125rem' }}>
           {req.vendor_email ? (
             <a 
               href={`mailto:${req.vendor_email}`}
-              className="text-xs font-body text-[color:var(--text)] hover:text-[color:var(--gold)] hover:underline break-words max-w-full transition-colors"
+              className="text-blue-600 hover:text-blue-700 hover:underline transition-colors"
               title={`Email ${req.vendor_email}`}
               onClick={(e) => e.stopPropagation()}
             >
               {req.vendor_email}
             </a>
           ) : (
-            <span className="text-xs font-body text-[color:var(--text-secondary)] italic">—</span>
+            <span className="text-[#9CA3AF] italic">—</span>
           )}
         </div>
       </td>
       
       {/* Actions */}
-      <td className="px-2 py-3 text-left align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '140px' }}>
-        <div className="flex gap-1 justify-end items-center">
-          <button
-            onClick={() => onViewDetails(req)}
-            className="p-1.5 text-[color:var(--gold)] hover:bg-[color:var(--gold)] hover:bg-opacity-10 hover:text-[color:var(--gold)] focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 rounded-lg transition-all"
-            title="View details"
-            aria-label={`View details for ${req.title}`}
+      <td className="px-4 py-0 text-center align-middle bg-white" style={{ width: '56px', position: 'sticky', right: 0, zIndex: 20 }}>
+        <div className="flex items-center justify-center h-14">
+          <Tooltip title="Actions">
+            <button
+              onClick={handleActionMenuOpen}
+              className="p-0 w-8 h-8 text-[#475569] bg-white border border-[#E5E7EB] rounded-lg hover:bg-[#F8FAFC] hover:border-[#CBD5E1] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-30 flex items-center justify-center"
+              aria-label={`Actions for ${req.title}`}
+              aria-haspopup="true"
+              aria-expanded={actionMenuOpen}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        </div>
+        
+        <Menu
+          anchorEl={actionMenuAnchorEl}
+          open={actionMenuOpen}
+          onClose={handleActionMenuClose}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+          slotProps={{
+            paper: {
+              sx: {
+                backgroundColor: '#FFFFFF',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+                border: '1px solid #E5E7EB',
+                minWidth: '180px',
+              },
+            },
+          }}
+        >
+          <MenuItem
+            onClick={handleView}
+            sx={{
+              py: 1.25,
+              px: 2,
+              fontSize: '0.8125rem',
+              color: '#1F2937',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              '&:hover': {
+                backgroundColor: '#F1F5F9',
+              },
+            }}
           >
             <Eye className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onCreateInterview?.(req.id)}
-            className="p-1.5 text-green-600 hover:bg-green-500 hover:bg-opacity-10 hover:text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-opacity-30 rounded-lg transition-all"
-            title="Create interview"
-            aria-label={`Create interview for ${req.title}`}
+            View
+          </MenuItem>
+          
+          <MenuItem
+            onClick={handleCreateInterview}
+            sx={{
+              py: 1.25,
+              px: 2,
+              fontSize: '0.8125rem',
+              color: '#2563EB',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              '&:hover': {
+                backgroundColor: '#F1F5F9',
+              },
+            }}
           >
             <Calendar className="w-4 h-4" />
-          </button>
+            Create Interview
+          </MenuItem>
+          
           {isAdmin && (
-            <button
-              onClick={() => onDelete(req.id)}
-              className="p-1.5 text-red-600 hover:bg-red-500 hover:bg-opacity-10 hover:text-red-600 focus:ring-2 focus:ring-red-500 focus:ring-opacity-30 rounded-lg transition-all"
-              title="Delete requirement"
-              aria-label={`Delete ${req.title}`}
+            <MenuItem
+              onClick={handleDelete}
+              sx={{
+                py: 1.25,
+                px: 2,
+                fontSize: '0.8125rem',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                '&:hover': {
+                  backgroundColor: '#F1F5F9',
+                },
+              }}
             >
               <Trash2 className="w-4 h-4" />
-            </button>
+              Delete
+            </MenuItem>
           )}
-        </div>
+        </Menu>
       </td>
     </tr>
   );
@@ -261,7 +363,6 @@ const TableRow = memo(({
 export const RequirementsTable = memo(({
   requirements,
   onViewDetails,
-  onRowClick,
   onCreateInterview,
   onDelete,
   isAdmin,
@@ -355,28 +456,23 @@ export const RequirementsTable = memo(({
       : 0;
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(234,179,8,0.2)',
-        borderRadius: 2,
-        bgcolor: 'var(--darkbg-surface)',
-      }}
-    >
-      <div className="bg-white">
-        {/* Header Row - Title and Search */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-gray-200 gap-3">
-          <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">Requirements</h3>
+    <div className="w-full bg-white rounded-lg border border-[#E5E7EB] pt-0">
+      {/* Toolbar - Search & Filters */}
+      <div className="px-6 py-4 border-b border-[#EAECEF] bg-white">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-[16px] font-semibold text-[#0F172A]">Requirements</h3>
+            <p className="text-[12px] text-[#64748B] mt-1">{sortedRequirements.length} requirements total</p>
+          </div>
           
-          {/* Search Bar - Right */}
-          <div className="flex-shrink-0 min-w-0">
+          {/* Search Bar */}
+          <div className="w-full sm:w-auto">
             {headerSearch ?? null}
           </div>
         </div>
       </div>
 
+      {/* Table */}
       <Box
         ref={parentRef}
         sx={{
@@ -384,68 +480,91 @@ export const RequirementsTable = memo(({
           overflowX: { xs: 'auto', sm: 'auto', md: 'auto' },
           overflowY: 'auto',
           maxHeight: { xs: '60vh', sm: '65vh', md: '70vh' },
-          pb: 1,
+          pb: 0,
           scrollbarGutter: 'stable',
           width: '100%',
           willChange: 'transform',
           contain: 'content',
+          fontFamily: '"Instrument Sans", sans-serif',
           '& table': {
             width: '100%',
             minWidth: { xs: '1200px', sm: '1200px', md: '100%' },
             tableLayout: 'auto',
             borderCollapse: 'collapse',
+            fontFamily: '"Instrument Sans", sans-serif',
           },
           '& thead': {
             position: 'sticky',
             top: 0,
             zIndex: 10,
-            boxShadow: `0 2px 0 0 rgba(234, 179, 8, 0.3)`,
-          },
-          '& thead tr': {
-            borderBottom: '2px solid rgba(234, 179, 8, 0.3)',
           },
         }}
       >
-        <table className="min-w-full border border-[color:var(--gold)] border-opacity-20 rounded-lg">
-          <thead className="bg-white">
-            <tr>
-              
-              <th className="px-2 py-3 text-center text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-[#F8FAFC] border-b border-[#EAECEF]">
+              {/* Checkbox Header */}
+              <th className="px-4 py-3 text-center align-middle bg-[#F8FAFC]" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 30 }}>
                 <button
                   onClick={toggleSelectAll}
-                  className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 focus:ring-offset-1 transition-all"
+                  className="p-1.5 hover:bg-gray-200 hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
                   title={selectedRows.size === sortedRequirements.length ? 'Deselect all' : 'Select all'}
+                  aria-label={selectedRows.size === sortedRequirements.length ? 'Deselect all' : 'Select all'}
+                  style={{ fontSize: '0.75rem' }}
                 >
                   {selectedRows.size === sortedRequirements.length && sortedRequirements.length > 0 ? (
-                    <CheckSquare className="w-4 h-4 text-[color:var(--gold)]" />
+                    <CheckSquare className="w-4 h-4 text-blue-600" />
                   ) : (
-                    <Square className="w-4 h-4 text-[color:var(--text-secondary)] hover:text-[color:var(--gold)]" />
+                    <Square className="w-4 h-4 text-[#9CA3AF] hover:text-gray-600" />
                   )}
                 </button>
               </th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '50px' }}>REQ</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>Title</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>Status</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '18%' }}>Vendor Company</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>Contact Person</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '15%' }}>Phone</th>
-              <th className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '20%' }}>Email</th>
-              <th className="px-2 py-3 text-right text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '140px' }}>Actions</th>
+              
+              <th className="px-4 py-3 text-left align-middle bg-[#F8FAFC]" style={{ width: '60px', position: 'sticky', left: '44px', zIndex: 30, fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">ID</span>
+              </th>
+              
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '24%', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Title</span>
+              </th>
+              
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Status</span>
+              </th>
+              
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '18%', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Vendor Company</span>
+              </th>
+              
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Contact</span>
+              </th>
+              
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Phone</span>
+              </th>
+              
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '18%', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Email</span>
+              </th>
+              
+              <th className="px-4 py-3 text-center align-middle bg-[#F8FAFC]" style={{ width: '56px', position: 'sticky', right: 0, zIndex: 30, fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Actions</span>
+              </th>
             </tr>
           </thead>
-          <tbody
-            className="bg-white"
-          >
+          
+          <tbody>
             {sortedRequirements.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-2 py-12 text-center">
+                <td colSpan={9} className="px-6 py-12 text-center">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="w-14 h-14 rounded-full bg-[color:var(--gold)] bg-opacity-10 flex items-center justify-center">
-                      <Calendar className="w-8 h-8 text-[color:var(--gold)]" />
+                    <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Calendar className="w-7 h-7 text-gray-400" />
                     </div>
                     <div>
-                      <p className="text-[color:var(--text)] font-medium text-xs">No requirements found</p>
-                      <p className="text-[color:var(--text-secondary)] text-xs mt-2">Try adjusting your filters or create a new requirement</p>
+                      <p className="text-[14px] font-semibold text-[#0F172A]">No requirements found</p>
+                      <p className="text-[13px] text-[#64748B] mt-1">Try adjusting your filters or create a new requirement</p>
                     </div>
                   </div>
                 </td>
@@ -470,7 +589,6 @@ export const RequirementsTable = memo(({
                       colors={colors}
                       toggleRowSelected={toggleRowSelected}
                       onViewDetails={onViewDetails}
-                      onRowClick={onRowClick}
                       onCreateInterview={onCreateInterview}
                       onDelete={onDelete}
                       isAdmin={isAdmin}
@@ -493,35 +611,39 @@ export const RequirementsTable = memo(({
         </table>
       </Box>
 
-      {/* Footer - Pagination and Stats */}
-      <div className="bg-white border-t border-gray-200">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 gap-3">
-          <div className="flex items-center space-x-2 text-xs font-body text-gray-600">
-            <span>Page: <strong>{page + 1}</strong></span>
-            <span className="text-gray-300">|</span>
-            <span>Rows: <strong>{sortedRequirements.length}</strong></span>
-            <span className="text-gray-300">|</span>
-            <span>Selected: <strong>{selectedRows.size}</strong></span>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onPageChange(page - 1)}
-              disabled={page === 0 || isFetchingPage}
-              className="px-3 py-1.5 text-xs font-body text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Prev
-            </button>
-            <button
-              onClick={() => onPageChange(page + 1)}
-              disabled={!hasNextPage || isFetchingPage}
-              className="px-3 py-1.5 text-xs font-body text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Next
-            </button>
-          </div>
+      {/* Footer - Pagination */}
+      <div className="px-6 py-4 border-t border-[#EAECEF] bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-[13px] text-[#64748B]">
+          <span>
+            Page: <span className="font-semibold text-[#0F172A]">{page + 1}</span>
+          </span>
+          <span className="w-px h-4 bg-[#E5E7EB]" />
+          <span>
+            Rows: <span className="font-semibold text-[#0F172A]">{sortedRequirements.length}</span>
+          </span>
+          <span className="w-px h-4 bg-[#E5E7EB]" />
+          <span>
+            Selected: <span className="font-semibold text-[#0F172A]">{selectedRows.size}</span>
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 0 || isFetchingPage}
+            className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => onPageChange(page + 1)}
+            disabled={!hasNextPage || isFetchingPage}
+            className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
+          >
+            Next →
+          </button>
         </div>
       </div>
-    </Paper>
+    </div>
   );
 });

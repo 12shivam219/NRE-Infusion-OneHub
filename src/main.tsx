@@ -6,8 +6,6 @@ import CssBaseline from '@mui/material/CssBaseline';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './contexts/ToastContext';
-import { ThemeModeProvider } from './contexts/ThemeModeProvider';
-import { useThemeMode } from './hooks/useThemeMode';
 import './index.css';
 
 // Defer heavy initialization to not block initial render
@@ -44,24 +42,22 @@ const hideInitialLoader = () => {
 };
 
 // Lazy load theme creation to defer theme object instantiation
-const cachedThemes: { dark?: Theme; light?: Theme } = {};
+const cachedTheme: { light?: Theme } = {};
 
-const getTheme = async (mode: 'dark' | 'light'): Promise<Theme> => {
-  if (cachedThemes[mode]) return cachedThemes[mode];
+const getTheme = async (): Promise<Theme> => {
+  if (cachedTheme.light) return cachedTheme.light;
   
-  const { crmThemeDark, crmThemeLight } = await import('./lib/mui/crmTheme');
-  const theme = mode === 'dark' ? crmThemeDark : crmThemeLight;
-  cachedThemes[mode] = theme;
-  return theme;
+  const { crmThemeLight } = await import('./lib/mui/crmTheme');
+  cachedTheme.light = crmThemeLight;
+  return crmThemeLight;
 };
 
 export const ThemedApp = memo(() => {
-  const { themeMode } = useThemeMode();
   const [theme, setTheme] = useState<Theme | null>(null);
 
   useEffect(() => {
-    getTheme(themeMode === 'dark' ? 'dark' : 'light').then(setTheme);
-  }, [themeMode]);
+    getTheme().then(setTheme);
+  }, []);
 
   // Hide initial loader when React app mounts
   useEffect(() => {
@@ -90,9 +86,7 @@ if (rootElement && !rootElement.__reactRoot) {
       <BrowserRouter>
         <ErrorBoundary>
           <ToastProvider>
-            <ThemeModeProvider>
-              <ThemedApp />
-            </ThemeModeProvider>
+            <ThemedApp />
           </ToastProvider>
         </ErrorBoundary>
       </BrowserRouter>

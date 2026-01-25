@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, ReactNode, memo } from 'react';
-import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import AddIcon from '@mui/icons-material/Add';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import { ChevronUp } from 'lucide-react';
 import Popover from '@mui/material/Popover';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -8,7 +9,6 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Box from '@mui/material/Box';
-import { useThemeSync } from '../../contexts/ThemeSyncContext';
 
 interface CreateDropdownItem {
   label: string;
@@ -34,8 +34,6 @@ const CreateDropdownComponent = ({
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const { theme } = useThemeSync();
-  const accent = theme.accent;
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setAnchorEl(event.currentTarget);
@@ -77,20 +75,20 @@ const CreateDropdownComponent = ({
   // Styles for the header variant to match original design
   const headerPaperSx = {
     minWidth: 200,
-    boxShadow: `0 8px 24px rgba(0, 255, 208, 0.15), 0 4px 8px rgba(0, 0, 0, 0.4)`,
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
     borderRadius: '0.5rem',
-    bgcolor: '#0e2a30',
-    border: '1px solid #12393f',
+    bgcolor: '#FFFFFF',
+    border: '1px solid #E5E7EB',
     mt: 1, 
   };
 
   // Styles for the standalone variant to match original design
   const standalonePaperSx = {
     minWidth: 200,
-    boxShadow: 'var(--shadow-gold-glow)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
     borderRadius: '0.75rem',
-    bgcolor: 'var(--darkbg-surface)',
-    border: '1px solid rgba(234, 179, 8, 0.2)',
+    bgcolor: '#FFFFFF',
+    border: '1px solid #E5E7EB',
     mt: 1,
   };
 
@@ -107,60 +105,79 @@ const CreateDropdownComponent = ({
         aria-expanded={open}
         aria-controls={open ? 'create-popover' : undefined}
         className={isHeader ? `
-          flex flex-shrink-0 items-center gap-1
-          px-3 py-2
-          rounded-md
-          bg-[#0b252b]
-          border border-[#12393f]
-          text-gray-300
-          transition-colors duration-200 ease-in-out
-          hover:bg-[#0e2a30]
-          hover:border-[#00ffd0]
-          hover:text-[#00ffd0]
-          focus:outline-none
-          active:outline-none
+          flex flex-shrink-0 items-center justify-center gap-0.5
+          w-11 h-9
+          rounded-sm
+          bg-transparent
+          border border-gray-300
+          text-gray-600
+          transition-all duration-200 ease-in-out
+          hover:bg-gray-100
+          hover:border-gray-400
+          hover:text-gray-700
+          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-0
+          active:bg-gray-200
           disabled:opacity-50
           disabled:cursor-not-allowed
           ${className}
         ` : `
           flex items-center justify-center gap-1
           px-3 py-2
-          bg-[color:var(--gold)]
-          hover:bg-[#f5d547]
-          text-[color:var(--dark-bg)]
+          bg-blue-600
+          hover:bg-blue-700
+          text-white
           rounded-lg
           font-medium font-body
           transition-all duration-200
-          hover:shadow-[0_0_12px_rgba(234,179,8,0.3)]
+          hover:shadow-[0_0_12px_rgba(37,99,235,0.3)]
           disabled:opacity-50 disabled:cursor-not-allowed
-          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[color:var(--gold)]
+          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-400
           ${className}
         `}
         title={`${label || 'Create'} menu`}
       >
-        <AddRoundedIcon
+        <AddIcon
           sx={{
-            fontSize: isHeader ? 20 : 'small',
-            transition: 'color 200ms ease-in-out',
+            fontSize: isHeader ? 18 : 20,
+            width: isHeader ? 18 : 20,
+            height: isHeader ? 18 : 20,
+            transition: 'transform 200ms ease-in-out',
+            transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
           }}
         />
-        <Box
-          component="span"
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'transform 200ms ease-in-out',
-            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-          }}
-        >
-          <ExpandMoreRoundedIcon
-            sx={{
-              fontSize: isHeader ? 18 : 'small',
-              transition: 'color 200ms ease-in-out',
+        {isHeader && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 200ms ease-in-out',
+              transform: open ? 'rotate(0deg)' : 'rotate(180deg)',
+              marginLeft: '1px',
             }}
-          />
-        </Box>
+          >
+            <ChevronUp size={14} strokeWidth={2.5} />
+          </div>
+        )}
+        {!isHeader && (
+          <Box
+            component="span"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 200ms ease-in-out',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            }}
+          >
+            <ExpandMoreRoundedIcon
+              sx={{
+                fontSize: 'small',
+                transition: 'color 200ms ease-in-out',
+              }}
+            />
+          </Box>
+        )}
         {!isHeader && label && <span className="text-sm font-heading">{label}</span>}
       </button>
 
@@ -195,16 +212,16 @@ const CreateDropdownComponent = ({
                   px: 2,
                   transition: 'all 150ms ease-in-out',
                   ...(isHeader ? {
-                    color: '#CBD5E1',
+                    color: '#0F172A',
                     '&:hover': {
-                      bgcolor: '#12393f',
-                      color: accent,
+                      bgcolor: '#F1F5F9',
+                      color: '#2563EB',
                     },
                   } : {
-                    color: 'var(--text-secondary)',
+                    color: '#64748B',
                     '&:hover': {
-                      bgcolor: 'var(--darkbg-surface-light)',
-                      color: 'var(--gold)',
+                      bgcolor: '#F1F5F9',
+                      color: '#2563EB',
                     },
                   }),
                 }}

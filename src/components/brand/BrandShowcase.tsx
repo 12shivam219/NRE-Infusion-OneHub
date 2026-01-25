@@ -314,7 +314,7 @@ export const BrandShowcase: React.FC = () => {
             ].map((item) => (
               <div key={item.color} className="space-y-2">
                 <div
-                  className="w-full h-16 rounded-lg border border-gold border-opacity-20"
+                  className="w-full h-16 rounded-lg border border-blue-300"
                   style={{ backgroundColor: item.color }}
                 />
                 <p className="text-xs text-text-secondary font-mono text-center">{item.name}</p>
@@ -339,7 +339,7 @@ export const BrandShowcase: React.FC = () => {
               { label: '2xl (48px)', size: 'w-12 h-12' },
             ].map((item) => (
               <div key={item.label} className="flex items-center gap-4">
-                <div className={`${item.size} bg-gold rounded`} />
+                <div className={`${item.size} bg-blue-600 rounded`} />
                 <span className="text-text-secondary">{item.label}</span>
               </div>
             ))}
@@ -348,7 +348,7 @@ export const BrandShowcase: React.FC = () => {
       </BrandCard>
 
       {/* Footer */}
-      <div className="text-center py-8 border-t border-gold border-opacity-10">
+      <div className="text-center py-8 border-t border-gray-200">
         <p className="text-text-secondary">
           NRETech Brand System • Premium Design for Enterprise Applications
         </p>

@@ -167,7 +167,7 @@ export const BrandCheckbox = React.forwardRef<HTMLInputElement, BrandCheckboxPro
             ref={ref}
             type="checkbox"
             id={checkboxId}
-            className={`w-4 h-4 rounded border-gold border accent-gold cursor-pointer ${className}`}
+            className={`w-4 h-4 rounded border-blue-600 border accent-blue-600 cursor-pointer ${className}`}
             {...props}
           />
           {label && (

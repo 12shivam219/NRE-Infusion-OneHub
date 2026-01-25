@@ -301,7 +301,7 @@ export const RequirementTemplates = ({ onTemplateApplied }: RequirementTemplates
           <h3 className="text-xs font-medium text-gray-900 mb-4">Suggested Templates</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {suggestedTemplates.map(template => (
-              <div key={template.id} className="card-base card-p-sm bg-gradient-to-br from-primary-50 to-primary-100">
+              <div key={template.id} className="card-base card-p-sm bg-white border border-gray-200">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{template.name}</p>

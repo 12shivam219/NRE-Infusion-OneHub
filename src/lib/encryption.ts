@@ -4,8 +4,6 @@
  * Uses AES-256 encryption with crypto-js
  */
 
-import CryptoJS from 'crypto-js';
-
 const EMAIL_SERVER_URL = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
 
 async function callEmailServer(path: string, body: Record<string, unknown>) {
@@ -49,15 +47,10 @@ export async function encryptData(plainText: string): Promise<string> {
 }
 
 /**
- * Check if a string appears to be encrypted (Base64 format)
- * @param text - The text to check
- * @returns true if text looks encrypted
+ * Check if a string appears to be encrypted
  */
 export function isEncrypted(text: string): boolean {
-  if (!text || typeof text !== 'string') {
-    return false;
-  }
-  // Accept both legacy Base64 (frontend) and backend hex:hex:hex formats
+  if (!text || typeof text !== 'string') return false;
   try {
     const looksBase64 = /^[A-Za-z0-9+/=]+$/.test(text) && text.length > 20;
     const parts = text.split(':');
@@ -69,28 +62,31 @@ export function isEncrypted(text: string): boolean {
 }
 
 /**
- * Hash a password for comparison (non-reversible)
- * @param password - The password to hash
- * @returns SHA-256 hash
+ * Hash a password for comparison (SHA-256)
+ * NOTE: This is now ASYNC because Web Crypto is async.
  */
-export function hashPassword(password: string): string {
-  return CryptoJS.SHA256(password).toString();
+export async function hashPassword(password: string): Promise<string> {
+  const msgBuffer = new TextEncoder().encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
  * Verify a password against a hash
- * @param password - The plain text password
- * @param hash - The stored hash
- * @returns true if password matches hash
  */
-export function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const computedHash = await hashPassword(password);
+  return computedHash === hash;
 }
 
 /**
- * Generate a random encryption key for new setups
- * @returns A random 32-character key suitable for AES-256
+ * Generate a random encryption key
+ * Uses native crypto.getRandomValues
  */
+
 export function generateEncryptionKey(): string {
-  return CryptoJS.lib.WordArray.random(32).toString();
+  const array = new Uint8Array(16); // 16 bytes = 32 hex chars
+  crypto.getRandomValues(array);
+  return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
 }

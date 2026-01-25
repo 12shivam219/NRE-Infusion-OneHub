@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { RefreshCw, CloudLightning, ChevronDown } from 'lucide-react';
+import { RefreshCw, CloudLightning } from 'lucide-react';
 import { useSyncStatus, useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -64,31 +64,32 @@ export const SyncStatusBadge = () => {
         aria-label="Sync status"
         sx={{
           display: { xs: 'none', md: 'inline-flex' },
-          color: '#FFFFFF',
-          borderRadius: 2,
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-          px: 1.5,
-          py: 0.75,
-          gap: 0.75,
+          color: '#3B82F6',
+          borderRadius: '4px',
+          backgroundColor: '#EFF6FF',
+          px: 0.875,
+          py: 0.375,
+          gap: 0.375,
           minHeight: 'auto',
-          transition: 'all 320ms ease',
+          minWidth: 'auto',
+          height: 36,
+          transition: 'all 200ms ease',
           '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 0.16)',
-            boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+            backgroundColor: '#DBEAFE',
           },
         }}
       >
         <CloudLightning className="w-4 h-4" />
         <Typography
           sx={{
-            fontSize: '0.75rem',
+            fontSize: '0.6875rem',
             fontWeight: 600,
             fontFamily: '"Poppins", sans-serif',
+            color: '#3B82F6',
           }}
         >
           {syncProgress}%
         </Typography>
-        <ChevronDown className="w-3 h-3" />
       </IconButton>
 
       {/* Dropdown Menu */}
@@ -101,11 +102,11 @@ export const SyncStatusBadge = () => {
           sx: {
             width: 280,
             maxWidth: 'calc(100vw - 2rem)',
-            backgroundColor: '#161B22',
-            backgroundImage: 'linear-gradient(135deg, #161B22 0%, #0D1117 100%)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: '#FFFFFF',
+            backgroundImage: 'none',
+            border: '1px solid #E5E7EB',
             borderRadius: '0.75rem',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           },
         }}
       >
@@ -117,7 +118,7 @@ export const SyncStatusBadge = () => {
             px: 2,
             '&.Mui-disabled': {
               opacity: 1,
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: '#1F2937',
             },
           }}
         >
@@ -127,6 +128,7 @@ export const SyncStatusBadge = () => {
               sx={{
                 fontFamily: '"Inter", sans-serif',
                 fontSize: '0.875rem',
+                color: '#6B7280',
               }}
             >
               Pending Items
@@ -137,7 +139,7 @@ export const SyncStatusBadge = () => {
                 fontWeight: 600,
                 fontFamily: '"Poppins", sans-serif',
                 fontSize: '0.875rem',
-                color: '#FFFFFF',
+                color: '#3B82F6',
               }}
             >
               {pendingCount}
@@ -145,7 +147,7 @@ export const SyncStatusBadge = () => {
           </Box>
         </MenuItem>
 
-        <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+        <Divider sx={{ borderColor: '#E5E7EB' }} />
 
         {/* Sync Status Info */}
         <MenuItem
@@ -155,7 +157,7 @@ export const SyncStatusBadge = () => {
             px: 2,
             '&.Mui-disabled': {
               opacity: 1,
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: '#1F2937',
             },
           }}
         >
@@ -165,7 +167,7 @@ export const SyncStatusBadge = () => {
               sx={{
                 fontFamily: '"Inter", sans-serif',
                 fontSize: '0.75rem',
-                color: 'rgba(255, 255, 255, 0.5)',
+                color: '#9CA3AF',
                 mb: 0.5,
               }}
             >
@@ -177,13 +179,13 @@ export const SyncStatusBadge = () => {
                 fontWeight: 600,
                 fontFamily: '"Poppins", sans-serif',
                 fontSize: '0.875rem',
-                color: '#FFFFFF',
+                color: '#1F2937',
               }}
               title={syncStatus?.lastSyncTime ? `Last synced: ${new Date(syncStatus.lastSyncTime).toLocaleString()}` : 'Not synced yet'}
             >
               {syncProgress}%
               {syncStatus && syncStatus.failedItems > 0 && (
-                <span style={{ marginLeft: '0.5rem', color: '#ff6b6b', fontSize: '0.75rem' }}>
+                <span style={{ marginLeft: '0.5rem', color: '#EF4444', fontSize: '0.75rem' }}>
                   ({syncStatus.failedItems} failed)
                 </span>
               )}
@@ -191,7 +193,7 @@ export const SyncStatusBadge = () => {
           </Box>
         </MenuItem>
 
-        <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+        <Divider sx={{ borderColor: '#E5E7EB' }} />
 
         {/* Process Sync Button */}
         <MenuItem
@@ -207,15 +209,15 @@ export const SyncStatusBadge = () => {
             fontWeight: 600,
             fontSize: '0.875rem',
             fontFamily: '"Poppins", sans-serif',
-            backgroundColor: pendingCount > 0 ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-            color: pendingCount > 0 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
+            backgroundColor: pendingCount > 0 ? '#EFF6FF' : '#F9FAFB',
+            color: pendingCount > 0 ? '#3B82F6' : '#9CA3AF',
             transition: 'all 200ms ease',
             '&:hover': {
-              backgroundColor: pendingCount > 0 ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+              backgroundColor: pendingCount > 0 ? '#DBEAFE' : '#F3F4F6',
             },
             '&.Mui-disabled': {
               opacity: pendingCount === 0 ? 0.6 : 1,
-              color: pendingCount > 0 ? '#FFFFFF' : 'rgba(255, 255, 255, 0.5)',
+              color: pendingCount > 0 ? '#3B82F6' : '#9CA3AF',
             },
           }}
         >
@@ -225,8 +227,8 @@ export const SyncStatusBadge = () => {
                 height: '0.875rem',
                 width: '0.875rem',
                 borderRadius: '50%',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderTopColor: '#FFFFFF',
+                border: '2px solid #DBEAFE',
+                borderTopColor: '#3B82F6',
                 animation: 'spin 0.6s linear infinite',
                 marginRight: '0.5rem',
               }} />
@@ -256,11 +258,12 @@ export const SyncStatusBadge = () => {
             fontWeight: 500,
             fontSize: '0.875rem',
             fontFamily: '"Inter", sans-serif',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            color: 'rgba(255, 255, 255, 0.8)',
+            backgroundColor: '#F9FAFB',
+            color: '#6B7280',
             transition: 'all 200ms ease',
             '&:hover': {
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              backgroundColor: '#F3F4F6',
+              color: '#374151',
             },
           }}
         >

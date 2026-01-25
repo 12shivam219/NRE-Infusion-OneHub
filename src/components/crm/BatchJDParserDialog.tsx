@@ -130,7 +130,7 @@ export function BatchJDParserDialog({
         }}
       >
         <Stack direction="row" spacing={1} alignItems="center">
-          <Zap className="w-5 h-5" style={{ color: 'var(--gold)' }} />
+          <Zap className="w-5 h-5" style={{ color: '#2563EB' }} />
           <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
             Batch Job Description Parser
           </Typography>

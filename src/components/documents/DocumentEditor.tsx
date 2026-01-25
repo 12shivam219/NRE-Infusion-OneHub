@@ -9,6 +9,13 @@ import { downloadDocument } from '../../lib/api/documents';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
+// Type definition for SuperDoc library
+interface SuperDoc {
+  export(options?: unknown): Promise<Blob | void>;
+  on(event: string, callback: (err?: Error) => void): void;
+  destroy(): void;
+}
+
 interface DocumentEditorProps {
   documents: Document[];
   layout: 'single' | '2x2' | '3x3';
@@ -558,11 +565,12 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
         console.log(`Phase 3: Initializing SuperDoc for ${documentsToDisplay.length} document(s)...`);
 
         // Lazy-load SuperDoc library and styles once
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let SuperDocLib: any = null;
         try {
           const mod = await import('@harbour-enterprises/superdoc');
           // Module may export as named or default
-          SuperDocLib = mod.SuperDoc || mod.default || mod;
+          SuperDocLib = (mod as Record<string, unknown>).SuperDoc || (mod as Record<string, unknown>).default || mod;
           await import('@harbour-enterprises/superdoc/style.css');
         } catch (err) {
           console.error('Failed to load SuperDoc module or styles:', err);
@@ -615,7 +623,8 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             console.log(`File size: ${file.size} bytes`);
 
             // SPEED OPTIMIZATION: Initialize SuperDoc with minimal settings
-            const superdoc = new SuperDocLib({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const superdoc = new (SuperDocLib as any)({
               selector,
               toolbar: toolbarSelector,
               documents: [

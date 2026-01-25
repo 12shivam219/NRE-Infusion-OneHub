@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
@@ -12,11 +12,6 @@ import { ErrorAlert } from '../common/ErrorAlert';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../lib/database.types';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import IconButton from '@mui/material/IconButton';
-import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import type { SelectChangeEvent } from '@mui/material/Select';
@@ -442,27 +437,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
   };
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm" scroll="paper" PaperProps={{
-      sx: { maxHeight: '95vh' }
-    }}>
-      <DialogTitle sx={{ pr: 7, pb: 1.5 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#333', mb: 0.5 }}>
-          Create New Requirement
-        </Typography>
-        <Typography sx={{ fontSize: '0.85rem', color: '#888' }}>
-          Add job requirement details
-        </Typography>
-        <IconButton
-          onClick={onClose}
-          sx={{ position: 'absolute', right: 8, top: 8 }}
-          aria-label="Close form"
-          title="Close form"
-        >
-          <X className="w-6 h-6" />
-        </IconButton>
-      </DialogTitle>
-
-      <DialogContent dividers sx={{ backgroundColor: '#fff', p: 2 }}>
+    <div style={{ padding: '1rem' }}>
         <form onSubmit={handleSubmit}>
           {/* Submit Error Alert */}
           {submitError && (
@@ -755,7 +730,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
             </button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
   );
 };

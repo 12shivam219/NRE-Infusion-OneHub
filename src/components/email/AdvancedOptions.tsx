@@ -68,7 +68,7 @@ export const AdvancedOptions = ({
         sx={{
           p: 2,
           bgcolor: 'background.paper',
-          borderColor: 'rgba(234,179,8,0.20)',
+          borderColor: '#E5E7EB',
         }}
       >
         <Stack spacing={2}>
@@ -109,8 +109,8 @@ export const AdvancedOptions = ({
             <Paper
               sx={{
                 p: 1.5,
-                bgcolor: 'rgba(234,179,8,0.05)',
-                borderColor: 'rgba(234,179,8,0.2)',
+                bgcolor: 'rgba(59,130,246,0.05)',
+                borderColor: '#E5E7EB',
                 border: '1px solid',
               }}
             >

@@ -60,8 +60,8 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({
           </div>
         </div>
         {icon && (
-          <div className="flex-shrink-0 p-3 rounded-lg bg-gold bg-opacity-10">
-            <div className="text-gold">{icon}</div>
+          <div className="flex-shrink-0 p-3 rounded-lg bg-blue-100">
+            <div className="text-blue-600">{icon}</div>
           </div>
         )}
       </div>
@@ -108,7 +108,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
           onViewAll && (
             <button
               onClick={onViewAll}
-              className="text-gold hover:text-gold-light transition-colors text-xs font-semibold"
+              className="text-blue-600 hover:text-blue-700 transition-colors text-xs font-semibold"
             >
               View All →
             </button>
@@ -122,7 +122,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
             return (
               <div
                 key={activity.id}
-                className="flex gap-3 p-3 rounded-lg bg-gold bg-opacity-5 hover:bg-opacity-10 transition-colors duration-200"
+                className="flex gap-3 p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors duration-200"
               >
                 <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${config.bg}`} />
                 <div className="flex-1 min-w-0">
@@ -177,7 +177,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
           action && (
             <button
               onClick={action.onClick}
-              className="text-gold hover:text-gold-light transition-colors text-xs font-semibold"
+              className="text-blue-600 hover:text-blue-700 transition-colors text-xs font-semibold"
             >
               {action.label}
             </button>
@@ -189,11 +189,11 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
           {items.map((item, index) => (
             <div
               key={index}
-              className="flex items-center justify-between p-3 rounded-lg border border-gold border-opacity-10 hover:border-opacity-20 transition-all duration-200"
+              className="flex items-center justify-between p-3 rounded-lg border border-blue-200 hover:border-blue-300 transition-all duration-200"
             >
-              <span className="text-sm text-text-secondary">{item.label}</span>
+              <span className="text-sm text-slate-600">{item.label}</span>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold font-heading text-gold">
+                <span className="text-lg font-bold font-heading text-blue-600">
                   {item.value}
                 </span>
                 {item.badge && (

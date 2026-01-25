@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
 import { CreateFormProvider } from './contexts/CreateFormContext';
 import { ChatProvider } from './contexts/ChatProvider';
+import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { useAuth } from './hooks/useAuth';
 import { useToast } from './contexts/ToastContext';
 import { LogoLoader } from './components/common/LogoLoader';
@@ -15,17 +16,16 @@ import {
   LazyCRMPage,
   LazyAdminPage,
 } from './lib/lazyLoader';
+import { Header } from './components/layout/Header';
+import { ModernSidebar } from './components/layout/ModernSidebar';
 
 // ⚡ Lazy load all heavy components to defer loading until needed
-const LazyHeader = lazy(() => import('./components/layout/Header').then(m => ({ default: m.Header })));
 const LazyLoginForm = lazy(() => import('./components/auth/LoginForm').then(m => ({ default: m.LoginForm })));
 const LazyRegisterForm = lazy(() => import('./components/auth/RegisterForm').then(m => ({ default: m.RegisterForm })));
 const LazyOfflineIndicator = lazy(() => import('./components/common/OfflineIndicator').then(m => ({ default: m.OfflineIndicator })));
 const LazySyncErrorHandler = lazy(() => import('./components/common/SyncErrorHandler').then(m => ({ default: m.SyncErrorHandler })));
 const LazySyncQueueModal = lazy(() => import('./components/common/SyncQueueModal').then(m => ({ default: m.SyncQueueModal })));
 const LazySkipLinks = lazy(() => import('./components/common/SkipLinks').then(m => ({ default: m.SkipLinks })));
-// Startup guide removed: no lazy import to prevent startup notification
-const LazyModernSidebar = lazy(() => import('./components/layout/ModernSidebar').then(m => ({ default: m.ModernSidebar })));
 const LazyFloatingChat = lazy(() => import('./components/chat/FloatingChat').then(m => ({ default: m.FloatingChat })));
 
 type AuthView = 'login' | 'register';
@@ -52,6 +52,7 @@ const RouteSuspenseFallback = ({ onStart, onStop }: { onStart: () => void; onSto
 const AppContent = () => {
   const { user, isLoading, refreshUser, isAdmin } = useAuth();
   const { showToast } = useToast();
+  const { isCollapsed } = useSidebar();
   const [authView, setAuthView] = useState<AuthView>('login');
   const [hasShownOfflineToast, setHasShownOfflineToast] = useState(false);
   const hasShownOfflineToastRef = useRef(false);
@@ -138,36 +139,34 @@ const AppContent = () => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden text-amber-50" style={{
-      backgroundColor: 'var(--bg)',
+    <div className="relative min-h-screen overflow-hidden text-slate-900" style={{
+      backgroundColor: '#FFFFFF',
       transition: shouldReduceMotion ? undefined : 'background-color 100ms linear'
     }}>
       <Suspense fallback={null}>
         <LazySkipLinks />
       </Suspense>
 
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ display: 'none' }}>
         <div
           className="absolute inset-0 transition-opacity duration-500"
           style={{
-            background: 'linear-gradient(140deg, var(--nre-gradient-start), var(--nre-gradient-end))',
-            opacity: 0.92,
+            background: 'transparent',
+            opacity: 0,
           }}
         />
         <div
-          className="absolute -inset-[45%] opacity-90"
+          className="absolute -inset-[45%] opacity-0"
           style={{
-            background:
-              'radial-gradient(circle at 18% 22%, var(--nre-ambient) 0%, transparent 58%), radial-gradient(circle at 78% 12%, var(--nre-ambient-secondary) 0%, transparent 60%)',
-            animation: shouldReduceMotion ? 'none' : 'nre-gradient-pan var(--nre-gradient-duration) linear infinite',
+            background: 'transparent',
+            animation: 'none',
             mixBlendMode: 'screen',
           }}
         />
         <div
           className="absolute inset-x-0 bottom-[-28%] h-[55vh] transition-opacity duration-500"
           style={{
-            background:
-              'radial-gradient(circle at 50% 0%, var(--nre-ambient-secondary) 0%, transparent 70%)',
+            background: 'transparent',
           }}
         />
         <div className="adaptive-haze" />
@@ -175,24 +174,18 @@ const AppContent = () => {
       </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
-      <Suspense fallback={<div style={{ height: '72px' }} />}>
-        <LazyHeader />
-      </Suspense>
-
-      {/* Modern Sidebar Navigation */}
-      <Suspense fallback={null}>
-        <LazyModernSidebar />
-      </Suspense>
+        <Header />
+        <ModernSidebar />
 
       <main
         id="main-content"
         role="main"
-        className="flex-1 overflow-y-auto md:ml-64"
+        className={`flex-1 overflow-y-auto ${isCollapsed ? 'md:ml-16' : 'md:ml-56'}`}
         style={{
-          backgroundColor: 'var(--surface)',
-          transition: shouldReduceMotion ? undefined : 'background-color 100ms linear',
-          marginTop: '72px',
-          minHeight: 'calc(100vh - 72px)',
+          backgroundColor: '#FFFFFF',
+          transition: shouldReduceMotion ? undefined : 'background-color 100ms linear, margin-left 200ms ease',
+          minHeight: 'calc(100vh)',
+          marginTop: '56px',
         }}
       >
         <Suspense
@@ -240,7 +233,8 @@ const AppContent = () => {
 function App() {
   return (
     <AuthProvider>
-      <ThemeSyncProvider>
+      <SidebarProvider>
+        <ThemeSyncProvider>
         <AdaptiveAtmosphereProvider>
           <CreateFormProvider>
             <Suspense fallback={null}>
@@ -261,6 +255,7 @@ function App() {
           </CreateFormProvider>
         </AdaptiveAtmosphereProvider>
       </ThemeSyncProvider>
+      </SidebarProvider>
     </AuthProvider>
   );
 }

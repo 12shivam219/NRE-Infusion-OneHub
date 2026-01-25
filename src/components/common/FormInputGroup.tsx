@@ -18,7 +18,7 @@ export const FormInputGroup = ({
   className = '',
 }: FormInputGroupProps) => {
   return (
-    <div className={`space-y-4 p-4 bg-[color:var(--darkbg-surface)] rounded-lg border border-[color:var(--gold)] border-opacity-20 ${className}`}>
+    <div className={`space-y-4 p-4 bg-white rounded-lg border border-gray-200 ${className}`}>
       {title && (
         <div className="mb-2">
           <h3 className="text-sm font-heading font-bold text-[color:var(--text)] uppercase letter-spacing-wide">{title}</h3>

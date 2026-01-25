@@ -81,7 +81,7 @@ export const OfflineIndicator = () => {
   if (!isOnline) {
     return (
       <>
-        <div id="offline-indicator" className="fixed bottom-4 left-4 z-50 bg-amber-600 text-[color:var(--text)] px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-sm border border-[color:var(--gold)] border-opacity-30">
+        <div id="offline-indicator" className="fixed bottom-4 left-4 z-50 bg-amber-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 max-w-sm border border-amber-700">
           <WifiOff className="w-5 h-5 flex-shrink-0" />
           <div className="flex-1">
             <p className="font-medium font-heading">Working offline</p>
@@ -101,7 +101,7 @@ export const OfflineIndicator = () => {
 
         {/* Educational Info Banner - Shows on first offline experience */}
         {showOfflineInfo && !hasSeenOfflineInfo && (
-          <div className="fixed bottom-24 left-4 z-50 bg-[color:var(--gold)] text-[color:var(--dark-bg)] px-5 py-4 rounded-lg shadow-xl max-w-md transform transition-all duration-300 ease-out border border-[color:var(--gold)] border-opacity-40">
+          <div className="fixed bottom-24 left-4 z-50 bg-blue-600 text-white px-5 py-4 rounded-lg shadow-xl max-w-md transform transition-all duration-300 ease-out border border-blue-700">
             <div className="flex items-start gap-3">
               <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
@@ -117,13 +117,13 @@ export const OfflineIndicator = () => {
                       setHasSeenOfflineInfo(true);
                       localStorage.setItem('hasSeenOfflineInfo', 'true');
                     }}
-                    className="px-3 py-1.5 bg-[color:var(--dark-bg)] text-[color:var(--gold)] hover:bg-opacity-80 rounded text-xs font-medium transition-colors border border-[color:var(--gold)] font-heading"
+                    className="px-3 py-1.5 bg-white text-blue-600 hover:bg-blue-50 rounded text-xs font-medium transition-colors border border-blue-200 font-heading"
                   >
                     Got it!
                   </button>
                   <button
                     onClick={() => setShowOfflineInfo(false)}
-                    className="px-3 py-1.5 bg-[color:var(--dark-bg)] bg-opacity-50 text-[color:var(--text)] hover:bg-opacity-70 rounded text-xs font-medium transition-colors font-body"
+                    className="px-3 py-1.5 bg-white bg-opacity-20 text-white hover:bg-opacity-30 rounded text-xs font-medium transition-colors font-body"
                   >
                     Dismiss
                   </button>
@@ -135,7 +135,7 @@ export const OfflineIndicator = () => {
                   setHasSeenOfflineInfo(true);
                   localStorage.setItem('hasSeenOfflineInfo', 'true');
                 }}
-                className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-20 rounded transition-colors flex-shrink-0"
+                className="p-1 hover:bg-blue-500 rounded transition-colors flex-shrink-0"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -150,14 +150,14 @@ export const OfflineIndicator = () => {
   // Syncing mode
   if (syncStatus?.isSyncing) {
     return (
-      <div id="syncing-indicator" className="fixed bottom-4 left-4 z-50 bg-[color:var(--gold)] text-[color:var(--dark-bg)] px-4 py-3 rounded-lg shadow-lg border border-[color:var(--gold)] border-opacity-40">
+      <div id="syncing-indicator" className="fixed bottom-4 left-4 z-50 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg border border-blue-700">
         <div className="flex items-center gap-2 mb-2">
           <Wifi className="w-5 h-5 animate-pulse" />
           <p className="font-semibold font-heading">Syncing data</p>
         </div>
-        <div className="w-48 bg-[color:var(--gold)] bg-opacity-30 rounded-full h-2">
+        <div className="w-48 bg-blue-300 rounded-full h-2">
           <div
-            className="bg-[color:var(--gold)] h-2 rounded-full transition-all duration-300"
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${syncStatus.progress}%` }}
           />
         </div>

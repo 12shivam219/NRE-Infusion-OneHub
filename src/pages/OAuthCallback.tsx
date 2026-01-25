@@ -20,7 +20,7 @@ export default function OAuthCallback() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
+    <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="text-center space-y-6">
         <div className="flex justify-center">
           <div className="p-4 bg-white rounded-full shadow-lg">

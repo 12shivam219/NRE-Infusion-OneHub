@@ -60,7 +60,7 @@ export const Breadcrumbs = ({ items, className = '' }: BreadcrumbsProps) => {
               {index === 0 ? (
                 <Home className="w-4 h-4 text-[color:var(--text-secondary)]" aria-hidden="true" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-[color:var(--gold)]" aria-hidden="true" />
+                <ChevronRight className="w-4 h-4 text-slate-500" aria-hidden="true" />
               )}
               
               {isLast || !item.path ? (
@@ -73,7 +73,7 @@ export const Breadcrumbs = ({ items, className = '' }: BreadcrumbsProps) => {
               ) : (
                 <Link
                   to={item.path}
-                  className="text-[color:var(--text-secondary)] hover:text-[color:var(--gold)] transition-colors focus-ring rounded px-1"
+                  className="text-slate-500 hover:text-blue-600 transition-colors focus-ring rounded px-1"
                 >
                   {item.label}
                 </Link>

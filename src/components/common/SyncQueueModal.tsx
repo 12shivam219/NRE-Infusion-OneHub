@@ -88,7 +88,7 @@ export const SyncQueueModal = () => {
             <button
               onClick={handleProcess}
               disabled={isProcessing || pendingCount === 0}
-              className="px-3 py-2 rounded-lg bg-[color:var(--gold)] text-[color:var(--dark-bg)] hover:bg-[#f5d547] disabled:bg-[color:var(--gold)] disabled:bg-opacity-30 disabled:text-[color:var(--text-secondary)] transition flex items-center gap-2 font-heading font-bold"
+              className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-600 disabled:bg-opacity-30 disabled:text-slate-500 transition flex items-center gap-2 font-heading font-bold"
             >
               <CloudLightning className="w-4 h-4" />
               {isProcessing ? 'Processing…' : 'Process'}
@@ -96,7 +96,7 @@ export const SyncQueueModal = () => {
 
             <button
               onClick={handleClear}
-              className="px-3 py-2 rounded-lg bg-[color:var(--darkbg-surface)] text-[color:var(--text)] hover:bg-[color:var(--darkbg-surface-light)] transition flex items-center gap-2 border border-[color:var(--gold)] border-opacity-20 font-heading font-bold"
+              className="px-3 py-2 rounded-lg bg-white text-slate-900 hover:bg-slate-50 transition flex items-center gap-2 border border-gray-200 font-heading font-bold"
             >
               <RefreshCw className="w-4 h-4" />
               Clear
@@ -105,7 +105,7 @@ export const SyncQueueModal = () => {
             <button
               onClick={handleRetryFailed}
               disabled={isProcessing || failedCount === 0}
-              className="px-3 py-2 rounded-lg bg-red-500 bg-opacity-10 text-red-600 hover:bg-opacity-20 disabled:bg-[color:var(--gold)] disabled:bg-opacity-5 disabled:text-[color:var(--text-secondary)] transition flex items-center gap-2 font-heading font-bold border border-red-500 border-opacity-20"
+              className="px-3 py-2 rounded-lg bg-red-500 bg-opacity-10 text-red-600 hover:bg-opacity-20 disabled:bg-slate-100 disabled:bg-opacity-100 disabled:text-slate-500 transition flex items-center gap-2 font-heading font-bold border border-red-500 border-opacity-20"
             >
               <AlertCircle className="w-4 h-4" />
               Retry failed
@@ -113,13 +113,13 @@ export const SyncQueueModal = () => {
           </div>
         </div>
 
-        <div className="border border-[color:var(--gold)] border-opacity-20 rounded-lg overflow-hidden">
-          <div className="max-h-[50vh] overflow-y-auto bg-[color:var(--darkbg-surface-light)] bg-opacity-50">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <div className="max-h-[50vh] overflow-y-auto bg-slate-50 bg-opacity-50">
             {pendingItems.length === 0 ? (
-              <div className="p-4 text-xs font-body text-[color:var(--text-secondary)]">No items in queue.</div>
+              <div className="p-4 text-xs font-body text-slate-500">No items in queue.</div>
             ) : (
               pendingItems.slice(0, 100).map((item) => (
-                <div key={item.id} className="p-3 border-b border-[color:var(--gold)] border-opacity-10">
+                <div key={item.id} className="p-3 border-b border-gray-200">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs font-heading font-bold text-[color:var(--text)]">

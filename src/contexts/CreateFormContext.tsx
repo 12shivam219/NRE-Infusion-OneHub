@@ -3,6 +3,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import { CreateFormContext } from './CreateFormContextDef';
 import { CreateRequirementForm } from '../components/crm/CreateRequirementForm';
@@ -40,43 +41,49 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
       <Dialog
         open={openForm === 'requirement'}
         onClose={closeCreateForm}
-        maxWidth="lg"
+        maxWidth="sm"
         fullWidth
         disableScrollLock
         PaperProps={{
           sx: {
             borderRadius: '1rem',
-            backgroundColor: 'var(--darkbg-surface)',
-            backgroundImage: 'linear-gradient(135deg, var(--darkbg-surface) 0%, var(--darkbg) 100%)',
-            border: '1px solid rgba(234, 179, 8, 0.2)',
-            boxShadow: '0 0 30px rgba(234, 179, 8, 0.1)',
+            backgroundColor: '#FFFFFF',
+            backgroundImage: 'none',
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
+            zIndex: 1401,
+          },
+        }}
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(3px)',
+              zIndex: 1400,
+            },
           },
         }}
       >
-        <DialogTitle
-          sx={{
-            fontWeight: 700,
-            fontFamily: '"Poppins", sans-serif',
-            color: '#FFFFFF',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid rgba(234, 179, 8, 0.1)',
-          }}
-        >
-          Create Requirement
+        <DialogTitle sx={{ pr: 7, pb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: '#333', mb: 0.5 }}>
+              Create New Requirement
+            </Typography>
+            <Typography sx={{ fontSize: '0.85rem', color: '#888' }}>
+              Add job requirement details
+            </Typography>
+          </div>
           <IconButton
             onClick={closeCreateForm}
             size="small"
-            sx={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              '&:hover': { color: '#FFFFFF' },
-            }}
+            sx={{ color: '#666', '&:hover': { color: '#333' } }}
+            aria-label="Close form"
+            title="Close form"
           >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ pt: 3, pb: 2 }}>
+        <DialogContent dividers sx={{ backgroundColor: '#fff', p: 2 }}>
           <CreateRequirementForm
             onClose={closeCreateForm}
             onSuccess={closeCreateForm}
@@ -88,7 +95,7 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
       <Dialog
         open={openForm === 'interview'}
         onClose={closeCreateForm}
-        maxWidth="lg"
+        maxWidth="sm"
         fullWidth
         disableScrollLock
         PaperProps={{
@@ -137,16 +144,16 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
       <Dialog
         open={openForm === 'consultant'}
         onClose={closeCreateForm}
-        maxWidth="lg"
+        maxWidth="sm"
         fullWidth
         disableScrollLock
         PaperProps={{
           sx: {
             borderRadius: '1rem',
-            backgroundColor: 'var(--darkbg-surface)',
-            backgroundImage: 'linear-gradient(135deg, var(--darkbg-surface) 0%, var(--darkbg) 100%)',
-            border: '1px solid rgba(234, 179, 8, 0.2)',
-            boxShadow: '0 0 30px rgba(234, 179, 8, 0.1)',
+            backgroundColor: '#FFFFFF',
+            backgroundImage: 'none',
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           },
         }}
       >
@@ -154,11 +161,11 @@ export const CreateFormProvider = ({ children }: { children: ReactNode }) => {
           sx={{
             fontWeight: 700,
             fontFamily: '"Poppins", sans-serif',
-            color: '#FFFFFF',
+            color: '#0F172A',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            borderBottom: '1px solid rgba(234, 179, 8, 0.1)',
+            borderBottom: '1px solid #E5E7EB',
           }}
         >
           Create Consultant

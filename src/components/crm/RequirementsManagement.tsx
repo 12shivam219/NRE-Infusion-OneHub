@@ -571,7 +571,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
           <div className="h-10 bg-gray-200 rounded w-full max-w-md animate-pulse" />
         </div>
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-          <div className="px-4 py-3 bg-gradient-to-r from-white to-primary-50 border-b border-gray-100">
+          <div className="px-4 py-3 bg-white border-b border-gray-100">
             <div className="h-6 bg-gray-200 rounded w-32 mb-2 animate-pulse" />
           </div>
           <div className="p-4">
@@ -1113,19 +1113,6 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
 
       {/* Requirements Display - Table View Only */}
       <div className="w-full">
-        {/* Active Status Filter Chip */}
-        {selectedStatusFilter !== 'ALL' && (
-          <Box sx={{ mb: 2 }}>
-            <Chip
-              label={`Status: ${selectedStatusFilter}`}
-              onDelete={() => setSelectedStatusFilter('ALL')}
-              color="primary"
-              variant="outlined"
-              size="small"
-            />
-          </Box>
-        )}
-
         {/* Empty State - When no requirements match filters */}
         {requirements.length === 0 && !loading && (
           <Paper

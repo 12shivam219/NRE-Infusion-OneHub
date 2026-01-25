@@ -19,7 +19,7 @@ export const Skeleton = ({
   height,
   animation = 'pulse'
 }: SkeletonProps) => {
-  const baseClasses = 'bg-[color:var(--gold)] bg-opacity-10 rounded';
+  const baseClasses = 'bg-blue-100 rounded';
   const variantClasses = {
     text: 'h-4',
     circular: 'rounded-full',
@@ -53,7 +53,7 @@ export const Skeleton = ({
  * SkeletonCard - Pre-configured skeleton for card layouts
  */
 export const SkeletonCard = ({ className }: { className?: string }) => (
-  <div className={cn('bg-[color:var(--darkbg-surface)] rounded-xl shadow-sm border border-[color:var(--gold)] border-opacity-20 p-6', className)}>
+  <div className={cn('bg-white rounded-xl shadow-sm border border-gray-200 p-6', className)}>
     <Skeleton variant="text" width="60%" className="mb-4" />
     <Skeleton variant="text" width="40%" className="mb-2" />
     <Skeleton variant="text" width="80%" />
@@ -109,7 +109,7 @@ export const SkeletonGrid = ({
 export const SkeletonList = ({ items = 5 }: { items?: number }) => (
   <div className="space-y-4">
     {Array.from({ length: items }).map((_, idx) => (
-      <div key={idx} className="flex items-center gap-4 p-4 bg-[color:var(--darkbg-surface)] rounded-lg border border-[color:var(--gold)] border-opacity-20">
+      <div key={idx} className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200">
         <Skeleton variant="circular" width={40} height={40} />
         <div className="flex-1 space-y-2">
           <Skeleton variant="text" width="60%" />
@@ -124,7 +124,7 @@ export const SkeletonList = ({ items = 5 }: { items?: number }) => (
  * SkeletonStatCard - Pre-configured skeleton for stat cards
  */
 export const SkeletonStatCard = () => (
-  <div className="bg-[color:var(--darkbg-surface)] rounded-xl shadow-sm border border-[color:var(--gold)] border-opacity-20 p-6">
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
     <div className="flex items-center justify-between mb-4">
       <Skeleton variant="text" width="40%" />
       <Skeleton variant="circular" width={48} height={48} />

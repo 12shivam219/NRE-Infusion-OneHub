@@ -274,7 +274,7 @@ export const BulkEmailComposer = ({
 
   if (!user) {
     return (
-      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
+      <Paper variant="outlined" sx={{ p: 3, textAlign: 'center', bgcolor: '#FFFFFF', borderColor: '#E5E7EB' }}>
         <Typography variant="body2" color="text.secondary">
           Please sign in to send bulk emails
         </Typography>
@@ -437,7 +437,7 @@ export const BulkEmailComposer = ({
             {step === 'compose' && (
               <Stack spacing={2}>
                 {/* Recipients Summary */}
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.35)', borderLeft: '4px solid rgb(234,179,8)' }}>
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#EEF2FF', borderColor: '#93C5FD', borderLeft: '4px solid #2563EB' }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
                     <Stack spacing={0.5}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
@@ -512,7 +512,7 @@ export const BulkEmailComposer = ({
                     />
 
                     {rotationEnabled && (
-                      <Stack spacing={1.5} sx={{ pl: 3, pt: 1, borderLeft: '2px solid rgba(234,179,8,0.2)' }}>
+                      <Stack spacing={1.5} sx={{ pl: 3, pt: 1, borderLeft: '2px solid #93C5FD' }}>
                         <FormControl size="small" sx={{ maxWidth: 280 }}>
                           <InputLabel id="emails-per-account-label">Emails per Account</InputLabel>
                           <Select
@@ -613,7 +613,7 @@ export const BulkEmailComposer = ({
                 {/* Email Body Preview */}
                 <Stack spacing={1}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>💬 Email Body Preview</Typography>
-                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflowY: 'auto', bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
+                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 300, overflowY: 'auto', bgcolor: '#FFFFFF', borderColor: '#E5E7EB' }}>
                     <Typography 
                       variant="body2" 
                       sx={{ 

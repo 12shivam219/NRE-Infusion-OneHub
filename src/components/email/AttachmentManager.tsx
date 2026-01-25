@@ -335,7 +335,7 @@ export const AttachmentManager = ({
                         : totalSizePercent > 75
                           ? '#f97316'
                           : totalSizePercent > 60
-                            ? '#eab308'
+                            ? '#3b82f6'
                             : '#10b981',
                     borderRadius: '4px',
                   },

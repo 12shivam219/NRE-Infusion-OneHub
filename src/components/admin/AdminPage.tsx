@@ -1,4 +1,5 @@
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   UserCheck,
@@ -154,10 +155,12 @@ export const AdminPage = () => {
   const { user: currentAdmin, isAdmin } = useAuth();
   const adminId = currentAdmin?.id ?? null;
   const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // --- MOVED: Hooks declared here (before any conditional return) ---
 
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const tabParam = searchParams.get('tab') as TabType | null;
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'dashboard');
 
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -347,6 +350,18 @@ export const AdminPage = () => {
 
     setUserDetailLoading(false);
   };
+
+  // Sync activeTab with URL search params
+  useEffect(() => {
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam, activeTab]);
+
+  // Update URL when activeTab changes
+  useEffect(() => {
+    setSearchParams({ tab: activeTab });
+  }, [activeTab, setSearchParams]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -852,52 +867,18 @@ export const AdminPage = () => {
       </header>
 
       <nav className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2 text-gray-900">
-            {(() => {
-              const activeConfig = tabs.find((tab) => tab.id === activeTab);
-              if (!activeConfig) return null;
-              const ActiveIcon = activeConfig.icon;
-              return (
-                <>
-                  <ActiveIcon className="w-4 h-4 text-primary-600" aria-hidden="true" />
-                  <span className="text-xs font-medium">{activeConfig.label}</span>
-                </>
-              );
-            })()}
-          </div>
-
-          <div className="w-full sm:w-64">
-            <label htmlFor="admin-section-select" className="sr-only">
-              Select admin section
-            </label>
-            <div className="relative">
-              <select
-                id="admin-section-select"
-                value={activeTab}
-                onChange={(event) => setActiveTab(event.target.value as TabType)}
-                className="w-full appearance-none border border-gray-300 rounded-lg px-3 py-2 pr-10 text-xs font-medium text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-600"
-              >
-                {tabs.map((tab) => (
-                  <option key={tab.id} value={tab.id}>
-                    {tab.label}
-                  </option>
-                ))}
-              </select>
-              <svg
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 12a1 1 0 0 1-.707-.293l-4-4a1 1 0 1 1 1.414-1.414L10 9.586l3.293-3.293a1 1 0 1 1 1.414 1.414l-4 4A1 1 0 0 1 10 12Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 p-4 border-b border-gray-200 text-gray-900">
+          {(() => {
+            const activeConfig = tabs.find((tab) => tab.id === activeTab);
+            if (!activeConfig) return null;
+            const ActiveIcon = activeConfig.icon;
+            return (
+              <>
+                <ActiveIcon className="w-4 h-4 text-primary-600" aria-hidden="true" />
+                <span className="text-xs font-medium">{activeConfig.label}</span>
+              </>
+            );
+          })()}
         </div>
 
         <div className="p-6">

@@ -156,7 +156,7 @@ export const DraftManager = ({
         sx={{
           p: 2,
           bgcolor: 'background.paper',
-          borderColor: 'rgba(234,179,8,0.20)',
+          borderColor: '#E5E7EB',
         }}
       >
         <Stack spacing={2}>
@@ -190,7 +190,7 @@ export const DraftManager = ({
                   <Typography variant="h6">💾</Typography>
                   <Stack spacing={0.25}>
                     <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                      Auto-save: <span style={{ color: showAutoSaveIndicator ? 'rgb(34,197,94)' : 'text-secondary' }}>
+                      Auto-save: <span style={{ color: showAutoSaveIndicator ? '#2563EB' : '#64748B' }}>
                         {showAutoSaveIndicator ? '✓ Saved' : 'Enabled'}
                       </span>
                     </Typography>
@@ -213,8 +213,8 @@ export const DraftManager = ({
             <Paper
               sx={{
                 p: 1.5,
-                bgcolor: 'rgba(234,179,8,0.05)',
-                borderColor: 'rgba(234,179,8,0.2)',
+                bgcolor: 'rgba(59,130,246,0.05)',
+                borderColor: '#E5E7EB',
                 border: '1px solid',
               }}
             >
@@ -270,8 +270,8 @@ export const DraftManager = ({
                   variant="outlined"
                   sx={{
                     p: 1.5,
-                    bgcolor: 'rgba(234,179,8,0.02)',
-                    borderColor: 'rgba(234,179,8,0.1)',
+                    bgcolor: '#F8F9FA',
+                    borderColor: '#E5E7EB',
                   }}
                 >
                   <Stack direction="row" justifyContent="space-between" alignItems="start">

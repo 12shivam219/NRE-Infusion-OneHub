@@ -4,6 +4,7 @@
  */
 
 // Lazy-load Sentry to avoid heavy module resolution at dev startup
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Sentry: any = null;
 let SentryLoaded = false;
 
@@ -13,7 +14,7 @@ const loadSentry = async () => {
     Sentry = await import('@sentry/react');
     SentryLoaded = true;
     return Sentry;
-  } catch (e) {
+  } catch {
     // If import fails, keep functions as no-ops
     Sentry = null;
     SentryLoaded = false;

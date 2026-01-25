@@ -210,9 +210,10 @@ const IconCircular = ({
   }: LogoCircularProps) => {
     const [isHovered, setIsHovered] = useState(false);
     
-    const goldColor = '#d4af37';
-    const goldLight = '#eab308';
-    const subtleGold = isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(234, 179, 8, 0.2)';
+    // Muted gold colors for light mode (enterprise look)
+    const goldColor = isDark ? '#d4af37' : '#a89968';
+    const goldLight = isDark ? '#eab308' : '#c4b59a';
+    const subtleGold = isDark ? 'rgba(212, 175, 55, 0.3)' : 'rgba(160, 153, 104, 0.15)';
   
     if (variant === 'icon') {
       return (
@@ -252,14 +253,18 @@ const IconCircular = ({
         </div>
         <div className="flex flex-col justify-center">
           <div 
-            className="font-heading font-bold text-lg tracking-tight text-amber-400 leading-[1.1]"
+            className={`font-heading font-bold text-lg tracking-tight leading-[1.1] ${
+              isDark ? 'text-amber-400' : 'text-gray-900'
+            }`}
           >
             <span className="font-extrabold">NRE</span>
             <span className="font-semibold">Tech</span>
           </div>
           {showTagline && (
             <div 
-              className="text-[10px] tracking-[0.22em] uppercase text-gray-300/80 leading-[1.25]"
+              className={`text-[10px] tracking-[0.22em] uppercase leading-[1.25] ${
+                isDark ? 'text-gray-300/80' : 'text-gray-500'
+              }`}
             >
               IT'S TIME TO MAKE IT
             </div>
@@ -288,14 +293,18 @@ const IconCircular = ({
       />
       <div className="text-center">
         <div 
-          className="font-heading font-bold text-2xl tracking-tight text-amber-400 leading-[1.1]"
+          className={`font-heading font-bold text-2xl tracking-tight leading-[1.1] ${
+            isDark ? 'text-amber-400' : 'text-gray-900'
+          }`}
         >
           <span className="font-extrabold">NRE</span>
           <span className="font-semibold">Tech</span>
         </div>
         {showTagline && (
           <div 
-            className="text-[10px] tracking-[0.22em] uppercase mt-1 text-gray-300/80 leading-[1.25]"
+            className={`text-[10px] tracking-[0.22em] uppercase mt-1 leading-[1.25] ${
+              isDark ? 'text-gray-300/80' : 'text-gray-500'
+            }`}
           >
             IT'S TIME TO MAKE IT
           </div>

@@ -221,7 +221,7 @@ export const ConsultantProfiles = memo(() => {
             </InputAdornment>
           ),
         }}
-        sx={{ flex: 1, '& .MuiOutlinedInput-root': { color: 'var(--text)', borderColor: 'rgba(234,179,8,0.2)', '&:hover': { borderColor: 'rgba(234,179,8,0.4)' } } }}
+        sx={{ flex: 1, '& .MuiOutlinedInput-root': { color: '#0F172A', borderColor: '#E5E7EB', '&:hover': { borderColor: '#D1D5DB' } } }}
       />
 
       <select
@@ -243,7 +243,7 @@ export const ConsultantProfiles = memo(() => {
             setSearchError(null);
             handleDebouncedSearch('');
           }}
-          className="text-xs font-body text-[color:var(--text-secondary)] hover:text-[color:var(--gold)] transition-colors flex items-center gap-1 px-2 py-1"
+          className="text-xs font-body text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-1 px-2 py-1"
         >
           <X className="w-3 h-3" />
           Clear

@@ -1,27 +1,42 @@
 /**
- * NRETech Brand System
- * Comprehensive design tokens for unified, premium UI across all components
+ * Enterprise Light Theme - White + Blue + Slate Color System
+ * Production-ready enterprise CRM styling (Salesforce/Workday/ServiceNow light mode)
  */
 
-// ========== BRAND COLORS ==========
+// ========== ENTERPRISE LIGHT THEME COLORS ==========
 export const BRAND_COLORS = {
-  // Primary: Amber Gold - Premium, modern, tech-forward
-  gold: '#EAB308',
-  goldLight: '#fef08a',
-  goldDark: '#ca8a04',
+  // App & Surface Backgrounds
+  bgApp: '#FFFFFF',
+  bgSurface: '#FFFFFF',
   
-  // Dark Gradient Base - Sophisticated dark theme
-  darkBg: '#0D1117',
-  darkBgDeep: '#05070A',
-  darkSurface: '#161B22',
-  darkSurfaceLight: '#1C2128',
+  // Text Colors
+  textPrimary: '#0F172A',      // Headings, primary text (Slate-900)
+  textSecondary: '#64748B',    // Labels, helper text (Slate-500)
+  textMuted: '#94A3B8',        // Muted text (Slate-400)
   
-  // Neutral grayscale for text and borders
-  textPrimary: '#FFFFFF',
-  textSecondary: 'rgba(255, 255, 255, 0.7)',
-  textMuted: 'rgba(255, 255, 255, 0.5)',
-  borderDefault: 'rgba(255, 255, 255, 0.1)',
-  borderHover: 'rgba(255, 255, 255, 0.2)',
+  // Borders & Dividers
+  borderDefault: '#E5E7EB',    // Dividers, outlines (Gray-200)
+  borderHover: '#D1D5DB',      // Hover borders (Gray-300)
+  
+  // Accent Colors - Blue Primary
+  accentPrimary: '#2563EB',    // Primary actions & active states (Blue-600)
+  accentHoverBg: '#F1F5F9',    // Hover background (Slate-100)
+  accentActiveBg: '#EEF2FF',   // Selected/active background (Blue-50)
+  focusRing: '#93C5FD',        // Focus outline (Blue-300)
+  
+  // Legacy aliases for compatibility
+  gold: '#2563EB',             // Use blue as primary
+  goldLight: '#EEF2FF',
+  goldDark: '#1D4ED8',
+  darkBg: '#FFFFFF',
+  darkBgDeep: '#FFFFFF',
+  darkSurface: '#FFFFFF',
+  darkSurfaceLight: '#F9FAFB',
+  textPrimaryLight: '#0F172A',
+  textSecondaryLight: '#64748B',
+  textMutedLight: '#94A3B8',
+  borderDefaultLight: '#E5E7EB',
+  borderHoverLight: '#D1D5DB',
 };
 
 // ========== TYPOGRAPHY SYSTEM ==========
@@ -105,23 +120,21 @@ export const BORDER_RADIUS = {
 
 // ========== SHADOWS & ELEVATION ==========
 export const ELEVATION = {
-  // Glow effects for gold accent
-  goldGlow: '0 0 20px rgba(234, 179, 8, 0.15)',
-  goldGlowHover: '0 0 30px rgba(234, 179, 8, 0.25)',
-  goldGlowActive: '0 0 40px rgba(234, 179, 8, 0.35)',
+  // Focus ring (blue)
+  focusRing: '0 0 0 3px rgba(37, 99, 235, 0.1), 0 0 0 1px rgba(37, 99, 235, 0.5)',
   
-  // Standard shadows
+  // Standard enterprise shadows
   sm: '0 1px 2px rgba(0, 0, 0, 0.05)',
-  md: '0 4px 12px rgba(0, 0, 0, 0.1)',
-  lg: '0 10px 25px rgba(0, 0, 0, 0.15)',
-  xl: '0 20px 40px rgba(0, 0, 0, 0.2)',
+  md: '0 4px 12px rgba(0, 0, 0, 0.08)',
+  lg: '0 10px 25px rgba(0, 0, 0, 0.1)',
+  xl: '0 20px 40px rgba(0, 0, 0, 0.12)',
   
   // Card shadows
-  card: '0 2px 8px rgba(0, 0, 0, 0.1)',
-  cardHover: '0 8px 24px rgba(0, 0, 0, 0.15)',
+  card: '0 1px 3px rgba(0, 0, 0, 0.06)',
+  cardHover: '0 4px 12px rgba(0, 0, 0, 0.1)',
   
   // Input/focus shadows
-  focus: '0 0 0 3px rgba(234, 179, 8, 0.1), 0 0 0 1px rgba(234, 179, 8, 0.5)',
+  focus: '0 0 0 3px rgba(37, 99, 235, 0.1), 0 0 0 1px rgba(37, 99, 235, 0.5)',
 };
 
 // ========== TRANSITIONS & ANIMATIONS ==========

@@ -12,7 +12,7 @@ interface BrandBadgeProps {
 
 const variantClasses: Record<BadgeVariant, string> = {
   default: 'badge-status-new',
-  gold: 'bg-gold bg-opacity-20 text-gold border-gold border-opacity-40',
+  gold: 'bg-blue-100 text-blue-700 border-blue-300 border',
   success: 'bg-green-500 bg-opacity-20 text-green-400 border-green-500 border-opacity-40',
   warning: 'bg-yellow-500 bg-opacity-20 text-yellow-400 border-yellow-500 border-opacity-40',
   danger: 'bg-red-500 bg-opacity-20 text-red-400 border-red-500 border-opacity-40',
@@ -91,8 +91,8 @@ export const BrandDotBadge: React.FC<{
   className?: string;
 }> = ({ variant = 'default', label, className = '' }) => {
   const colorMap: Record<BadgeVariant, string> = {
-    default: 'bg-gold',
-    gold: 'bg-gold',
+    default: 'bg-blue-600',
+    gold: 'bg-blue-600',
     success: 'bg-green-500',
     warning: 'bg-yellow-500',
     danger: 'bg-red-500',

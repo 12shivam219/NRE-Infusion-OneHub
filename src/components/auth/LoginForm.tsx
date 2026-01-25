@@ -58,85 +58,88 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
 
   return (
     <AuthLayout variant="login">
-      <div className="relative">
-        <div className="absolute -left-4 -top-6 hidden h-20 w-20 rounded-full bg-primary-100 md:block" aria-hidden="true" />
-        <div className="absolute -right-6 -bottom-8 hidden h-24 w-24 rounded-full bg-amber-100/80 md:block" aria-hidden="true" />
+      <div className="w-full">
+        <div className="relative w-full overflow-hidden rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-sm md:px-8 md:py-10">
+          {/* Decorative elements - more subtle */}
+          <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-blue-50/40 blur-3xl" aria-hidden="true" />
+          <div className="absolute -left-20 -bottom-20 h-40 w-40 rounded-full bg-slate-100/30 blur-3xl" aria-hidden="true" />
 
-        <div className="relative w-full overflow-hidden rounded-2xl border border-slate-100 bg-white/90 px-3 py-4 shadow-xl backdrop-blur-sm sm:rounded-3xl sm:px-5 sm:py-5 md:px-6 md:py-6">
-          <div className="mb-4 space-y-2 text-center sm:mb-5 sm:space-y-2.5">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary-700 shadow-lg shadow-primary-200/50 sm:h-13 sm:w-13">
-              <LogIn className="h-6 w-6 text-white sm:h-6.5 sm:w-6.5" aria-hidden="true" />
-            </div>
-            <div className="space-y-0.5 sm:space-y-1">
-              <h1 className="text-[clamp(1.25rem,3.5vw,2rem)] font-bold tracking-tight text-slate-900">Welcome Back</h1>
-              <p className="text-[0.75rem] text-slate-600 sm:text-[0.8125rem] md:text-sm">Sign in to NRETech OneHub</p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5 md:space-y-4">
-            {error && (
-              <div
-                className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[0.75rem] text-red-700 sm:px-3 sm:py-2 sm:text-[0.8125rem]"
-                role="alert"
-                aria-live="polite"
-              >
-                {error}
+          <div className="relative">
+            <div className="mb-8 space-y-2 text-center md:mb-10">
+              <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20">
+                <LogIn className="h-7 w-7 text-white" aria-hidden="true" />
               </div>
-            )}
-
-            <div className="space-y-1 sm:space-y-1.5">
-              <label htmlFor="email" className="block text-[0.75rem] font-semibold text-slate-700 sm:text-[0.8125rem]">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                aria-required="true"
-                autoComplete="email"
-                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
-                placeholder="you@example.com"
-              />
+              <div className="space-y-1.5 pt-2 md:pt-3">
+                <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">Welcome Back</h1>
+                <p className="text-sm text-slate-600 md:text-base">Sign in to your NRETech OneHub account</p>
+              </div>
             </div>
 
-            <div className="space-y-1 sm:space-y-1.5">
-              <label htmlFor="password" className="block text-[0.75rem] font-semibold text-slate-700 sm:text-[0.8125rem]">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                aria-required="true"
-                autoComplete="current-password"
-                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[0.75rem] text-slate-900 shadow-sm transition sm:rounded-lg sm:px-3 sm:py-2 sm:text-[0.8125rem] focus:border-amber-400 focus:ring-2 focus:ring-amber-200"
-                placeholder="••••••••"
-              />
+            <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
+              {error && (
+                <div
+                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                  role="alert"
+                  aria-live="polite"
+                >
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  aria-required="true"
+                  autoComplete="email"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-500 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  aria-required="true"
+                  autoComplete="current-password"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-500 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
+                aria-busy={loading}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center text-sm text-slate-600 md:mt-8">
+              <span>Don't have an account? </span>
+              <button
+                onClick={onSwitchToRegister}
+                className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                aria-label="Switch to registration form"
+              >
+                Create Account
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-primary-700 py-1.5 text-[0.75rem] font-semibold uppercase tracking-[0.25em] text-white transition hover:bg-primary-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:cursor-not-allowed disabled:opacity-60 sm:rounded-lg sm:py-2 sm:text-[0.8125rem]"
-              aria-busy={loading}
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="mt-2.5 text-center text-[0.75rem] text-slate-600 sm:mt-3.5 sm:text-[0.8125rem] md:text-xs">
-            <span>Don't have an account? </span>
-            <button
-              onClick={onSwitchToRegister}
-              className="font-semibold text-primary-700 hover:text-primary-900 transition"
-              aria-label="Switch to registration form"
-            >
-              Create Account
-            </button>
           </div>
         </div>
       </div>

@@ -468,7 +468,7 @@ export const EmailThreading = ({ requirementId, onClose }: EmailThreadingProps) 
 
                             {/* Signature in Reply */}
                             {signatures.length > 0 && (
-                              <Paper sx={{ p: 1, bgcolor: 'rgba(234,179,8,0.05)' }}>
+                              <Paper sx={{ p: 1, bgcolor: '#F8F9FA', borderColor: '#E5E7EB', border: '1px solid' }}>
                                 <Button
                                   size="small"
                                   onClick={() => {

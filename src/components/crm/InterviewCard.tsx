@@ -97,7 +97,7 @@ const InterviewCard = memo(({
         bgcolor: isOverdue ? 'rgba(239,68,68,0.06)' : isToday ? 'rgba(249,115,22,0.06)' : isSoon ? 'rgba(234,179,8,0.06)' : 'var(--darkbg-surface)',
         borderColor: isOverdue ? 'rgba(239,68,68,0.45)' : isToday ? 'rgba(249,115,22,0.45)' : isSoon ? 'rgba(234,179,8,0.45)' : 'rgba(234,179,8,0.2)',
         transition: 'box-shadow 200ms ease, transform 200ms ease',
-        '&:hover': { boxShadow: '0 0 16px rgba(234,179,8,0.3)', transform: 'translateY(-2px)' },
+        '&:hover': { boxShadow: '0 2px 8px rgba(0,0,0,0.1)', transform: 'translateY(-2px)' },
         minHeight: 320,
       }}
     >
@@ -105,8 +105,9 @@ const InterviewCard = memo(({
         sx={{
           px: 2,
           py: 1.5,
-          background: 'linear-gradient(90deg, var(--gold) 0%, rgba(234,179,8,0.8) 100%)',
-          color: 'var(--dark-bg)',
+          background: '#FFFFFF',
+          borderBottom: '1px solid #E5E7EB',
+          color: '#0F172A',
         }}
       >
         <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">

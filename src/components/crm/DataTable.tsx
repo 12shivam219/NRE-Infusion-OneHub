@@ -2,7 +2,7 @@ import { useState, useMemo, memo, useRef } from 'react';
 import { Eye, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import Box from '@mui/material/Box';
-import Paper from '@mui/material/Paper';
+import Tooltip from '@mui/material/Tooltip';
 
 export type SortField = string;
 export type SortOrder = 'asc' | 'desc';
@@ -46,8 +46,8 @@ const DataTableRow = memo(({
   onDelete,
   onRowClick,
   isAdmin,
-  rowIndex,
   rowRef,
+  rowIndex,
   dataIndex,
 }: {
   item: { id: string };
@@ -62,62 +62,87 @@ const DataTableRow = memo(({
   rowRef?: (el: HTMLTableRowElement | null) => void;
   dataIndex?: number;
 }) => {
+  const isAlternate = rowIndex % 2 === 1;
+  
   return (
     <tr
       ref={rowRef}
       data-index={dataIndex}
       onClick={() => onRowClick?.(item)}
-      className={`${rowIndex % 2 === 0 ? 'bg-[color:var(--darkbg-surface)]' : 'bg-[color:var(--darkbg-surface-light)]'} hover:bg-[color:var(--gold)] hover:bg-opacity-10 transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''}`}
+      className={`
+        transition-colors duration-150
+        border-b border-[#EAECEF]
+        ${isAlternate ? 'bg-[#FAFBFC]' : 'bg-white'}
+        ${onRowClick ? 'cursor-pointer' : ''}
+        hover:bg-[#F5F7FA]
+        h-14
+      `}
     >
-      <td className="px-2 py-3 text-center align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
+      {/* Checkbox */}
+      <td className="px-4 py-0 text-center align-middle" style={{ width: '44px' }}>
         <div className="flex items-center justify-center">
           <button
-            onClick={() => toggleRowSelected(item.id)}
-            className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-offset-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleRowSelected(item.id);
+            }}
+            className="p-1.5 hover:bg-gray-200 hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
             aria-pressed={isSelected}
             title={isSelected ? 'Deselect item' : 'Select item'}
             aria-label={isSelected ? 'Deselect' : 'Select'}
           >
             {isSelected ? (
-              <CheckSquare className="w-4 h-4 text-[color:var(--gold)]" />
+              <CheckSquare className="w-4 h-4 text-blue-600" />
             ) : (
-              <Square className="w-4 h-4 text-[color:var(--text-secondary)] hover:text-[color:var(--gold)]" />
+              <Square className="w-4 h-4 text-[#9CA3AF] hover:text-gray-600" />
             )}
           </button>
         </div>
       </td>
 
+      {/* Data columns */}
       {columns.map((col) => (
         <td
           key={String(col.key)}
-          className="px-2 py-3 text-left align-top whitespace-normal break-words border-b border-r border-[color:var(--gold)] border-opacity-10"
-          style={{ width: col.width }}
+          className="px-4 py-0 text-left align-middle truncate font-normal text-[#475569]"
+          style={{ width: col.width, fontSize: '0.8125rem' }}
+          title={String(item[col.key as keyof typeof item] || '')}
         >
-          <div className="min-w-0">
+          <div className="truncate">
             {col.render ? col.render(item, String(col.key)) : String(item[col.key as keyof typeof item] || '—')}
           </div>
         </td>
       ))}
 
-      <td className="px-2 py-3 text-left align-middle border-b border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '140px' }}>
-        <div className="flex gap-1 justify-end items-center">
-          <button
-            onClick={() => onViewDetails(item)}
-            className="p-1.5 text-[color:var(--gold)] hover:bg-[color:var(--gold)] hover:bg-opacity-10 hover:text-[color:var(--gold)] focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 rounded-lg transition-all"
-            title="View details"
-            aria-label="View details"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          {isAdmin && (
+      {/* Actions */}
+      <td className="px-4 py-0 text-right align-middle" style={{ width: '90px' }}>
+        <div className="flex gap-1.5 justify-end items-center">
+          <Tooltip title="View details">
             <button
-              onClick={() => onDelete(item.id)}
-              className="p-1.5 text-red-600 hover:bg-red-500 hover:bg-opacity-10 hover:text-red-600 focus:ring-2 focus:ring-red-500 focus:ring-opacity-30 rounded-lg transition-all"
-              title="Delete item"
-              aria-label="Delete"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDetails(item);
+              }}
+              className="p-2 text-[#64748B] hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-30"
+              aria-label="View details"
             >
-              <Trash2 className="w-4 h-4" />
+              <Eye className="w-4 h-4" />
             </button>
+          </Tooltip>
+          
+          {isAdmin && (
+            <Tooltip title="Delete item">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(item.id);
+                }}
+                className="p-2 text-[#64748B] hover:text-red-600 hover:bg-red-50 rounded-md transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-30"
+                aria-label="Delete"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </Tooltip>
           )}
         </div>
       </td>
@@ -191,25 +216,23 @@ export const DataTable = memo(({
   }, 40 + 140); // checkbox + actions
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: 'rgba(234,179,8,0.2)',
-        borderRadius: 2,
-        bgcolor: 'var(--darkbg-surface)',
-      }}
-    >
-      <div className="bg-white">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-gray-200 gap-3">
-          <h3 className="text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide">{title}</h3>
-          <div className="flex-shrink-0 min-w-0">
+    <div className="w-full bg-white rounded-lg border border-[#E5E7EB]">
+      {/* Toolbar - Header with Title and Search */}
+      <div className="px-6 py-4 border-b border-[#EAECEF] bg-white">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-[16px] font-semibold text-[#0F172A]">{title}</h3>
+            <p className="text-[12px] text-[#64748B] mt-1">{sortedData.length} items total</p>
+          </div>
+          
+          {/* Search Bar */}
+          <div className="w-full sm:w-auto">
             {headerSearch ?? null}
           </div>
         </div>
       </div>
 
+      {/* Table */}
       <Box
         ref={parentRef}
         sx={{
@@ -217,7 +240,7 @@ export const DataTable = memo(({
           overflowX: { xs: 'auto', sm: 'auto', md: 'auto' },
           overflowY: 'auto',
           maxHeight: { xs: '60vh', sm: '65vh', md: '70vh' },
-          pb: 1,
+          pb: 0,
           scrollbarGutter: 'stable',
           width: '100%',
           willChange: 'transform',
@@ -232,55 +255,60 @@ export const DataTable = memo(({
             position: 'sticky',
             top: 0,
             zIndex: 10,
-            boxShadow: `0 2px 0 0 rgba(234, 179, 8, 0.3)`,
-          },
-          '& thead tr': {
-            borderBottom: '2px solid rgba(234, 179, 8, 0.3)',
           },
         }}
       >
-        <table className="min-w-full border border-[color:var(--gold)] border-opacity-20 rounded-lg">
-          <thead className="bg-white">
-            <tr>
-              <th className="px-2 py-3 text-center text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '40px' }}>
+        <table className="w-full">
+          <thead>
+            <tr className="bg-[#F8FAFC] border-b border-[#EAECEF]">
+              {/* Checkbox Header */}
+              <th className="px-4 py-3 text-center align-middle" style={{ width: '44px', fontSize: '0.75rem', fontWeight: 600 }}>
                 <button
                   onClick={toggleSelectAll}
-                  className="p-1 hover:bg-[color:var(--gold)] hover:bg-opacity-10 rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--gold)] focus:ring-opacity-30 focus:ring-offset-1 transition-all"
+                  className="p-1.5 hover:bg-gray-200 hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
                   title={selectedRows.size === sortedData.length ? 'Deselect all' : 'Select all'}
+                  aria-label={selectedRows.size === sortedData.length ? 'Deselect all' : 'Select all'}
                 >
                   {selectedRows.size === sortedData.length && sortedData.length > 0 ? (
-                    <CheckSquare className="w-4 h-4 text-[color:var(--gold)]" />
+                    <CheckSquare className="w-4 h-4 text-blue-600" />
                   ) : (
-                    <Square className="w-4 h-4 text-[color:var(--text-secondary)] hover:text-[color:var(--gold)]" />
+                    <Square className="w-4 h-4 text-[#9CA3AF] hover:text-gray-600" />
                   )}
                 </button>
               </th>
+              
+              {/* Column Headers */}
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
-                  className="px-2 py-3 text-left text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10"
-                  style={{ width: col.width }}
+                  className="px-4 py-3 text-left align-middle"
+                  style={{ width: col.width, fontSize: '0.75rem', fontWeight: 600 }}
                 >
-                  {col.label}
+                  <span className="text-[#475569] uppercase tracking-wide">
+                    {col.label}
+                  </span>
                 </th>
               ))}
-              <th className="px-2 py-3 text-right text-xs font-heading font-bold text-[color:var(--gold)] uppercase letter-spacing-wide border-r border-[color:var(--gold)] border-opacity-10" style={{ width: '140px' }}>
-                Actions
+              
+              {/* Actions Header */}
+              <th className="px-4 py-3 text-right align-middle" style={{ width: '90px', fontSize: '0.75rem', fontWeight: 600 }}>
+                <span className="text-[#475569] uppercase tracking-wide">Actions</span>
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white">
+          
+          <tbody>
             {sortedData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 2} className="px-2 py-12 text-center">
+                <td colSpan={columns.length + 2} className="px-6 py-12 text-center">
                   <div className="flex flex-col items-center gap-3">
                     {EmptyStateIcon && (
-                      <div className="w-14 h-14 rounded-full bg-[color:var(--gold)] bg-opacity-10 flex items-center justify-center">
-                        <EmptyStateIcon className="w-8 h-8 text-[color:var(--gold)]" />
+                      <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center">
+                        <EmptyStateIcon className="w-7 h-7 text-gray-400" />
                       </div>
                     )}
                     <div>
-                      <p className="text-[color:var(--text)] font-medium text-xs">
+                      <p className="text-[14px] font-semibold text-[#0F172A]">
                         {emptyStateMessage || 'No data found'}
                       </p>
                     </div>
@@ -326,34 +354,39 @@ export const DataTable = memo(({
         </table>
       </Box>
 
-      <div className="bg-white border-t border-gray-200">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 gap-3">
-          <div className="flex items-center space-x-2 text-xs font-body text-gray-600">
-            <span>Page: <strong>{page + 1}</strong></span>
-            <span className="text-gray-300">|</span>
-            <span>Rows: <strong>{sortedData.length}</strong></span>
-            <span className="text-gray-300">|</span>
-            <span>Selected: <strong>{selectedRows.size}</strong></span>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onPageChange(page - 1)}
-              disabled={page === 0 || isFetchingPage}
-              className="px-3 py-1.5 text-xs font-body text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Prev
-            </button>
-            <button
-              onClick={() => onPageChange(page + 1)}
-              disabled={!hasNextPage || isFetchingPage}
-              className="px-3 py-1.5 text-xs font-body text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[color:var(--gold)] focus:ring-opacity-30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Next
-            </button>
-          </div>
+      {/* Footer - Pagination */}
+      <div className="px-6 py-4 border-t border-[#EAECEF] bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-[13px] text-[#64748B]">
+          <span>
+            Page: <span className="font-semibold text-[#0F172A]">{page + 1}</span>
+          </span>
+          <span className="w-px h-4 bg-[#E5E7EB]" />
+          <span>
+            Rows: <span className="font-semibold text-[#0F172A]">{sortedData.length}</span>
+          </span>
+          <span className="w-px h-4 bg-[#E5E7EB]" />
+          <span>
+            Selected: <span className="font-semibold text-[#0F172A]">{selectedRows.size}</span>
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 0 || isFetchingPage}
+            className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
+          >
+            ← Previous
+          </button>
+          <button
+            onClick={() => onPageChange(page + 1)}
+            disabled={!hasNextPage || isFetchingPage}
+            className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
+          >
+            Next →
+          </button>
         </div>
       </div>
-    </Paper>
+    </div>
   );
 });

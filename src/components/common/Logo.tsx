@@ -1,14 +1,16 @@
 import { LogoCircular } from './LogoCircular';
 import { LogoGeometric } from './LogoGeometric';
 import { LogoMonogram } from './LogoMonogram';
+import { LogoEnterprise } from './LogoEnterprise';
 
 interface LogoProps {
   variant?: 'full' | 'icon' | 'horizontal';
-  style?: 'circular' | 'geometric' | 'monogram';
+  style?: 'circular' | 'geometric' | 'monogram' | 'enterprise';
   className?: string;
   isDark?: boolean;
   showTagline?: boolean;
   animate?: boolean;
+  colorMode?: 'slate' | 'blue';
 }
 
 export const Logo = ({
@@ -18,6 +20,7 @@ export const Logo = ({
   isDark = true,
   showTagline = false,
   animate = false,
+  colorMode = 'slate',
 }: LogoProps) => {
   // Render the selected logo style
   const renderLogo = () => {
@@ -42,6 +45,17 @@ export const Logo = ({
             animate={animate}
           />
         );
+      case 'enterprise':
+        return (
+          <LogoEnterprise
+            variant={variant}
+            className={className}
+            isDark={isDark}
+            showTagline={showTagline}
+            animate={animate}
+            colorMode={colorMode}
+          />
+        );
       case 'circular':
       default:
         return (
@@ -63,3 +77,4 @@ export const Logo = ({
 export { LogoCircular } from './LogoCircular';
 export { LogoGeometric } from './LogoGeometric';
 export { LogoMonogram } from './LogoMonogram';
+export { LogoEnterprise } from './LogoEnterprise';

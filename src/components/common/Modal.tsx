@@ -210,16 +210,16 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'md', initialFo
         aria-modal="true"
         aria-labelledby={hasTitle ? titleElementId : undefined}
         aria-label={hasTitle ? undefined : 'Dialog'}
-        className={`bg-darkbg-surface rounded-card shadow-xl w-full ${sizeClasses[size]} max-h-[95vh] sm:max-h-[90vh] flex flex-col animate-slide-up border border-gold border-opacity-10`}
+        className={`bg-white rounded-card shadow-xl w-full ${sizeClasses[size]} max-h-[95vh] sm:max-h-[90vh] flex flex-col animate-slide-up border border-gray-200`}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gold border-opacity-10 flex-shrink-0">
-          <h2 id={titleElementId} className="text-base sm:text-lg font-bold font-heading text-text pr-4 letter-spacing-tight">{title}</h2>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+          <h2 id={titleElementId} className="text-base sm:text-lg font-bold font-heading text-slate-900 pr-4 letter-spacing-tight">{title}</h2>
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="p-2 text-text-secondary hover:text-gold hover:bg-gold hover:bg-opacity-10 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-gold flex-shrink-0"
+            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 focus:ring-2 focus:ring-blue-300 flex-shrink-0"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />

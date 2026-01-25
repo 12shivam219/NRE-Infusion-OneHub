@@ -20,73 +20,90 @@ export default {
         widest: '0.2em',
       },
       colors: {
-        // Brand Primary - Amber Gold
-        gold: {
-          50: '#fffef2',
-          100: '#fffde6',
-          200: '#fffacc',
-          300: '#fff8b3',
-          400: '#fff499',
-          500: '#EAB308', // Primary brand gold
-          600: '#ca8a04',
-          700: '#a16207',
-          800: '#854d0e',
-          900: '#713f12',
+        // Blue Primary - Enterprise accent (replaces gold)
+        blue: {
+          50: '#EFF6FF',
+          100: '#DBEAFE',
+          200: '#BFDBFE',
+          300: '#93C5FD',
+          400: '#60A5FA',
+          500: '#3B82F6',
+          600: '#2563EB',  // Primary accent
+          700: '#1D4ED8',  // Dark accent
+          800: '#1E40AF',
+          900: '#1E3A8A',
         },
-        // Dark Theme Background Gradient
-        darkbg: {
-          DEFAULT: '#0D1117',
-          deep: '#05070A',
-          surface: '#161B22',
-          surface_light: '#1C2128',
+        // Slate - Enterprise text & borders
+        slate: {
+          50: '#F8FAFC',
+          100: '#F1F5F9',
+          200: '#E2E8F0',
+          300: '#CBD5E1',
+          400: '#94A3B8',
+          500: '#64748B',  // Secondary text
+          600: '#475569',
+          700: '#334155',
+          800: '#1E293B',
+          900: '#0F172A',  // Primary text
         },
-        // Enterprise Color Palette - Charcoal Primary + Gold Accent
-        // Primary - Charcoal
-        primary: {
-          50: '#f9fafb',
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280', // Base charcoal
-          600: '#4b5563',
-          700: '#374151', // Dark charcoal
-          800: '#1f2937',
-          900: '#111827', // Deep charcoal
-        },
-        // Accent - Gold (Legacy, maps to new gold)
-        accent: {
-          50: '#fffef2',
-          100: '#fffde6',
-          200: '#fffacc',
-          300: '#fff8b3',
-          400: '#fff499',
-          500: '#EAB308',
-          600: '#ca8a04',
-          700: '#a16207',
-          800: '#854d0e',
-          900: '#713f12',
-        },
-        // Neutral grayscale
-        neutral: {
-          50: '#f9fafb',
-          100: '#f3f4f6',
-          200: '#e5e7eb',
-          300: '#d1d5db',
-          400: '#9ca3af',
-          500: '#6b7280',
-          600: '#4b5563',
+        // Gray - Backgrounds & borders
+        gray: {
+          50: '#F9FAFB',
+          100: '#F3F4F6',
+          200: '#E5E7EB',  // Default border
+          300: '#D1D5DB',
+          400: '#9CA3AF',
+          500: '#6B7280',
+          600: '#4B5563',
           700: '#374151',
-          800: '#1f2937',
+          800: '#1F2937',
           900: '#111827',
+        },
+        // White surface
+        white: '#FFFFFF',
+        
+        // Legacy primary color mapped to blue
+        primary: {
+          50: '#EFF6FF',
+          100: '#DBEAFE',
+          200: '#BFDBFE',
+          300: '#93C5FD',
+          400: '#60A5FA',
+          500: '#3B82F6',
+          600: '#2563EB',
+          700: '#1D4ED8',
+          800: '#1E40AF',
+          900: '#1E3A8A',
+        },
+        // Accent maps to blue
+        accent: {
+          50: '#EFF6FF',
+          100: '#DBEAFE',
+          200: '#BFDBFE',
+          300: '#93C5FD',
+          400: '#60A5FA',
+          500: '#3B82F6',
+          600: '#2563EB',
+          700: '#1D4ED8',
+          800: '#1E40AF',
+          900: '#1E3A8A',
+        },
+        // Neutral grayscale (slate-based)
+        neutral: {
+          50: '#F8FAFC',
+          100: '#F1F5F9',
+          200: '#E2E8F0',
+          300: '#CBD5E1',
+          400: '#94A3B8',
+          500: '#64748B',
+          600: '#475569',
+          700: '#334155',
+          800: '#1E293B',
+          900: '#0F172A',
         },
       },
       boxShadow: {
-        // Gold glow effects
-        'gold-glow': '0 0 20px rgba(234, 179, 8, 0.15)',
-        'gold-glow-hover': '0 0 30px rgba(234, 179, 8, 0.25)',
-        'gold-glow-active': '0 0 40px rgba(234, 179, 8, 0.35)',
-        // Subtle and soft shadows for depth
+        // Enterprise shadows
         xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
         sm: '0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.08)',
         base: '0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08)',
@@ -94,9 +111,9 @@ export default {
         lg: '0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.08)',
         xl: '0 25px 50px -12px rgb(0 0 0 / 0.1)',
         'card': '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
-        'card-hover': '0 10px 20px -5px rgb(0 0 0 / 0.1)',
-        // Focus states
-        'focus-gold': '0 0 0 3px rgba(234, 179, 8, 0.1), 0 0 0 1px rgba(234, 179, 8, 0.5)',
+        'card-hover': '0 4px 12px rgb(0 0 0 / 0.1)',
+        // Focus ring - Blue
+        'focus-blue': '0 0 0 3px rgba(37, 99, 235, 0.1), 0 0 0 1px rgba(37, 99, 235, 0.5)',
       },
       borderRadius: {
         'card': '1rem',
@@ -120,12 +137,11 @@ export default {
       },
       animation: {
         'spin-slow': 'spin 4s linear infinite',
-        'pulse-gold': 'pulse-gold 3s ease-in-out infinite',
+        'pulse-subtle': 'pulse-subtle 3s ease-in-out infinite',
         'scale-subtle': 'scale-subtle 0.3s ease-out',
-        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
       },
       keyframes: {
-        'pulse-gold': {
+        'pulse-subtle': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.7' },
         },
@@ -133,16 +149,6 @@ export default {
           '0%': { transform: 'scale(1)' },
           '50%': { transform: 'scale(1.05)' },
           '100%': { transform: 'scale(1)' },
-        },
-        'glow-pulse': {
-          '0%, 100%': { 
-            boxShadow: '0 0 20px rgba(234, 179, 8, 0.15)',
-            opacity: '1',
-          },
-          '50%': { 
-            boxShadow: '0 0 30px rgba(234, 179, 8, 0.25)',
-            opacity: '0.9',
-          },
         },
       },
     },

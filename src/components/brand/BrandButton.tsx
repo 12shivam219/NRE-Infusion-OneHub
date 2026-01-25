@@ -15,7 +15,7 @@ const variantClasses = {
   outline: 'btn-outline',
   danger: 'btn-danger',
   success: 'btn-success',
-  ghost: 'bg-transparent text-gold hover:bg-gold hover:bg-opacity-10 transition-colors duration-200',
+  ghost: 'bg-transparent text-blue-600 hover:bg-blue-50 transition-colors duration-200',
 };
 
 const sizeClasses = {

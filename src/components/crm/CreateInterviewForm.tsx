@@ -922,11 +922,11 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                 mb: 1.5,
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <MessageSquare size={18} style={{ color: '#eab308' }} />
+                  <MessageSquare size={18} style={{ color: '#2563EB' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                     Interview Focus                  </Typography>
                   <Box sx={{
-                    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
                     padding: '2px 8px',
                     borderRadius: '4px',
                     border: '1px solid rgba(212, 175, 55, 0.3)',
@@ -1039,7 +1039,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
             {/* Special Note */}
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <FileText size={18} style={{ color: '#eab308' }} />
+                <FileText size={18} style={{ color: '#2563EB' }} />
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                   Special Note
                 </Typography>
