@@ -18,8 +18,8 @@ import {
   Alert,
 } from '@mui/material';
 import { useMultilingual } from '../../hooks/useMultilingual';
-import { getPhrase } from '../../lib/chat/multilingual';
-import type { LanguageConfig } from '../../lib/chat/multilingual';
+import { getPhrase } from '../../lib/chat/utils/multilingual';
+import type { LanguageConfig } from '../../lib/chat/utils/multilingual';
 
 interface LanguageSelectorProps {
   open: boolean;

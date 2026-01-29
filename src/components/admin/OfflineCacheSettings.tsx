@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Database, HardDrive, Lock } from 'lucide-react';
+import { Database, HardDrive, Lock, RefreshCw } from 'lucide-react';
 import { useCachePreferences } from '../../hooks/useCachePreferences';
 
 /**
@@ -10,6 +10,7 @@ export const OfflineCacheSettings = () => {
   const {
     preferences,
     updatePreferences,
+    reloadPreferences,
     cacheSize,
     cacheQuota,
     cachePercentage,
@@ -37,12 +38,21 @@ export const OfflineCacheSettings = () => {
             <HardDrive className="w-5 h-5 text-primary-600" />
             <h3 className="font-medium text-gray-900">Storage Usage</h3>
           </div>
-          {isPersistent && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
-              <Lock className="w-3 h-3" />
-              Persistent
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isPersistent && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                <Lock className="w-3 h-3" />
+                Persistent
+              </span>
+            )}
+            <button
+              onClick={reloadPreferences}
+              className="p-2 hover:bg-gray-100 rounded transition text-gray-600 hover:text-gray-900"
+              title="Reload preferences from database"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2">

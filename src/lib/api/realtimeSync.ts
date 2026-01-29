@@ -27,7 +27,7 @@ export const subscribeToRequirements = (
         table: 'requirements',
         filter: `user_id=eq.${userId}`,
       },
-      (payload) => {
+      (payload: any) => {
         if (payload.eventType === 'INSERT') {
           onUpdate({
             type: 'INSERT',
@@ -70,7 +70,7 @@ export const subscribeToInterviews = (
         table: 'interviews',
         filter: `user_id=eq.${userId}`,
       },
-      (payload) => {
+      (payload: any) => {
         if (payload.eventType === 'INSERT') {
           onUpdate({
             type: 'INSERT',
@@ -113,7 +113,7 @@ export const subscribeToConsultants = (
         table: 'consultants',
         filter: `user_id=eq.${userId}`,
       },
-      (payload) => {
+      (payload: any) => {
         if (payload.eventType === 'INSERT') {
           onUpdate({
             type: 'INSERT',
@@ -155,7 +155,7 @@ export const subscribeToAllRequirements = (
         schema: 'public',
         table: 'requirements',
       },
-      (payload) => {
+      (payload: any) => {
         if (payload.eventType === 'INSERT') {
           onUpdate({
             type: 'INSERT',
@@ -196,7 +196,7 @@ export const subscribeToAllInterviews = (
         schema: 'public',
         table: 'interviews',
       },
-      (payload) => {
+      (payload: any) => {
         if (payload.eventType === 'INSERT') {
           onUpdate({
             type: 'INSERT',
@@ -237,7 +237,7 @@ export const subscribeToAllConsultants = (
         schema: 'public',
         table: 'consultants',
       },
-      (payload) => {
+      (payload: any) => {
         if (payload.eventType === 'INSERT') {
           onUpdate({
             type: 'INSERT',
@@ -280,7 +280,7 @@ export const subscribeToRequirementById = (
         table: 'requirements',
         filter: `id=eq.${id}`,
       },
-      (payload) => {
+      (payload: any) => {
         onUpdate({
           type: 'UPDATE',
           record: payload.new as Requirement,
@@ -311,7 +311,7 @@ export const subscribeToInterviewById = (
         table: 'interviews',
         filter: `id=eq.${id}`,
       },
-      (payload) => {
+      (payload: any) => {
         onUpdate({
           type: 'UPDATE',
           record: payload.new as Interview,
@@ -342,7 +342,7 @@ export const subscribeToConsultantById = (
         table: 'consultants',
         filter: `id=eq.${id}`,
       },
-      (payload) => {
+      (payload: any) => {
         onUpdate({
           type: 'UPDATE',
           record: payload.new as Consultant,

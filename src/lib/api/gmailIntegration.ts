@@ -232,6 +232,20 @@ async function saveGmailToken(
   if (error) {
     throw new Error(`Failed to save Gmail token: ${error.message}`);
   }
+
+  // Also update user metadata with Gmail connection status and email
+  const { error: metadataError } = await supabase.auth.updateUser({
+    data: {
+      gmail_connected: true,
+      gmail_email: gmailEmail,
+      gmail_refresh_token: gmailToken.refresh_token,
+    },
+  });
+
+  if (metadataError) {
+    console.error('Failed to update Gmail metadata:', metadataError);
+    // Don't throw here as the token is already saved
+  }
 }
 
 /**
@@ -275,6 +289,20 @@ async function disconnectGmailAccount(userId: string): Promise<void> {
 
   if (error) {
     throw new Error(`Failed to disconnect Gmail account: ${error.message}`);
+  }
+
+  // Also update user metadata to clear Gmail connection
+  const { error: metadataError } = await supabase.auth.updateUser({
+    data: {
+      gmail_connected: false,
+      gmail_email: null,
+      gmail_refresh_token: null,
+    },
+  });
+
+  if (metadataError) {
+    console.error('Failed to update Gmail metadata:', metadataError);
+    // Don't throw here as the disconnection is already done
   }
 }
 

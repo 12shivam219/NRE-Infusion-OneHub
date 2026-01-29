@@ -6,7 +6,7 @@ import {
   getTranslationFromCache,
   cacheTranslation,
 } from '../lib/api/phase3';
-import { getLanguageConfig, SUPPORTED_LANGUAGES, detectLanguage } from '../lib/chat/multilingual';
+import { getLanguageConfig, SUPPORTED_LANGUAGES, detectLanguage } from '../lib/chat/utils/multilingual';
 
 export function useMultilingual() {
   const { user } = useAuth();

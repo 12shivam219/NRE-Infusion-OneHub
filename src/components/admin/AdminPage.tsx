@@ -47,6 +47,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 const EmailAccountsSettings = lazy(() => import('./EmailAccountsSettings').then(m => ({ default: m.EmailAccountsSettings })));
 const SyncDashboard = lazy(() => import('./SyncDashboard').then(m => ({ default: m.SyncDashboard })));
 const OfflineCacheSettings = lazy(() => import('./OfflineCacheSettings').then(m => ({ default: m.OfflineCacheSettings })));
+const JobExtractionAgentDashboard = lazy(() => import('./JobExtractionAgentDashboard').then(m => ({ default: m.JobExtractionAgentDashboard })));
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -57,7 +58,7 @@ type Attachment = Database['public']['Tables']['attachments']['Row'];
 // `user_sessions` table type from DB schema
 type UserSession = Database['public']['Tables']['user_sessions']['Row'];
 
-type TabType = 'dashboard' | 'approvals' | 'security' | 'errors' | 'email-accounts' | 'offline-sync' | 'cache-settings';
+type TabType = 'dashboard' | 'approvals' | 'security' | 'errors' | 'email-accounts' | 'offline-sync' | 'cache-settings' | 'job-extraction';
 
 type ApprovalStatistics = {
   pendingApproval: number;
@@ -842,6 +843,7 @@ export const AdminPage = () => {
     { id: 'email-accounts' as TabType, label: 'Email Accounts', icon: Mail },
     { id: 'offline-sync' as TabType, label: 'Sync Dashboard', icon: RefreshCw },
     { id: 'cache-settings' as TabType, label: 'Cache Management', icon: HardDrive },
+    { id: 'job-extraction' as TabType, label: 'Job Extraction Agent', icon: AlertTriangle },
   ];
 
   // --- MOVED: Conditional check is now AFTER all hooks ---
@@ -1536,6 +1538,12 @@ export const AdminPage = () => {
           {activeTab === 'cache-settings' && (
             <Suspense fallback={<div className="p-8 text-center">Loading cache settings...</div>}>
               <OfflineCacheSettings />
+            </Suspense>
+          )}
+
+          {activeTab === 'job-extraction' && (
+            <Suspense fallback={<div className="p-8 text-center">Loading job extraction agent...</div>}>
+              <JobExtractionAgentDashboard />
             </Suspense>
           )}
         </div>

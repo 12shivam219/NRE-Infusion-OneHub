@@ -565,7 +565,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
         console.log(`Phase 3: Initializing SuperDoc for ${documentsToDisplay.length} document(s)...`);
 
         // Lazy-load SuperDoc library and styles once
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         let SuperDocLib: any = null;
         try {
           const mod = await import('@harbour-enterprises/superdoc');
@@ -623,7 +623,7 @@ export const DocumentEditor = ({ documents, layout, onClose, onSave }: DocumentE
             console.log(`File size: ${file.size} bytes`);
 
             // SPEED OPTIMIZATION: Initialize SuperDoc with minimal settings
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+             
             const superdoc = new (SuperDocLib as any)({
               selector,
               toolbar: toolbarSelector,

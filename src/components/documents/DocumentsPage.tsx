@@ -788,7 +788,7 @@ export const DocumentsPage = () => {
           return removeFromPages(currentPages);
         },
         {
-          optimisticData: (currentData) => removeFromPages(currentData),
+          optimisticData: (currentData: any) => removeFromPages(currentData),
           rollbackOnError: true,
           populateCache: true,
           revalidate: false,

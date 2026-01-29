@@ -6,7 +6,7 @@
 import { useCallback, useState } from 'react';
 import { sendChatMessageStream } from '../lib/api/chat';
 import type { SendMessageInput } from '../lib/api/chat';
-import type { StreamMessage } from '../lib/chat/streaming';
+import type { StreamMessage } from '../lib/chat/utils/streaming';
 
 interface UseStreamingReturn {
   isStreaming: boolean;

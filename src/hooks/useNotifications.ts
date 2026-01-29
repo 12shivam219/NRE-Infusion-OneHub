@@ -110,7 +110,7 @@ export const useNotifications = () => {
             void loadNotifications();
           }
         )
-        .subscribe((status) => {
+        .subscribe((status: string) => {
           // Only log if there's an actual error during subscription
           if (status === 'CHANNEL_ERROR') {
             console.warn(`Notification channel error for user ${userId}`);

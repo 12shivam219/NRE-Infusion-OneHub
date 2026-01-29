@@ -13,8 +13,8 @@ import {
   buildBranchTree,
   calculateBranchDivergence,
   validateBranchName,
-} from '../lib/chat/conversationBranching';
-import type { ConversationBranch, BranchMessage } from '../lib/chat/conversationBranching';
+} from '../lib/chat/features/conversationBranching';
+import type { ConversationBranch, BranchMessage } from '../lib/chat/features/conversationBranching';
 
 export function useConversationBranching(conversationId: string) {
   const { user } = useAuth();
@@ -41,7 +41,7 @@ export function useConversationBranching(conversationId: string) {
       if (result.success && result.data) {
         setBranches(result.data);
         // Load messages for each branch
-        result.data.forEach(async (branch) => {
+        result.data.forEach(async (branch: ConversationBranch) => {
           const messagesResult = await getBranchMessages(user.id, branch.id);
           if (messagesResult.success && messagesResult.data) {
             setBranchMessages(prev => new Map(prev).set(branch.id, messagesResult.data || []));

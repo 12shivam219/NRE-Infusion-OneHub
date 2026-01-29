@@ -7,8 +7,8 @@ import {
 } from '../lib/api/phase4';
 import {
   updatePresenceStatus,
-} from '../lib/chat/realtimeCollaboration';
-import type { CollaborationSession, UserPresence } from '../lib/chat/realtimeCollaboration';
+} from '../lib/chat/features/realtimeCollaboration';
+import type { CollaborationSession, UserPresence } from '../lib/chat/features/realtimeCollaboration';
 
 interface UseRealtimeCollaborationReturn {
   session: CollaborationSession | null;

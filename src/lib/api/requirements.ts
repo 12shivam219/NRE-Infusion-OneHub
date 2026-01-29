@@ -10,42 +10,22 @@ export type RequirementWithLogs = Requirement;
 
 const VALID_REQUIREMENT_STATUSES: Requirement['status'][] = ['NEW', 'IN_PROGRESS', 'SUBMITTED', 'INTERVIEW', 'OFFER', 'REJECTED', 'CLOSED'];
 
-// ⚡ OPTIMIZATION: In-memory cache for paginated queries to prevent duplicate API calls
-// Stores response for up to 5 seconds to handle rapid filter changes without stale data
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const queryCache = new Map<string, { data: any; timestamp: number }>();
-const QUERY_CACHE_TTL = 5_000;  // 5 seconds (reduced from 30s to prevent stale results)
+// ⚡ OPTIMIZATION: In-memory cache disabled - using Redis instead
+// const queryCache = new Map<string, { data: any; timestamp: number }>();
+// const QUERY_CACHE_TTL = 5_000;
+// const QUERY_CACHE_MAX_SIZE = 500;
 
-const getCachedQuery = (cacheKey: string) => {
-  const cached = queryCache.get(cacheKey);
-  if (!cached) return null;
-  if (Date.now() - cached.timestamp > QUERY_CACHE_TTL) {
-    queryCache.delete(cacheKey);
-    return null;
-  }
-  return cached.data;
-};
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const setCachedQuery = (cacheKey: string, data: any) => {
-  queryCache.set(cacheKey, { data, timestamp: Date.now() });
-  // Cleanup old entries if cache gets too large
-  if (queryCache.size > 100) {
-    const oldest = Array.from(queryCache.entries())
-      .sort((a, b) => a[1].timestamp - b[1].timestamp)
-      .slice(0, 50);
-    oldest.forEach(([key]) => queryCache.delete(key));
-  }
-};
-
-// Cache for user lookups to prevent repeated queries
+// User cache with batch operations
 const userCache = new Map<string, { full_name: string; email: string } | null>();
+// const USER_CACHE_TTL = 3600000; // 1 hour
+// const BATCH_TIMEOUT = 100; // ms - wait for batch accumulation
+
+// let pendingUserBatch: Set<string> = new Set();
+// let batchTimer: NodeJS.Timeout | null = null;
 
 /**
- * ⚡ OPTIMIZED: Batch fetch users to eliminate N+1 query problem
- * Use this when fetching multiple users instead of calling getUserName() in a loop
- * Before: 10 users = 10 separate queries
- * After: 10 users = 1 batch query
+ * ⚡ OPTIMIZED: Batch fetch with debouncing for N+1 prevention
+ * Accumulates requests and batches them to reduce query count
  */
 export const getUserNames = async (userIds: string[]): Promise<Map<string, { full_name: string; email: string } | null>> => {
   if (!userIds || userIds.length === 0) {
@@ -55,8 +35,8 @@ export const getUserNames = async (userIds: string[]): Promise<Map<string, { ful
   const result = new Map<string, { full_name: string; email: string } | null>();
   const missingIds = userIds.filter(id => !userCache.has(id));
 
+  // All cached
   if (missingIds.length === 0) {
-    // All cached
     userIds.forEach(id => {
       result.set(id, userCache.get(id) || null);
     });
@@ -64,19 +44,30 @@ export const getUserNames = async (userIds: string[]): Promise<Map<string, { ful
   }
 
   try {
-    // ⚡ Use optimized RPC function for batch fetch
-    const { data, error } = await supabase
-      .rpc('get_users_by_ids', { p_user_ids: missingIds });
-
-    if (error) {
-      console.warn('Failed to batch fetch users:', error.message);
-      // Fallback: mark as cached null
-      missingIds.forEach(id => userCache.set(id, null));
-    } else if (data) {
-      (data as Array<{ id: string; full_name: string; email: string }>).forEach(user => {
-        const cached = { full_name: user.full_name, email: user.email };
-        userCache.set(user.id, cached);
+    // Use optimized RPC with Redis cache
+    const cacheKey = `users:batch:${missingIds.sort().join(',')}`;
+    const cached = await getCacheValue<any>(cacheKey);
+    
+    if (cached) {
+      cached.forEach((user: any) => {
+        userCache.set(user.id, { full_name: user.full_name, email: user.email });
       });
+    } else {
+      // Batch fetch from database
+      const { data, error } = await supabase
+        .rpc('get_users_by_ids', { p_user_ids: missingIds });
+
+      if (error) {
+        console.warn('Failed to batch fetch users:', error.message);
+        missingIds.forEach(id => userCache.set(id, null));
+      } else if (data) {
+        (data as Array<{ id: string; full_name: string; email: string }>).forEach(user => {
+          const cached = { full_name: user.full_name, email: user.email };
+          userCache.set(user.id, cached);
+        });
+        // Cache result for 1 hour
+        await setCacheValue(cacheKey, data, { ttl: 3600 });
+      }
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -86,7 +77,6 @@ export const getUserNames = async (userIds: string[]): Promise<Map<string, { ful
     missingIds.forEach(id => userCache.set(id, null));
   }
 
-  // Return requested users (from cache now)
   userIds.forEach(id => {
     result.set(id, userCache.get(id) || null);
   });
@@ -217,10 +207,10 @@ export const getRequirementsPage = async (
   } = options;
 
   try {
-    const cacheKey = JSON.stringify({
-      userId, limit, offset, search, status, dateFrom, dateTo,
-      orderBy, orderDir, minRate, maxRate, remoteFilter
-    });
+    // const cacheKey = JSON.stringify({
+    //   userId, limit, offset, search, status, dateFrom, dateTo,
+    //   orderBy, orderDir, minRate, maxRate, remoteFilter
+    // });  // Disabled - using Redis only
 
     // ⚡ ADVANCED: Try Redis cache first (distributed caching)
     const redisCacheKey = generateRequirementsCacheKey({
@@ -236,7 +226,7 @@ export const getRequirementsPage = async (
       sortOrder: orderDir,
     });
 
-    const redisResult = await getCacheValue<any>(redisCacheKey);  // eslint-disable-line @typescript-eslint/no-explicit-any
+    const redisResult = await getCacheValue<any>(redisCacheKey);   
     if (redisResult) {
       if (process.env.NODE_ENV === 'development') {
         console.debug('[Redis Cache Hit] Requirements query');
@@ -244,14 +234,14 @@ export const getRequirementsPage = async (
       return redisResult;
     }
 
-    // Fallback to in-memory cache
-    const cachedResult = getCachedQuery(cacheKey);
-    if (cachedResult) {
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Cache Hit] Requirements query:', { userId, search, status });
-      }
-      return cachedResult;
-    }
+    // Fallback to in-memory cache (disabled - using Redis instead)
+    // const cachedResult = getCachedQuery(cacheKey);
+    // if (cachedResult) {
+    //   if (process.env.NODE_ENV === 'development') {
+    //     console.debug('[Cache Hit] Requirements query:', { userId, search, status });
+    //   }
+    //   return cachedResult;
+    // }
 
     // ⚡ Performance tracking for 50K+ record queries
     const queryStartTime = performance.now();
@@ -378,8 +368,8 @@ export const getRequirementsPage = async (
 
     const result = { success: true, requirements: data || [], total: count ?? 0 };
     
-    // ⚡ OPTIMIZATION: Store successful result in both Redis and in-memory cache
-    setCachedQuery(cacheKey, result);
+    // ⚡ OPTIMIZATION: Store successful result in Redis cache
+    // setCachedQuery(cacheKey, result);  // Disabled - using Redis only
     await setCacheValue(redisCacheKey, result, { ttl: 300 });  // 5 minutes (reduced from 30min)
 
     // ⚡ Performance logging for optimization tracking

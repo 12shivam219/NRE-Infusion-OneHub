@@ -5,7 +5,7 @@
 
 import { supabase } from '../supabase';
 import type { ChatResponse, Message } from '../chat/types';
-import type { StreamMessage } from '../chat/streaming';
+import type { StreamMessage } from '../chat/utils/streaming';
 
 export interface SendMessageInput {
   message: string;
@@ -168,7 +168,7 @@ export const getConversationHistory = async (
 
     const messages: Message[] = data
       .reverse() // Reverse to get chronological order
-      .map(row => ({
+      .map((row: any) => ({
         id: row.id,
         role: row.role as 'user' | 'assistant',
         content: row.content,

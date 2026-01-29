@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LogIn } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { login } from '../../lib/auth';
 import { AuthLayout } from './AuthLayout';
 
@@ -11,6 +11,7 @@ interface LoginFormProps {
 export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -59,26 +60,28 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
   return (
     <AuthLayout variant="login">
       <div className="w-full">
-        <div className="relative w-full overflow-hidden rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-sm md:px-8 md:py-10">
-          {/* Decorative elements - more subtle */}
-          <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-blue-50/40 blur-3xl" aria-hidden="true" />
-          <div className="absolute -left-20 -bottom-20 h-40 w-40 rounded-full bg-slate-100/30 blur-3xl" aria-hidden="true" />
+        <div className="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm md:px-7 md:py-7">
+          {/* Decorative elements - subtle */}
+          <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-blue-50/30 blur-3xl" aria-hidden="true" />
+          <div className="absolute -left-20 -bottom-20 h-40 w-40 rounded-full bg-slate-100/20 blur-3xl" aria-hidden="true" />
 
           <div className="relative">
-            <div className="mb-8 space-y-2 text-center md:mb-10">
-              <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20">
-                <LogIn className="h-7 w-7 text-white" aria-hidden="true" />
+            {/* Header */}
+            <div className="mb-4 space-y-2 text-center">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md border-2 border-slate-300 bg-white">
+                <span className="text-sm font-bold text-slate-900">NT</span>
               </div>
-              <div className="space-y-1.5 pt-2 md:pt-3">
-                <h1 className="text-3xl font-bold text-slate-900 md:text-4xl">Welcome Back</h1>
-                <p className="text-sm text-slate-600 md:text-base">Sign in to your NRETech OneHub account</p>
+              <div className="space-y-0.5 pt-1">
+                <h1 className="text-lg font-bold text-slate-900">Welcome Back !</h1>
+                <p className="text-xs text-slate-500">Please enter your details</p>
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-3 md:space-y-3.5">
               {error && (
                 <div
-                  className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
                   role="alert"
                   aria-live="polite"
                 >
@@ -86,8 +89,9 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+              {/* Email */}
+              <div className="space-y-1">
+                <label htmlFor="email" className="block text-xs font-medium text-slate-700">
                   Email Address
                 </label>
                 <input
@@ -98,13 +102,14 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
                   required
                   aria-required="true"
                   autoComplete="email"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-500 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                  placeholder="you@example.com"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none"
+                  placeholder="name@example.com"
                 />
               </div>
 
-              <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+              {/* Password */}
+              <div className="space-y-1">
+                <label htmlFor="password" className="block text-xs font-medium text-slate-700">
                   Password
                 </label>
                 <input
@@ -115,30 +120,61 @@ export const LoginForm = ({ onSuccess, onSwitchToRegister }: LoginFormProps) => 
                   required
                   aria-required="true"
                   autoComplete="current-password"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-500 transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none"
                   placeholder="••••••••"
                 />
               </div>
 
+              {/* Remember Me & Forgot Password */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <div className={`relative h-4 w-4 border border-slate-300 rounded transition-colors ${
+                    rememberMe ? 'bg-blue-600 border-blue-600' : 'bg-white'
+                  }`}>
+                    {rememberMe && (
+                      <Check className="absolute inset-0 h-4 w-4 text-white" strokeWidth={3} />
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-600">Remember me</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { /* TODO: Handle forgot password */ }}
+                  className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300"
+                className="w-full rounded-md bg-blue-600 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:bg-slate-300"
                 aria-busy={loading}
               >
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? 'Signing in...' : 'Login'}
               </button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-slate-600 md:mt-8">
-              <span>Don't have an account? </span>
-              <button
-                onClick={onSwitchToRegister}
-                className="font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-                aria-label="Switch to registration form"
-              >
-                Create Account
-              </button>
+            {/* Footer */}
+            <div className="mt-4 space-y-2 text-center text-xs text-slate-600">
+              <p>
+                By creating an account, you agree to our{' '}
+                <a href="#" className="text-blue-600 hover:text-blue-700 transition-colors">Terms of Service</a>
+                {' '}and{' '}
+                <a href="#" className="text-blue-600 hover:text-blue-700 transition-colors">Privacy Policy</a>
+              </p>
+              <p>
+                Don't have an account?{' '}
+                <button
+                  onClick={onSwitchToRegister}
+                  className="font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                  aria-label="Switch to registration form"
+                >
+                  Sign Up
+                </button>
+              </p>
             </div>
           </div>
         </div>

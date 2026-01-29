@@ -24,7 +24,11 @@ interface EmailAccount {
 
 /**
  * Email Accounts Settings Component
- * Allows users to configure multiple email accounts for bulk sending
+ * Allows users to configure multiple email accounts for bulk email SENDING
+ * 
+ * Note: This is different from Gmail Job Scanner (in user settings)
+ * - Email Accounts: For SENDING bulk emails to candidates
+ * - Gmail Scanner: For SCANNING emails to extract job postings
  */
 export const EmailAccountsSettings = () => {
   const { user } = useAuth();
@@ -161,6 +165,16 @@ export const EmailAccountsSettings = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6">
+      {/* Purpose Notice */}
+      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-900">
+          <strong>Purpose:</strong> Configure email accounts for <strong>SENDING</strong> bulk emails to candidates.
+        </p>
+        <p className="text-xs text-blue-700 mt-2">
+          💡 Different from Gmail Job Scanner (User Settings) which is for <strong>SCANNING</strong> emails for job postings.
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">

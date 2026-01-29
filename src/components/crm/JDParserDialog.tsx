@@ -5,9 +5,10 @@ import { useToast } from '../../contexts/ToastContext';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { createRequirement } from '../../lib/api/requirements';
 import { sanitizeText } from '../../lib/utils';
+import { parseJD } from '../../lib/agents/jobExtractionAgent';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
-import { parseJD, type JdExtractionResult } from '../../lib/jdParser';
+import type { ExtractedJobDetails as JdExtractionResult } from '../../lib/agents/types';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { BrandButton } from '../brand';
 import Box from '@mui/material/Box';
@@ -43,8 +44,8 @@ const makeRequirementPayload = (
   cleanedJobText: string
 ) => {
   const title = extraction.jobTitle ? sanitizeText(extraction.jobTitle) : '';
-  const primaryTechStack = extraction.keySkills.length
-    ? extraction.keySkills.join(', ')
+  const primaryTechStack = (extraction.keySkills ?? []).length
+    ? (extraction.keySkills ?? []).join(', ')
     : '';
 
   const payload: Database['public']['Tables']['requirements']['Insert'] = {

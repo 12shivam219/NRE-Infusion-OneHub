@@ -4,8 +4,8 @@
  */
 
 import { ReactNode, useCallback, useEffect, useState } from 'react';
-import { ChatContext, type ChatContextType } from './ChatContextDef';
 import type { Message, ChatResponse } from '../lib/chat/types';
+import { ChatContext, type ChatContextType } from './ChatContext';
 import { sendChatMessage, saveChatMessage, getConversationHistory, deleteConversation } from '../lib/api/chat';
 import { useAuth } from '../hooks/useAuth';
 

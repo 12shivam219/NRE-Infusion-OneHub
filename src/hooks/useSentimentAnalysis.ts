@@ -6,8 +6,8 @@ import {
   createSentimentTrend,
   addToSentimentTrend,
   detectSentimentIssues,
-} from '../lib/chat/sentimentAnalysis';
-import type { SentimentScore, SentimentTrend } from '../lib/chat/sentimentAnalysis';
+} from '../lib/chat/ai/sentimentAnalysis';
+import type { SentimentScore, SentimentTrend } from '../lib/chat/ai/sentimentAnalysis';
 
 interface UseSentimentAnalysisReturn {
   trend: SentimentTrend | null;

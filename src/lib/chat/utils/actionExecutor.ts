@@ -5,7 +5,7 @@
  */
 
 import { useNavigate } from 'react-router-dom';
-import type { ActionIntent, NavigationTarget } from '../chat/types';
+import type { ActionIntent, NavigationTarget } from '../types';
 
 export interface ActionExecutorOptions {
   userRole?: 'user' | 'marketing' | 'admin';

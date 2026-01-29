@@ -5,9 +5,9 @@
 
 import { supabase } from '../supabase';
 import type { FinetuneConfig } from '../chat/finetuning';
-import type { ConversationBranch, BranchMessage, BranchMergeResult } from '../chat/conversationBranching';
-import type { UserFeedback, TrainingDataPoint, TrainingDataset } from '../chat/aiTraining';
-import type { ServiceConfig, ServiceIntegrationResult } from '../chat/externalServices';
+import type { ConversationBranch, BranchMessage, BranchMergeResult } from '../chat/features/conversationBranching';
+import type { UserFeedback, TrainingDataPoint, TrainingDataset } from '../chat/ai/aiTraining';
+import type { ServiceConfig, ServiceIntegrationResult } from '../chat/integrations/externalServices';
 
 // ============ FINE-TUNING API ============
 

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 /**
  * Phase 4 API Functions
  * Supabase CRUD operations for advanced features

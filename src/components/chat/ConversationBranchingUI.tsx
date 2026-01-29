@@ -20,8 +20,8 @@ import {
 } from '@mui/material';
 import MergeIcon from '@mui/icons-material/Merge';
 import { useConversationBranching } from '../../hooks/useConversationBranching';
-import { calculateBranchDepth } from '../../lib/chat/conversationBranching';
-import type { ConversationBranch } from '../../lib/chat/conversationBranching';
+import { calculateBranchDepth } from '../../lib/chat/features/conversationBranching';
+import type { ConversationBranch } from '../../lib/chat/features/conversationBranching';
 
 interface ConversationBranchingUIProps {
   conversationId: string;

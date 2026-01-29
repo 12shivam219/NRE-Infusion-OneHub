@@ -32,7 +32,7 @@ import {
   validateTriggerPhrase,
   sortCommandsByUsage,
   type CustomVoiceCommand,
-} from '../../lib/chat/customCommands';
+} from '../../lib/chat/features/customCommands';
 import {
   saveCustomCommand,
   getCustomCommands,

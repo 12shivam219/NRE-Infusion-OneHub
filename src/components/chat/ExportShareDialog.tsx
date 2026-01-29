@@ -21,7 +21,7 @@ import {
   Stack,
 } from '@mui/material';
 import { useState, useCallback } from 'react';
-import { exportToJSON, exportToMarkdown, generateDownloadBlob, downloadFile } from '../../lib/chat/exportUtils';
+import { exportToJSON, exportToMarkdown, generateDownloadBlob, downloadFile } from '../../lib/chat/utils/exportUtils';
 import { saveExport, shareExport } from '../../lib/api/phase2';
 import type { Message } from '../../lib/chat/types';
 

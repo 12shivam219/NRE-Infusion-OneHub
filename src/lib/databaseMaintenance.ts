@@ -145,7 +145,7 @@ export const getDatabaseSizeInfo = async (): Promise<{
         database: 'Query pg_database_size(current_database())',
         indexes: `${unusedIndexes?.length || 0} unused indexes found`,
         tables: 'Check pg_total_relation_size()',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         unused_indexes: `Total size: ${(unusedIndexes as any)?.reduce((sum: number, idx: any) => sum + (idx.index_size || 0), 0)}`,
       },
     };
@@ -190,9 +190,9 @@ export const refreshMaterializedViews = async (): Promise<{ success: boolean; er
  * Run all maintenance tasks
  * Should be called weekly or after bulk operations
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export const runFullMaintenance = async (): Promise<{ success: boolean; results: Record<string, any> }> => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const results: Record<string, any> = {};
 
   console.log('Starting database maintenance...');

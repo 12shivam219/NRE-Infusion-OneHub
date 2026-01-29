@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 /**
  * Voice Commands Library Module
  * Manages custom voice commands and command templates

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import useSWRInfinite from 'swr/infinite';
+// import { useInfiniteQuery } from '@tanstack/react-query';  // For future use
 import { getDocumentsPage } from '../lib/api/documents';
 import type { Database } from '../lib/database.types';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Mail, Loader } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
@@ -218,6 +218,10 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [allRequirements, setAllRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [loading, setLoading] = useState(false);
+  const [scanningGmail, setScanningGmail] = useState(false);
+  const [gmailJobs, setGmailJobs] = useState<Array<{ title: string; company: string; description: string; skills: string }>>([]);
+  const [showGmailJobs, setShowGmailJobs] = useState(false);
+  const [selectedGmailJob, setSelectedGmailJob] = useState<number | null>(null);
   const [similarRequirements, setSimilarRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -304,6 +308,104 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
     () => consultants.map(c => ({ label: c.name, value: c.id })),
     [consultants]
   );
+
+  const handleScanGmail = useCallback(async () => {
+    try {
+      setScanningGmail(true);
+      
+      // Get the user's auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        showToast({
+          type: 'error',
+          message: 'You need to be logged in to scan emails',
+        });
+        return;
+      }
+
+      // Fetch emails from Gmail
+      const { data: emailsData, error: emailsError } = await supabase.functions.invoke('fetch-gmail-emails', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: {
+          userId: user?.id,
+          query: 'subject:(job OR hiring OR position OR opening OR role OR career)',
+          maxResults: 10,
+        },
+      });
+
+      if (emailsError || !emailsData?.success) {
+        showToast({
+          type: 'error',
+          message: emailsData?.error || 'Failed to fetch emails',
+        });
+        return;
+      }
+
+      // Process each email with job extraction
+      const jobs: Array<{ title: string; company: string; description: string; skills: string }> = [];
+      
+      for (const email of emailsData.emails || []) {
+        const { data: jobData } = await supabase.functions.invoke('extract-job-details', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: {
+            userId: user?.id,
+            emailContent: email.body,
+            emailSubject: email.subject,
+            emailFrom: email.from,
+          },
+        });
+
+        if (jobData?.success && jobData.data) {
+          jobs.push({
+            title: jobData.data.jobTitle || 'N/A',
+            company: jobData.data.company || 'N/A',
+            description: jobData.data.jobDescription || '',
+            skills: jobData.data.skills?.join(', ') || '',
+          });
+        }
+      }
+
+      if (jobs.length === 0) {
+        showToast({
+          type: 'info',
+          message: 'No job postings found in recent emails',
+        });
+        return;
+      }
+
+      setGmailJobs(jobs);
+      setShowGmailJobs(true);
+      setSelectedGmailJob(0);
+      
+      showToast({
+        type: 'success',
+        message: `Found ${jobs.length} job posting(s)`,
+      });
+    } catch (error) {
+      console.error('Error scanning Gmail:', error);
+      showToast({
+        type: 'error',
+        message: 'Error scanning Gmail emails',
+      });
+    } finally {
+      setScanningGmail(false);
+    }
+  }, [showToast, user?.id]);
+
+  const handleSelectGmailJob = useCallback((job: { title: string; company: string; description: string; skills: string }) => {
+    setFormData(prevState => ({
+      ...prevState,
+      title: job.title,
+      company: job.company,
+      description: job.description,
+      primary_tech_stack: job.skills,
+    }));
+    setShowGmailJobs(false);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,13 +496,13 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
         if (formData.next_step.trim()) {
           try {
             await supabase
-              .from('next_step_comments')
+              .from('next_step_comments' as const)
               .insert([
                 {
                   requirement_id: result.requirement.id,
                   user_id: user.id,
                   comment_text: formData.next_step.trim(),
-                },
+                } as Database['public']['Tables']['next_step_comments']['Insert'],
               ]);
           } catch (commentError) {
             console.error('Failed to create initial next step comment:', commentError);
@@ -438,6 +540,80 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
 
   return (
     <div style={{ padding: '1rem' }}>
+        {/* Gmail Jobs Scanner */}
+        {showGmailJobs && gmailJobs.length > 0 ? (
+          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '6px', border: '1px solid #0ea5e9' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontWeight: 600, color: '#0369a1', margin: 0 }}>Jobs Found in Gmail ({gmailJobs.length})</h3>
+              <button
+                type="button"
+                onClick={() => setShowGmailJobs(false)}
+                style={{ padding: '0.5rem 1rem', backgroundColor: '#e0e7ff', color: '#4f46e5', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+              >
+                Cancel
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {gmailJobs.map((job, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleSelectGmailJob(job)}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: selectedGmailJob === idx ? '#dbeafe' : '#ffffff',
+                    border: selectedGmailJob === idx ? '2px solid #0ea5e9' : '1px solid #cbd5e1',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms ease',
+                  }}
+                >
+                  <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '0.25rem' }}>{job.title}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>{job.company}</div>
+                  {job.skills && <div style={{ fontSize: '0.75rem', color: '#0369a1', marginBottom: '0.25rem' }}>Skills: {job.skills}</div>}
+                  <div style={{ fontSize: '0.8rem', color: '#6b7280', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {job.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: '1rem' }}>
+            <button
+              type="button"
+              onClick={handleScanGmail}
+              disabled={scanningGmail}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                padding: '0.75rem 1rem',
+                backgroundColor: scanningGmail ? '#e0e7ff' : '#f0f9ff',
+                border: '1px solid #0ea5e9',
+                color: scanningGmail ? '#9ca3af' : '#0369a1',
+                borderRadius: '6px',
+                cursor: scanningGmail ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+                width: '100%',
+                fontSize: '0.9rem',
+              }}
+            >
+              {scanningGmail ? (
+                <>
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Scanning Gmail...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4" />
+                  Scan Gmail for Jobs
+                </>
+              )}
+            </button>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit}>
           {/* Submit Error Alert */}
           {submitError && (

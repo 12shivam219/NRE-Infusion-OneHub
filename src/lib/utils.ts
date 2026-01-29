@@ -53,10 +53,8 @@ export const truncateText = (text: string, maxLength: number): string => {
   return text.substring(0, maxLength) + '...';
 };
 
-export const validateEmail = (email: string): boolean => {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-};
+// Note: Email validation moved to emailParser.ts (isValidEmail)
+// Use: import { isValidEmail } from './emailParser'
 
 export const generateId = (): string => {
   return crypto.randomUUID();

@@ -5,9 +5,9 @@ import dotenv from 'dotenv';
 import bodyParser from 'body-parser';
 import rateLimit from 'express-rate-limit';
 import sanitizeHtml from 'sanitize-html';
+import compression from 'compression';
 import { encryptPassword, decryptPassword, isEncrypted } from './encryption.js';
 import { createClient } from '@supabase/supabase-js';
-// [FIX 1] Import Queue only (Worker is now in separate worker.js process)
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { RedisStore } from 'rate-limit-redis';
@@ -18,14 +18,31 @@ const app = express();
 const PORT = process.env.EMAIL_SERVER_PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// [FIX 1] Redis Connection Setup
+// Redis Connection with Connection Pooling
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 const connection = new IORedis(REDIS_URL, {
-  maxRetriesPerRequest: null, // Required for BullMQ
+  maxRetriesPerRequest: null,
+  enableKeepAlive: true,
+  keepAliveInitialDelayMs: 60000,
+  retryStrategy: (times) => Math.min(50 * Math.pow(2, times), 2000),
+  reconnectOnError: (err) => {
+    const targetError = 'READONLY';
+    if (err.message.includes(targetError)) {
+      return true;
+    }
+    return false;
+  },
 });
 
-// [FIX 1] Create Persistent Email Queue
-const emailQueue = new Queue('bulk-email-queue', { connection });
+// Create Persistent Email Queue with optimized settings
+const emailQueue = new Queue('bulk-email-queue', {
+  connection,
+  settings: {
+    lockDuration: 30000,
+    lockRenewTime: 15000,
+    maxRetriesPerRequest: null,
+  },
+});
 
 // Supabase client for persisting campaign status (server-side key required)
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -67,6 +84,12 @@ const corsOptions = {
   maxAge: 3600,
 };
 app.use(cors(corsOptions));
+
+// ⚡ OPTIMIZATION: Response compression (reduces bandwidth by 70-80%)
+app.use(compression({
+  level: 6, // Balance between compression ratio and speed
+  threshold: 1024, // Compress responses > 1KB
+}));
 
 // [FIX 4] SECURITY: Distributed Rate limiting using Redis
 const emailLimiter = rateLimit({
@@ -447,6 +470,135 @@ app.get('/api/email-accounts', (req, res) => {
   res.json({ success: true, accounts: accounts, count: accounts.length });
 });
 
+// ==========================================
+// GMAIL OAUTH INTEGRATION
+// ==========================================
+
+/**
+ * Exchange Google OAuth authorization code for access token and refresh token
+ * SECURITY: This endpoint keeps client_secret on the server
+ */
+app.post('/api/gmail/exchange-token', async (req, res) => {
+  try {
+    const { code, redirect_uri, userId } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+    const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      console.error('Missing Google OAuth configuration');
+      return res.status(500).json({ error: 'Google OAuth is not configured on the server' });
+    }
+
+    // Exchange authorization code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirect_uri || `${process.env.VITE_APP_URL || 'http://localhost:5173'}/oauth/callback`,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.json().catch(() => ({}));
+      console.error('Token exchange error:', error);
+      return res.status(400).json({ error: error.error_description || 'Failed to exchange authorization code' });
+    }
+
+    const tokenData = await tokenResponse.json();
+
+    // Get user's Gmail address from Gmail API
+    let gmailEmail = 'Gmail Account';
+    try {
+      const profileResponse = await fetch('https://www.googleapis.com/gmail/v1/users/me/profile', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+
+      if (profileResponse.ok) {
+        const profile = await profileResponse.json();
+        gmailEmail = profile.emailAddress || 'Gmail Account';
+      }
+    } catch (err) {
+      console.warn('Could not fetch Gmail profile:', err.message);
+    }
+
+    // Save tokens to Supabase
+    try {
+      if (!supabase) {
+        console.warn('Supabase not initialized, skipping token storage');
+      } else {
+        const { error: saveError } = await supabase.from('gmail_sync_tokens').upsert(
+          {
+            user_id: userId,
+            access_token: tokenData.access_token,
+            refresh_token: tokenData.refresh_token || '',
+            token_expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+            gmail_email: gmailEmail,
+            is_active: true,
+            sync_frequency_minutes: 15,
+          },
+          { onConflict: 'user_id' }
+        );
+
+        if (saveError) {
+          console.error('Failed to save Gmail token to database:', saveError);
+        }
+      }
+    } catch (err) {
+      console.error('Database error while saving token:', err.message);
+    }
+
+    // Update user metadata with Gmail connection status
+    try {
+      if (!supabase) {
+        console.warn('Supabase not initialized, skipping metadata update');
+      } else {
+        const { error: metadataError } = await supabase.auth.admin.updateUserById(userId, {
+          user_metadata: {
+            gmail_connected: true,
+            gmail_email: gmailEmail,
+            gmail_refresh_token: tokenData.refresh_token,
+          },
+        });
+
+        if (metadataError) {
+          console.warn('Failed to update user metadata:', metadataError.message);
+        }
+      }
+    } catch (err) {
+      console.warn('Error updating metadata:', err.message);
+      // Continue anyway - token is saved in database
+    }
+
+    res.json({
+      success: true,
+      email: gmailEmail,
+      message: `Gmail connected successfully as ${gmailEmail}`,
+    });
+  } catch (error) {
+    console.error('OAuth exchange error:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to process OAuth authorization',
+    });
+  }
+});
+
 // Manual email sync endpoint
 app.post('/api/emails/sync-now', async (req, res) => {
   try {
@@ -460,6 +612,44 @@ app.post('/api/emails/sync-now', async (req, res) => {
   } catch (error) {
     console.error('Manual sync error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==========================================
+// JOB EXTRACTION AGENT ENDPOINT
+// ==========================================
+
+/**
+ * Manually trigger the job extraction agent
+ * This endpoint allows admin users to run the agent on demand
+ */
+app.post('/api/job-extraction/run', async (req, res) => {
+  try {
+    const { runJobExtractionAgent } = await import('./job-extraction-agent.js');
+    
+    console.log(`\n🚀 Manual job extraction agent trigger at ${new Date().toISOString()}`);
+    
+    // Run agent asynchronously without blocking the response
+    runJobExtractionAgent()
+      .then(() => {
+        console.log('✅ Job extraction agent completed successfully');
+      })
+      .catch(err => {
+        console.error('❌ Job extraction agent failed:', err);
+      });
+
+    // Return immediately with success status
+    res.json({
+      success: true,
+      message: 'Job extraction agent started',
+      status: 'running',
+    });
+  } catch (error) {
+    console.error('Error triggering job extraction agent:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to trigger job extraction agent',
+    });
   }
 });
 

@@ -28,7 +28,7 @@ import {
   SERVICE_TEMPLATES,
   type TriggerEvent,
   type ServiceConfig,
-} from '../../lib/chat/externalServices';
+} from '../../lib/chat/integrations/externalServices';
 import { useAuth } from '../../hooks/useAuth';
 
 interface ExternalServiceIntegrationProps {

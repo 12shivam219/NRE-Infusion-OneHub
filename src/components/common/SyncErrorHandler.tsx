@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, X, RefreshCw } from 'lucide-react';
-import { getPendingSyncItems, updateSyncItemStatus, getUnresolvedConflicts } from '../../lib/offlineDB';
+import { getPendingSyncItems, updateSyncItemStatus, getUnresolvedConflicts, resolveConflict, recordAnalytics } from '../../lib/offlineDB';
 import { useToast } from '../../contexts/ToastContext';
 import type { SyncQueueItem, ConflictRecord } from '../../lib/offlineDB';
 
@@ -89,6 +89,31 @@ export const SyncErrorHandler = () => {
       });
     } finally {
       setIsRetrying(false);
+    }
+  };
+
+  const handleResolve = async (conflictId: string, choice: 'local' | 'remote') => {
+    try {
+      await resolveConflict(conflictId, choice);
+      // record telemetry
+      try {
+        await recordAnalytics('conflict_resolved', { conflictId, choice });
+      } catch (err) {
+        console.debug('[analytics] conflict_resolved failed', err);
+      }
+      showToast({
+        type: 'info',
+        title: 'Conflict Resolved',
+        message: `Conflict ${conflictId} resolved (${choice}).`,
+      });
+      // refresh list
+      const unresolvedConflicts = await getUnresolvedConflicts();
+      setConflicts(unresolvedConflicts);
+      // notify other UI
+      window.dispatchEvent(new CustomEvent('sync-queue-changed'));
+    } catch (err) {
+      console.error('Failed to resolve conflict', err);
+      showToast({ type: 'error', title: 'Resolve Failed', message: 'Could not resolve conflict. Try again.' });
     }
   };
 
@@ -294,9 +319,24 @@ export const SyncErrorHandler = () => {
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-500 mt-2 font-body">
-                    Timestamp: {new Date(conflict.timestamp).toLocaleString()}
-                  </p>
+                    <p className="text-xs text-slate-500 mt-2 font-body">
+                      Timestamp: {new Date(conflict.timestamp).toLocaleString()}
+                    </p>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => void handleResolve(conflict.id, 'local')}
+                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-heading font-bold"
+                      >
+                        Keep Local
+                      </button>
+                      <button
+                        onClick={() => void handleResolve(conflict.id, 'remote')}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-heading font-bold"
+                      >
+                        Keep Remote
+                      </button>
+                    </div>
                 </div>
               ))}
             </div>

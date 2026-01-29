@@ -1,20 +1,16 @@
 /**
- * Custom hook for cached requirement fetching with SWR
+ * Custom hook for cached requirement fetching
  * 
- * WHY SWR (Stale-While-Revalidate):
- * - Reduces API calls by caching results
- * - Shows cached data immediately while fetching fresh data
- * - Automatic revalidation in background
- * - Built-in error handling & retry logic
- * - ~70% faster initial load vs raw API calls
- * 
- * Performance Impact:
- * - First load: Shows cached data instantly (<10ms) then fetches fresh
- * - Subsequent loads: Uses cache + background refresh
- * - Typical savings: 100-200ms per request
+ * Note: Using React Query instead of SWR
+ * React Query provides:
+ * - Better cache management for 1M+ users
+ * - Distributed caching with Redis
+ * - Automatic revalidation
+ * - Better error handling
  */
 
 import useSWR from 'swr';
+// import { useQuery } from '@tanstack/react-query';  // For future use
 import { getRequirementsPage } from '../lib/api/requirements';
 import { cacheRequirements, getCachedRequirements, type CachedRequirement } from '../lib/offlineDB';
 import type { Database } from '../lib/database.types';

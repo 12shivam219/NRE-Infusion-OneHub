@@ -20,6 +20,7 @@ export const preloadDashboard = () => import('../components/dashboard/Dashboard'
 export const preloadDocumentsPage = () => import('../components/documents/DocumentsPage');
 export const preloadCRMPage = () => import('../components/crm/CRMPage');
 export const preloadAdminPage = () => import('../components/admin/AdminPage');
+export const preloadSettingsPage = () => import('../pages/SettingsPage');
 
 // Pre-configured lazy components - simple dynamic imports
 // These will only load when needed, reducing initial bundle
@@ -44,6 +45,12 @@ export const LazyCRMPage = lazy(() =>
 export const LazyAdminPage = lazy(() =>
   import('../components/admin/AdminPage').then(m => ({
     default: m.AdminPage,
+  }))
+);
+
+export const LazySettingsPage = lazy(() =>
+  import('../pages/SettingsPage').then(m => ({
+    default: m.default,
   }))
 );
 

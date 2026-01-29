@@ -54,12 +54,11 @@ CREATE POLICY "Users can insert their own chat messages"
   WITH CHECK (auth.uid() = user_id);
 
 -- Users can view their own chat history (admin can view all)
+-- NOTE: DO NOT use user_metadata for security checks - it's editable by end users
+-- This policy is intentionally simple and should be superseded by migration 039
 CREATE POLICY "Users can view their own chat history"
   ON chat_history FOR SELECT
-  USING (
-    auth.uid() = user_id OR
-    (auth.jwt() ->> 'user_metadata')::jsonb ->> 'role' = 'admin'
-  );
+  USING (auth.uid() = user_id);
 
 CREATE POLICY "Insert chat history for current user"
   ON chat_history FOR INSERT

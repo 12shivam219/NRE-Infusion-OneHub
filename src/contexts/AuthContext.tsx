@@ -1,4 +1,14 @@
-// Re-export from split files for backward compatibility
-export { AuthContext } from './AuthContextDef';
-export type { AuthContextType } from './AuthContextDef';
-export { AuthProvider } from './AuthProvider';
+import { createContext } from 'react';
+import type { User } from '../lib/auth';
+
+export interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isAdmin: boolean;
+  isMarketing: boolean;
+  logout: () => Promise<void>;
+  refreshUser: () => void;
+  refreshUserData: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);

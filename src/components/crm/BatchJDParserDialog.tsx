@@ -18,8 +18,8 @@ import {
   Tooltip
 } from "@mui/material"
 import { X, Plus, Zap, CheckCircle, AlertCircle, Clock } from "lucide-react"
-import { parseJD } from "../../lib/jdParser"
-import type { JdExtractionResult } from "../../lib/jdParser"
+import { parseJD } from "../../lib/agents/jobExtractionAgent"
+import type { ExtractedJobDetails as JdExtractionResult } from "../../lib/agents/types"
 
 type BatchJD = {
   id: string

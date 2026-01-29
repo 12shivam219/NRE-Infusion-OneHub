@@ -8,13 +8,19 @@ import {
   ChevronDown,
   Shield,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import MuiMenu from '@mui/material/Menu';
 import MuiMenuItem from '@mui/material/MenuItem';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useSidebar } from '../../contexts/SidebarContext';
 import { Logo } from '../common/Logo';
+import { 
+  preloadDashboard, 
+  preloadDocumentsPage, 
+  preloadCRMPage, 
+  preloadAdminPage 
+} from '../../lib/lazyLoader';
 
 interface MenuItem {
   id: string;
@@ -71,6 +77,14 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Resume Editor',
     icon: FileText,
     path: '/documents',
+    roles: ['user', 'admin'],
+    section: 'tools',
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Shield,
+    path: '/settings',
     roles: ['user', 'admin'],
     section: 'tools',
   },
@@ -197,6 +211,19 @@ export const ModernSidebar = () => {
     setIsMobileOpen(false);
   };
 
+  const handleMouseEnter = useCallback((path: string) => {
+    // Preload chunks when user hovers over menu items
+    if (path === '/dashboard' || path.startsWith('/dashboard')) {
+      preloadDashboard();
+    } else if (path === '/documents' || path.startsWith('/documents')) {
+      preloadDocumentsPage();
+    } else if (path === '/crm' || path.startsWith('/crm')) {
+      preloadCRMPage();
+    } else if (path === '/admin' || path.startsWith('/admin')) {
+      preloadAdminPage();
+    }
+  }, []);
+
   // Desktop sidebar - Enterprise grade navigation
   const desktopSidebar = (
     <div className={`flex flex-col h-screen bg-white border-r border-gray-200 overflow-visible transition-all duration-300 ${
@@ -292,6 +319,7 @@ export const ModernSidebar = () => {
                           handleNavigation(item.path);
                         }
                       }}
+                      onMouseEnter={() => handleMouseEnter(item.path)}
                       className={`${
                         isCollapsed
                           ? 'w-10 h-10 flex items-center justify-center rounded-md'
@@ -369,6 +397,7 @@ export const ModernSidebar = () => {
                             <button
                               key={child.id}
                               onClick={() => handleNavigation(child.path)}
+                              onMouseEnter={() => handleMouseEnter(child.path)}
                               className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-xs transition-colors duration-100 relative h-8 ${
                                 isChildActive
                                   ? 'text-blue-600 font-medium bg-blue-50'
@@ -451,6 +480,7 @@ export const ModernSidebar = () => {
                           handleNavigation(item.path);
                         }
                       }}
+                      onMouseEnter={() => handleMouseEnter(item.path)}
                       className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-100 relative ${
                         isActive
                           ? 'bg-blue-50 text-blue-700'
@@ -486,6 +516,7 @@ export const ModernSidebar = () => {
                             <button
                               key={child.id}
                               onClick={() => handleNavigation(child.path)}
+                              onMouseEnter={() => handleMouseEnter(child.path)}
                               className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-100 ${
                                 isChildActive
                                   ? 'bg-blue-50 text-blue-700'

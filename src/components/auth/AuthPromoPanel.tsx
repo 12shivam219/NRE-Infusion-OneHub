@@ -36,38 +36,38 @@ export const AuthPromoPanel = ({ variant = 'login' }: AuthPromoPanelProps) => {
         <div className="absolute -left-40 -bottom-40 h-80 w-80 rounded-full bg-blue-500/5 blur-3xl" />
       </div>
 
-      <div className="relative flex h-full flex-col gap-8 px-6 py-10 sm:gap-10 sm:px-8 sm:py-12 md:gap-12 md:px-10 md:py-14 lg:gap-10 lg:px-12 lg:py-14">
+      <div className="relative flex h-full flex-col gap-5 px-5 py-8 sm:gap-6 sm:px-7 sm:py-9 md:gap-7 md:px-9 md:py-10 lg:gap-8 lg:px-11 lg:py-11">
         {/* Header Section */}
-        <div className="space-y-4 text-pretty sm:space-y-5 md:space-y-6">
-          <span className="inline-flex items-center gap-2 rounded-full bg-blue-500/20 border border-blue-400/30 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-blue-300">
-            <Award className="h-4 w-4" aria-hidden="true" />
+        <div className="space-y-3 text-pretty sm:space-y-3.5 md:space-y-4">
+          <span className="inline-flex items-center gap-2 rounded-full bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-300">
+            <Award className="h-3.5 w-3.5" aria-hidden="true" />
             NRETech OneHub
           </span>
-          <h2 className="text-balance text-4xl font-bold leading-tight text-white sm:text-5xl md:text-[2.75rem] lg:text-5xl">
+          <h2 className="text-balance text-2xl font-bold leading-snug text-white sm:text-3xl md:text-2xl lg:text-3xl">
             Your talent operations, perfectly in orbit.
           </h2>
-          <p className="max-w-lg text-balance text-base leading-relaxed text-slate-300 sm:text-lg md:text-lg">
+          <p className="max-w-lg text-balance text-xs leading-relaxed text-slate-300 sm:text-sm md:text-sm">
             {heroCopy}
           </p>
         </div>
 
         {/* Features Grid */}
-        <div className="grid gap-4 sm:gap-5 md:gap-6">
+        <div className="grid gap-3 sm:gap-3.5 md:gap-4">
           {features.map(({ icon: Icon, title, description }) => (
-            <div key={title} className="flex items-start gap-4 rounded-xl bg-white/5 border border-white/10 p-4 backdrop-blur-sm transition-colors hover:bg-white/8 sm:rounded-xl sm:gap-4 sm:p-4 md:gap-4 md:p-4">
-              <div className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/20 border border-blue-400/30 text-blue-200 sm:h-12 sm:w-12 md:h-12 md:w-12">
-                <Icon className="h-5 w-5 sm:h-6 sm:w-6 md:h-6 md:w-6" aria-hidden="true" />
+            <div key={title} className="flex items-start gap-3 rounded-lg bg-white/5 border border-white/10 p-3 backdrop-blur-sm transition-colors hover:bg-white/8 sm:rounded-lg sm:gap-3 sm:p-3 md:gap-3 md:p-3.5">
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-blue-500/20 border border-blue-400/30 text-blue-200 sm:h-10 sm:w-10 md:h-10 md:w-10">
+                <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5 md:h-5 md:w-5" aria-hidden="true" />
               </div>
-              <div className="space-y-1.5 text-pretty flex-1">
-                <p className="text-sm font-semibold uppercase tracking-wide text-blue-200 sm:text-sm md:text-base">{title}</p>
-                <p className="text-sm leading-relaxed text-slate-300 sm:text-sm md:text-base">{description}</p>
+              <div className="space-y-0.5 text-pretty flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-200 sm:text-xs md:text-xs">{title}</p>
+                <p className="text-xs leading-tight text-slate-300 sm:text-xs md:text-xs">{description}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Footer Text */}
-        <div className="mt-auto pt-4 sm:pt-6 md:pt-8">
+        <div className="mt-auto pt-2 sm:pt-3 md:pt-4">
           <p className="text-xs uppercase tracking-wider text-slate-400">
             One platform. Every mission-critical orbit.
           </p>

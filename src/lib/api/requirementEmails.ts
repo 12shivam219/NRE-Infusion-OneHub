@@ -249,7 +249,7 @@ export async function getUnconfirmedEmailMatches(userId: string): Promise<Requir
 
   if (reqError || !requirements) return [];
 
-  const requirementIds = requirements.map((r) => r.id);
+  const requirementIds = requirements.map((r: any) => r.id);
 
   // Get emails that need confirmation
   const { data, error } = await supabase
@@ -428,7 +428,7 @@ export async function syncCampaignToRequirementEmails(
     }
 
     // Transform campaign_recipients to requirement_emails
-    const emailRecords = recipients.map((recipient) => {
+    const emailRecords = recipients.map((recipient: any) => {
       const recipientEmailLower = recipient.recipient_email.toLowerCase();
       // Get the actual status from emailStatusMap, default to 'sent' if not found
       const actualStatus = emailStatusMap[recipientEmailLower] || 'sent';

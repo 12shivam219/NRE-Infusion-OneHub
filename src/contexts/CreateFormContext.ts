@@ -1,6 +1,6 @@
 import { createContext } from 'react';
 
-type FormType = 'requirement' | 'interview' | 'consultant';
+export type FormType = 'requirement' | 'interview' | 'consultant';
 
 export interface CreateFormContextValue {
   openCreateForm: (type: FormType, requirementId?: string) => void;
@@ -8,3 +8,5 @@ export interface CreateFormContextValue {
 }
 
 export const CreateFormContext = createContext<CreateFormContextValue | undefined>(undefined);
+
+export default CreateFormContext;

@@ -8,7 +8,7 @@ import { Send, Mic, MicOff, Volume2, VolumeX, Loader } from 'lucide-react';
 import { useChatHistory } from '../../hooks/useChatHistory';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { useTextToSpeech } from '../../hooks/useTextToSpeech';
-import { useActionExecutor } from '../../lib/chat/actionExecutor';
+import { useActionExecutor } from '../../lib/chat/utils/actionExecutor';
 import { useAuth } from '../../hooks/useAuth';
 import type { ChatResponse } from '../../lib/chat/types';
 import Box from '@mui/material/Box';

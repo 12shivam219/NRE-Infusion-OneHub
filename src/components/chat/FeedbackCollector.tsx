@@ -17,9 +17,9 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { submitFeedback } from '../../lib/api/phase3';
-import { createFeedback, validateFeedback } from '../../lib/chat/aiTraining';
+import { createFeedback, validateFeedback } from '../../lib/chat/ai/aiTraining';
 import { useAuth } from '../../hooks/useAuth';
-import type { FeedbackType } from '../../lib/chat/aiTraining';
+import type { FeedbackType } from '../../lib/chat/ai/aiTraining';
 
 interface FeedbackCollectorProps {
   open: boolean;

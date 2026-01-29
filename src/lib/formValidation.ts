@@ -3,6 +3,10 @@
  */
 
 import { VALIDATION_RULES } from './constants';
+import { isValidEmail } from './emailParser';
+
+// Re-export for backward compatibility
+export { isValidEmail } from './emailParser';
 
 export interface ValidationError {
   isValid: boolean;
@@ -15,20 +19,6 @@ export interface PasswordValidationResult {
   isLeaked?: boolean;
   leakCount?: number;
 }
-
-/**
- * Validate email format - stricter validation
- */
-export const isValidEmail = (email: string): boolean => {
-  if (!email || typeof email !== 'string') return false;
-  // RFC 5322 simplified regex - ensures proper domain structure
-  const emailRegex = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  // Additional checks: no consecutive dots, no leading/trailing dots
-  const isValid = emailRegex.test(email);
-  if (!isValid) return false;
-  // Ensure no double dots or consecutive special characters
-  return !email.includes('..') && !email.startsWith('.') && !email.endsWith('.');
-};
 
 /**
  * Validate URL format with security checks

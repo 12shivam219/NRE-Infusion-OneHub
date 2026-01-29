@@ -1,23 +1,26 @@
 import { Suspense, useState, useEffect, useCallback, useRef, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
-import { CreateFormProvider } from './contexts/CreateFormContext';
+import { CreateFormProvider } from './contexts/CreateFormProvider';
 import { ChatProvider } from './contexts/ChatProvider';
 import { SidebarProvider, useSidebar } from './contexts/SidebarContext';
 import { useAuth } from './hooks/useAuth';
 import { useToast } from './contexts/ToastContext';
 import { LogoLoader } from './components/common/LogoLoader';
 import { ThemeSyncProvider, useThemeSync, resolveThemeKeyFromRoute } from './contexts/ThemeSyncContext';
-import { AdaptiveAtmosphereProvider } from './contexts/AdaptiveAtmosphereContext';
 import { usePrefersReducedMotion } from './hooks/usePrefersReducedMotion';
 import {
   LazyDashboard,
   LazyDocumentsPage,
   LazyCRMPage,
   LazyAdminPage,
+  LazySettingsPage,
 } from './lib/lazyLoader';
+import { OAuthCallbackPage } from './pages/OAuthCallbackPage';
 import { Header } from './components/layout/Header';
 import { ModernSidebar } from './components/layout/ModernSidebar';
+import ReloadBlockedToast from './components/common/ReloadBlockedToast';
+import UnsyncedDraftsPanel from './components/common/UnsyncedDraftsPanel';
 
 // ⚡ Lazy load all heavy components to defer loading until needed
 const LazyLoginForm = lazy(() => import('./components/auth/LoginForm').then(m => ({ default: m.LoginForm })));
@@ -27,6 +30,7 @@ const LazySyncErrorHandler = lazy(() => import('./components/common/SyncErrorHan
 const LazySyncQueueModal = lazy(() => import('./components/common/SyncQueueModal').then(m => ({ default: m.SyncQueueModal })));
 const LazySkipLinks = lazy(() => import('./components/common/SkipLinks').then(m => ({ default: m.SkipLinks })));
 const LazyFloatingChat = lazy(() => import('./components/chat/FloatingChat').then(m => ({ default: m.FloatingChat })));
+const LazyDraftEncryptionPanel = lazy(() => import('./components/common/DraftEncryptionPanel').then(m => ({ default: m.default })));
 
 type AuthView = 'login' | 'register';
 
@@ -38,16 +42,7 @@ const AdminRoute = ({ children, isAdmin }: { children: React.ReactNode; isAdmin:
   return children;
 };
 
-const RouteSuspenseFallback = ({ onStart, onStop }: { onStart: () => void; onStop: () => void }) => {
-  useEffect(() => {
-    onStart();
-    return () => {
-      onStop();
-    };
-  }, [onStart, onStop]);
 
-  return <LogoLoader fullScreen size="lg" showText label="Loading..." />;
-};
 
 const AppContent = () => {
   const { user, isLoading, refreshUser, isAdmin } = useAuth();
@@ -59,8 +54,7 @@ const AppContent = () => {
   const location = useLocation();
   const { setTheme, clearPreview } = useThemeSync();
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
-  const shouldReduceMotion = prefersReducedMotion || isRouteLoading;
+  const shouldReduceMotion = prefersReducedMotion;
 
   // Update ref when state changes
   useEffect(() => {
@@ -109,9 +103,6 @@ const AppContent = () => {
       window.removeEventListener('offline-mode-activated', handleOfflineActivation);
     };
   }, [handleOfflineActivation]);
-
-  const handleRouteLoadingStart = useCallback(() => setIsRouteLoading(true), []);
-  const handleRouteLoadingStop = useCallback(() => setIsRouteLoading(false), []);
 
   if (isLoading) {
     return <LogoLoader fullScreen size="xl" showText label="Loading Application" />;
@@ -188,36 +179,68 @@ const AppContent = () => {
           marginTop: '56px',
         }}
       >
-        <Suspense
-          fallback={
-            <RouteSuspenseFallback
-              onStart={handleRouteLoadingStart}
-              onStop={handleRouteLoadingStop}
-            />
-          }
-        >
-          <Routes>
-            <Route path="/dashboard" element={<LazyDashboard />} />
-            <Route path="/documents" element={<LazyDocumentsPage />} />
-            <Route path="/crm" element={<LazyCRMPage />} />
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute isAdmin={isAdmin}>
+        <Routes>
+          <Route 
+            path="/dashboard" 
+            element={
+              <Suspense fallback={null}>
+                <LazyDashboard />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/documents" 
+            element={
+              <Suspense fallback={null}>
+                <LazyDocumentsPage />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/crm" 
+            element={
+              <Suspense fallback={null}>
+                <LazyCRMPage />
+              </Suspense>
+            } 
+          />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute isAdmin={isAdmin}>
+                <Suspense fallback={null}>
                   <LazyAdminPage />
-                </AdminRoute>
-              }
-            />
-            {/* Redirect root to Dashboard for all authenticated users */}
-            <Route
-              path="/"
-              element={<Navigate to="/dashboard" replace />}
-            />
-            {/* Catch all - redirect to home */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+                </Suspense>
+              </AdminRoute>
+            }
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <Suspense fallback={null}>
+                <LazySettingsPage />
+              </Suspense>
+            } 
+          />
+          <Route 
+            path="/oauth/callback" 
+            element={<OAuthCallbackPage />}
+          />
+          {/* Redirect root to Dashboard for all authenticated users */}
+          <Route
+            path="/"
+            element={<Navigate to="/dashboard" replace />}
+          />
+          {/* Catch all - redirect to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
+          {/* Toast informing user when reload is blocked due to pending sync/drafts */}
+          <ReloadBlockedToast />
+          <UnsyncedDraftsPanel />
+          <Suspense fallback={null}>
+            <LazyDraftEncryptionPanel />
+          </Suspense>
       </div>
 
       {/* Startup guide removed: no notification shown on startup */}
@@ -235,7 +258,6 @@ function App() {
     <AuthProvider>
       <SidebarProvider>
         <ThemeSyncProvider>
-        <AdaptiveAtmosphereProvider>
           <CreateFormProvider>
             <Suspense fallback={null}>
               <ChatProvider>
@@ -253,7 +275,6 @@ function App() {
               <LazySyncErrorHandler />
             </Suspense>
           </CreateFormProvider>
-        </AdaptiveAtmosphereProvider>
       </ThemeSyncProvider>
       </SidebarProvider>
     </AuthProvider>

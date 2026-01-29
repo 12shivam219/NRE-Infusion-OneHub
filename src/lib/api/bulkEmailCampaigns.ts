@@ -350,7 +350,7 @@ export const pollCampaignStatus = async (
       .from('bulk_email_campaign_status')
       .select('id')
       .limit(5);
-    console.log(`[pollCampaignStatus] Available records in table:`, allRecords?.map(r => r.id) || []);
+    console.log(`[pollCampaignStatus] Available records in table:`, allRecords?.map((r: any) => r.id) || []);
 
     while (!isComplete && attempts < maxAttempts) {
       const { data, error } = await supabase
@@ -489,9 +489,9 @@ export const sendBulkEmailCampaign = async (
         .in('id', campaign.selected_account_ids);
 
       if (!accountsError && accountsData) {
-        selectedAccountEmails = accountsData.map(acc => acc.email_address);
+        selectedAccountEmails = accountsData.map((acc: any) => acc.email_address);
         // Create a map of account ID -> email for recipient mapping
-        accountsData.forEach(acc => {
+        accountsData.forEach((acc: any) => {
           accountIdToEmailMap[acc.id] = acc.email_address;
         });
       }
@@ -506,7 +506,7 @@ export const sendBulkEmailCampaign = async (
     // Build recipient-email mapping for the server
     const recipientAccountEmailMap: Record<string, string> = {};
     if (recipientMappings) {
-      recipientMappings.forEach(mapping => {
+      recipientMappings.forEach((mapping: any) => {
         if (mapping.account_id && accountIdToEmailMap[mapping.account_id]) {
           recipientAccountEmailMap[mapping.recipient_email] = accountIdToEmailMap[mapping.account_id];
         }

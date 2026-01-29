@@ -3,7 +3,7 @@
  */
 
 import { useContext } from 'react';
-import { ChatContext } from '../contexts/ChatContextDef';
+import { ChatContext } from '../contexts/ChatContext';
 
 export const useChatHistory = () => {
   const context = useContext(ChatContext);

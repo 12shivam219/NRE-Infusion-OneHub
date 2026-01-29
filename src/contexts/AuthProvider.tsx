@@ -3,7 +3,7 @@ import { supabase, supabaseAuthStorageKey } from '../lib/supabase';
 import { getCurrentUser, logout as authLogout, type User, getFreshUserData } from '../lib/auth';
 import { setSentryUser, clearSentryUser } from '../lib/sentry';
 import { clearOfflineCache } from '../lib/offlineDB';
-import { AuthContext } from './AuthContextDef';
+import { AuthContext } from './AuthContext';
 
 const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -174,7 +174,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Listen for Supabase auth changes so UI stays in sync with session events.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
+      (event: string) => {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           // User signed in or session refreshed
           void loadUser();

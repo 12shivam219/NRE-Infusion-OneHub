@@ -480,7 +480,7 @@ export const getApprovalStatistics = async (): Promise<{
 }> => {
   try {
     // Try cache first (5-minute invalidation for safety)
-    const cached = await getCacheValue<any>(ADMIN_STATS_CACHE_KEY);  // eslint-disable-line @typescript-eslint/no-explicit-any
+    const cached = await getCacheValue<any>(ADMIN_STATS_CACHE_KEY);   
     if (cached && cached.stats) {
       if (process.env.NODE_ENV === 'development') {
         console.debug('[Cache Hit] Admin statistics from Redis');
@@ -763,18 +763,18 @@ export const getErrorAttachments = async (
       return { success: false, error: error.message };
     }
 
-    const attachments = data ?? [];
+    const attachments = (data ?? []) as Attachment[];
 
     if (attachments.length === 0) {
       return { success: true, attachments: [] };
     }
 
-    const paths = attachments.map(attachment => attachment.storage_path);
+    const paths = attachments.map((attachment: Attachment) => attachment.storage_path);
     const { data: signedUrls, error: signedError } = await supabase.storage
       .from(DOCUMENTS_BUCKET)
       .createSignedUrls(paths, ATTACHMENT_URL_EXPIRY_SECONDS);
 
-    const attachmentsWithUrls = attachments.map((attachment, index) => ({
+    const attachmentsWithUrls = attachments.map((attachment: Attachment, index: number) => ({
       ...attachment,
       download_url: signedUrls?.[index]?.signedUrl ?? null,
     }));

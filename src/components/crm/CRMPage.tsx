@@ -3,8 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import Box from '@mui/material/Box';
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
-import { LogoLoader } from '../common/LogoLoader';
-import type { JdExtractionResult } from '../../lib/jdParser';
+import type { ExtractedJobDetails as JdExtractionResult } from '../../lib/agents/types';
 
 // Lazy load CRM sub-components to reduce initial load time
 const RequirementsManagement = lazy(() => import('./RequirementsManagement').then(m => ({ default: m.RequirementsManagement })));
@@ -49,7 +48,7 @@ export const CRMPage = () => {
     setParsedFormData({
       title: extraction.jobTitle ?? undefined,
       company: extraction.hiringCompany ?? undefined,
-      primary_tech_stack: extraction.keySkills.length > 0 ? extraction.keySkills.join(', ') : undefined,
+      primary_tech_stack: (extraction.keySkills ?? []).length > 0 ? (extraction.keySkills ?? []).join(', ') : undefined,
       rate: extraction.rate ?? undefined,
       remote: extraction.workLocationType ?? undefined,
       location: extraction.location ?? undefined,
@@ -130,7 +129,7 @@ export const CRMPage = () => {
             >
               <ErrorBoundary>
                 {currentView === 'requirements' ? (
-                  <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
+                  <Suspense fallback={null}>
                     <RequirementsManagement
                       onCreateInterview={handleCreateInterview}
                       onParsedJDData={handleParsedJDData}
@@ -140,13 +139,13 @@ export const CRMPage = () => {
                 ) : null}
 
                 {currentView === 'interviews' ? (
-                  <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
+                  <Suspense fallback={null}>
                     <InterviewTracking />
                   </Suspense>
                 ) : null}
 
                 {currentView === 'consultants' ? (
-                  <Suspense fallback={<LogoLoader fullScreen size="lg" showText label="Loading..." />}>
+                  <Suspense fallback={null}>
                     <ConsultantProfiles />
                   </Suspense>
                 ) : null}

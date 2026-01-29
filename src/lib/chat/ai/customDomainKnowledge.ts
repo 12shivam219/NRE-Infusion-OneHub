@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 /**
  * Custom Domain Knowledge Module
  * Manages domain-specific knowledge bases and context

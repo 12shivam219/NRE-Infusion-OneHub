@@ -3,7 +3,7 @@
  * Handles JSON, PDF, and Markdown export formats
  */
 
-import type { Message } from './types';
+import type { Message } from '../types';
 
 export interface ExportOptions {
   title: string;

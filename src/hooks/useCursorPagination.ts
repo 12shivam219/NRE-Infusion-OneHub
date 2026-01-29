@@ -5,6 +5,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import useSWR from 'swr';
+// import { useQuery } from '@tanstack/react-query';  // For future use
 import { getCursorPage, type CursorPaginationParams, type CursorPaginationResult } from '../lib/cursorPagination';
 
 interface UseCursorPaginationParams extends Omit<CursorPaginationParams, 'pageSize'> {

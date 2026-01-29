@@ -10,13 +10,13 @@ import {
 import type { CachePreferences } from '../lib/offlineDB';
 
 const DEFAULT_PREFERENCES: CachePreferences = {
-  key: 'cache-preferences',
+  key: 'userPreferences',
   cacheRequirements: true,
   cacheConsultants: true,
   cacheInterviews: true,
   cacheDocuments: true,
   cacheEmails: true,
-  maxCacheSize: 50, // MB
+  maxCacheSize: 100, // MB
   syncOnWiFiOnly: false,
 };
 
@@ -63,13 +63,32 @@ export function useCachePreferences() {
 
   const updatePreferences = useCallback(
     async (newPrefs: Partial<CachePreferences>) => {
-      const updated = { ...preferences, ...newPrefs };
+      const updated = { ...preferences, ...newPrefs, key: 'userPreferences' };
       setPreferences(updated);
       await savePrefs(updated);
+      console.log('[useCachePreferences] Updated preferences:', updated);
+      
+      // Dispatch event to notify IndexedDB viewers (DevTools) to refresh
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('preferences-updated', { detail: updated }));
+      }
+      
       await recordAnalytics('preferences_changed', { changes: newPrefs });
     },
     [preferences]
   );
+
+  const reloadPreferences = useCallback(async () => {
+    try {
+      const prefs = await fetchPreferences();
+      if (prefs) {
+        setPreferences(prefs);
+        console.log('[useCachePreferences] Reloaded preferences:', prefs);
+      }
+    } catch (error) {
+      console.error('Failed to reload cache preferences:', error);
+    }
+  }, []);
 
   const requestPersistence = useCallback(async () => {
     try {
@@ -88,6 +107,7 @@ export function useCachePreferences() {
   return {
     preferences,
     updatePreferences,
+    reloadPreferences,
     cacheSize,
     cacheQuota,
     cachePercentage: getCachePercentage(),

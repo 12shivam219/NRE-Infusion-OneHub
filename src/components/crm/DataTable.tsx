@@ -15,7 +15,7 @@ export interface Column<T> {
   sortable?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export interface DataTableProps<T extends { id: string } = any> {
   data: T[];
   columns: Column<T>[];

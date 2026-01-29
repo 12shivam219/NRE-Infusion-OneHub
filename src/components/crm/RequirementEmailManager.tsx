@@ -365,7 +365,7 @@ export const RequirementEmailManager = ({
 
       if (result?.success) {
         // Use the email server's campaign ID for polling (not the frontend campaign ID)
-        const emailServerCampaignId = (result as any).emailServerCampaignId || currentCampaignId; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const emailServerCampaignId = (result as any).emailServerCampaignId || currentCampaignId;  
         
         console.log(`[handleSendCampaign] Using campaign ID for polling: ${emailServerCampaignId}`);
         

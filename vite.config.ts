@@ -19,26 +19,14 @@ export default defineConfig({
     }),
   ],
   build: {
+    sourcemap: true,
+    minify: false,
+    // Removed custom manualChunks to prevent bundler-created circular
+    // chunk relationships (e.g. vendor <-> supabase) that can cause
+    // TDZ/initialization errors in the browser. Let Rollup/Vite decide
+    // chunking automatically for now.
     rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            // Group UI libraries to prevent waterfall loading
-            if (id.includes('@mui') || id.includes('@emotion') || id.includes('lucide')) {
-              return 'ui-vendor';
-            }
-            // Keep heavy editors separate
-            if (id.includes('superdoc')) {
-              return 'editor-engine';
-            }
-            if (id.includes('@supabase')) {
-              return 'supabase';
-            }
-            // Group everything else into vendor
-            return 'vendor';
-          }
-        },
-      },
+      output: {},
     },
   },
   optimizeDeps: {
@@ -51,6 +39,13 @@ export default defineConfig({
     hmr: {
       protocol: 'ws',
       host: 'localhost',
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '/api'),
+      },
     },
   },
 });

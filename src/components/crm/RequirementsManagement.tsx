@@ -12,9 +12,10 @@ import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsTable } from './RequirementsTable';
 import { JDParserDialog } from './JDParserDialog';
 import { BatchJDParserDialog } from './BatchJDParserDialog';
+import { AIAutoFillJobParser } from './AIAutoFillJobParser';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
-import type { JdExtractionResult } from '../../lib/jdParser';
+import type { ExtractedJobDetails as JdExtractionResult } from '../../lib/agents/types';
 import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -157,6 +158,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
   const [requirementToDelete, setRequirementToDelete] = useState<Requirement | null>(null);
   const [showJDParser, setShowJDParser] = useState(false);
   const [showBatchJDParser, setShowBatchJDParser] = useState(false);
+  const [showAIAutoFill, setShowAIAutoFill] = useState(false);
 
   // Sync queue UI state
   const { pendingItems, updateItemStatus, clearSynced, pendingCount } = useSyncQueue();
@@ -400,7 +402,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
             return;
           }
           if (matchesServerSideFilters(update.record)) {
-            void mutateRequirements((curr) => {
+            void mutateRequirements((curr: any) => {
               if (!curr) return curr;
               return {
                 ...curr,
@@ -414,18 +416,18 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
             message: `"${update.record.title}" has been added`,
           });
         } else if (update.type === 'UPDATE') {
-          void mutateRequirements((curr) => {
+          void mutateRequirements((curr: any) => {
             if (!curr) return curr;
-            const exists = curr.requirements.some(r => r.id === update.record.id);
+            const exists = curr.requirements.some((r: any) => r.id === update.record.id);
             const shouldInclude = matchesServerSideFilters(update.record);
 
             if (exists) {
               if (!shouldInclude) {
-                return { ...curr, requirements: curr.requirements.filter(r => r.id !== update.record.id) };
+                return { ...curr, requirements: curr.requirements.filter((r: any) => r.id !== update.record.id) };
               }
               return {
                 ...curr,
-                requirements: curr.requirements.map(r => (r.id === update.record.id ? (update.record as unknown as RequirementWithLogs) : r)),
+                requirements: curr.requirements.map((r: any) => (r.id === update.record.id ? (update.record as unknown as RequirementWithLogs) : r)),
               };
             }
 
@@ -446,9 +448,9 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
             });
           }
         } else if (update.type === 'DELETE') {
-          void mutateRequirements((curr) => {
+          void mutateRequirements((curr: any) => {
             if (!curr) return curr;
-            return { ...curr, requirements: curr.requirements.filter(r => r.id !== update.record.id) };
+            return { ...curr, requirements: curr.requirements.filter((r: any) => r.id !== update.record.id) };
           }, { revalidate: false });
           if (selectedRequirement?.id === update.record.id) {
             setSelectedRequirement(null);
@@ -505,9 +507,9 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     try {
       if (!isOnline) {
         await queueOfflineOperation('DELETE', 'requirement', requirement.id, {});
-        await mutateRequirements((curr) => {
+        await mutateRequirements((curr: any) => {
           if (!curr) return curr;
-          return { ...curr, requirements: curr.requirements.filter(r => r.id !== requirement.id) };
+          return { ...curr, requirements: curr.requirements.filter((r: any) => r.id !== requirement.id) };
         }, { revalidate: false });
         setSelectedRequirement(null);
         setShowDeleteConfirm(false);
@@ -524,9 +526,9 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
 
       const result = await deleteRequirement(requirement.id, user.id);
       if (result.success) {
-        await mutateRequirements((curr) => {
+        await mutateRequirements((curr: any) => {
           if (!curr) return curr;
-          return { ...curr, requirements: curr.requirements.filter(r => r.id !== requirement.id) };
+          return { ...curr, requirements: curr.requirements.filter((r: any) => r.id !== requirement.id) };
         }, { revalidate: false });
         setSelectedRequirement(null);
         setShowDeleteConfirm(false);
@@ -713,6 +715,28 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
                             }}
                           >
                             📑 Batch JD Parser
+                          </Button>
+
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            color="inherit"
+                            onClick={() => {
+                              setShowAIAutoFill(true);
+                              setToolsAnchorEl(null);
+                            }}
+                            sx={{
+                              justifyContent: 'flex-start',
+                              textTransform: 'none',
+                              fontWeight: 500,
+                              fontSize: '0.75rem',
+                              py: 1,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+                            }}
+                          >
+                            🤖 AI Auto-Fill
                           </Button>
 
                           <Button
@@ -1224,6 +1248,11 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
         open={showBatchJDParser}
         onClose={() => setShowBatchJDParser(false)}
         onParsedData={onParsedJDData}
+      />
+
+      <AIAutoFillJobParser
+        open={showAIAutoFill}
+        onClose={() => setShowAIAutoFill(false)}
       />
 
       {/* Detail Modal */}

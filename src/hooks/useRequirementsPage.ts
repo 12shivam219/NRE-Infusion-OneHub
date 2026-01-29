@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import useSWR from 'swr';
+// import { useQuery } from '@tanstack/react-query';  // For future use
 import { getRequirementsPage, type RequirementWithLogs } from '../lib/api/requirements';
 import { cacheRequirements, getCachedRequirements, type CachedRequirement } from '../lib/offlineDB';
 

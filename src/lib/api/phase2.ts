@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../supabase';
-import type { CustomVoiceCommand } from '../chat/customCommands';
+import type { CustomVoiceCommand } from '../chat/features/customCommands';
 
 // ========== ANALYTICS ==========
 

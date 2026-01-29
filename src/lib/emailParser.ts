@@ -14,6 +14,20 @@ export interface ParsedEmail {
 }
 
 /**
+ * Validate if a string is a valid email address (stricter validation)
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') return false;
+  // RFC 5322 simplified regex - ensures proper domain structure
+  const emailRegex = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  // Additional checks: no consecutive dots, no leading/trailing dots
+  const isValid = emailRegex.test(email);
+  if (!isValid) return false;
+  // Ensure no double dots or consecutive special characters
+  return !email.includes('..') && !email.startsWith('.') && !email.endsWith('.');
+}
+
+/**
  * Parse a single email entry
  * Supports formats like:
  * - email@example.com
@@ -131,19 +145,6 @@ export function parseEmailList(text: string): ParsedEmail[] {
   }
 
   return emails;
-}
-
-/**
- * Validate if a string is a valid email address
- */
-export function isValidEmail(email: string): boolean {
-  if (!email || typeof email !== 'string') {
-    return false;
-  }
-
-  // Basic email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email.trim());
 }
 
 /**

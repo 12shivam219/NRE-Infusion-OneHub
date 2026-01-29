@@ -1,5 +1,6 @@
 /**
- * Chat Context - Manages conversation state and history
+ * Chat Context
+ * Type definitions for chat state management
  */
 
 import { createContext } from 'react';

@@ -154,7 +154,7 @@ export const getCursorPage = async (
       const lastItem = items[items.length - 1];
       nextCursor = {
         id: lastItem.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         sortValue: lastItem[sortColumn as keyof typeof lastItem] as any,
       };
     }
@@ -163,7 +163,7 @@ export const getCursorPage = async (
       const firstItem = items[0];
       prevCursor = {
         id: firstItem.id,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         
         sortValue: firstItem[sortColumn as keyof typeof firstItem] as any,
       };
     }
