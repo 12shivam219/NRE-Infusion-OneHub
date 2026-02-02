@@ -10,69 +10,49 @@ interface JobExtractionRequest {
 
 interface ExtractedJobDetails {
   jobTitle: string;
-  company: string;
+  hiringCompany: string;
+  keySkills: string[];
+  rate?: string;
+  workLocationType?: string;
+  duration?: string;
+  vendor: string;
+  vendorContact: string;
+  vendorEmail: string;
+  vendorPhone: string;
   jobDescription: string;
-  requirements: string[];
-  salary?: {
-    min?: number;
-    max?: number;
-    currency?: string;
-  };
-  location: string;
-  isRemote: boolean;
-  employmentType?: "full-time" | "part-time" | "contract" | "temporary";
-  applicationDeadline?: string;
-  skills: string[];
-  experiences: string[];
-  benefits?: string[];
-  contactEmail?: string;
-  jobUrl?: string;
 }
 
-const JOB_DETECTION_PROMPT = `You are an expert at identifying job posting emails. 
-Analyze the following email content and determine if it's a job posting.
+const JOB_EXTRACTION_PROMPT = `You are an expert recruiter. Extract job posting information from this text.
 
-Email Subject: {subject}
-Email From: {from}
-Content: {content}
+TEXT TO PARSE:
+{content}
 
-Respond with ONLY a JSON object:
+IMPORTANT: Extract ALL vendor/recruiter contact information (name, email, phone, company).
+IMPORTANT: In the jobDescription field, remove ALL email addresses, phone numbers, person names, and URLs.
+
+Extract ONLY the following information and return a JSON object:
 {
-  "isJobPosting": boolean,
-  "confidence": number (0-100),
-  "reason": string
-}`;
-
-const JOB_EXTRACTION_PROMPT = `You are an expert recruiter and job analyst. 
-Extract all relevant job information from this email.
-
-Email Subject: {subject}
-Email From: {from}
-Content: {content}
-
-Extract and return ONLY a JSON object with this exact structure:
-{
-  "jobTitle": "string",
-  "company": "string",
-  "jobDescription": "string (brief summary)",
-  "requirements": ["array of key requirements"],
-  "salary": {
-    "min": number or null,
-    "max": number or null,
-    "currency": "string or null"
-  },
-  "location": "string",
-  "isRemote": boolean,
-  "employmentType": "full-time|part-time|contract|temporary",
-  "applicationDeadline": "YYYY-MM-DD or null",
-  "skills": ["required technical skills"],
-  "experiences": ["required experience"],
-  "benefits": ["benefits if mentioned"],
-  "contactEmail": "string or null",
-  "jobUrl": "string or null"
+  "jobTitle": "string - the position/job title (REQUIRED)",
+  "hiringCompany": "string - the end client or hiring company name",
+  "keySkills": ["array of required technical/professional skills"],
+  "rate": "string - hourly/daily/yearly rate if mentioned (e.g., '$75/hour', '€85k/year', null if not mentioned)",
+  "workLocationType": "string - Remote, On-site, Hybrid, Hybrid-Remote, etc. (null if not mentioned)",
+  "duration": "string - contract duration if mentioned (e.g., '3 months', '6 months', 'Long-term', null if not mentioned)",
+  "vendor": "string - the staffing/recruiting/vendor company name (REQUIRED - this is important)",
+  "vendorContact": "string - the contact person's full name (REQUIRED - this is important)",
+  "vendorEmail": "string - the contact person's email address (extract carefully)",
+  "vendorPhone": "string - the contact person's phone number (extract carefully)",
+  "jobDescription": "string - the complete job description with emails, phone numbers, person names, and contact URLs REMOVED. Keep the job content but strip all contact details."
 }
 
-Be accurate and extract only information that is explicitly mentioned. Use null for missing fields.`;
+Rules:
+1. Always extract vendor/recruiter information - this is a staffing company
+2. Remove ALL emails (xxx@xxx.com) from jobDescription
+3. Remove ALL phone numbers from jobDescription
+4. Remove names of recruiter/vendor people from jobDescription
+5. Keep job details, requirements, location, and other useful information
+6. Use null ONLY if information is truly not present in the text
+7. Never use empty strings "" for required fields`;
 
 async function callGroqAPI(messages: { role: string; content: string }[]) {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -82,10 +62,10 @@ async function callGroqAPI(messages: { role: string; content: string }[]) {
       Authorization: `Bearer ${groqApiKey}`,
     },
     body: JSON.stringify({
-      model: "mixtral-8x7b-32768",
+      model: "llama-3.3-70b-versatile",
       messages,
-      temperature: 0.7,
-      max_tokens: 1000,
+      temperature: 0.2,
+      max_tokens: 2000,
     }),
   });
 
@@ -98,6 +78,24 @@ async function callGroqAPI(messages: { role: string; content: string }[]) {
   return data.choices[0]?.message?.content || "";
 }
 
+function removeContactDetails(text: string): string {
+  if (!text) return '';
+  
+  let cleaned = text;
+  
+  // Remove email addresses
+  cleaned = cleaned.replace(/[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[email removed]');
+  
+  // Remove phone numbers (various formats)
+  cleaned = cleaned.replace(/(\+1|1)?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}/g, '[phone removed]');
+  cleaned = cleaned.replace(/(\+\d{1,3})?[-.\s]?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{4}/g, '[phone removed]');
+  
+  // Remove URLs
+  cleaned = cleaned.replace(/https?:\/\/[^\s]+/g, '[link removed]');
+  
+  return cleaned;
+}
+
 function extractJSON(content: string) {
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
@@ -106,48 +104,44 @@ function extractJSON(content: string) {
   return JSON.parse(jsonMatch[0]);
 }
 
-async function detectJobPosting(
-  subject: string,
-  from: string,
-  content: string
-): Promise<{ isJobPosting: boolean; confidence: number }> {
-  const prompt = JOB_DETECTION_PROMPT.replace("{subject}", subject)
-    .replace("{from}", from)
-    .replace("{content}", content.substring(0, 1000));
-
-  const response = await callGroqAPI([
-    {
-      role: "system",
-      content: "You are a job posting detection AI. Respond only with JSON.",
-    },
-    { role: "user", content: prompt },
-  ]);
-
-  const result = extractJSON(response);
-  return {
-    isJobPosting: result.isJobPosting || false,
-    confidence: result.confidence || 0,
-  };
-}
-
 async function extractJobDetails(
-  subject: string,
-  from: string,
   content: string
 ): Promise<ExtractedJobDetails> {
-  const prompt = JOB_EXTRACTION_PROMPT.replace("{subject}", subject)
-    .replace("{from}", from)
-    .replace("{content}", content.substring(0, 2000));
+  const prompt = JOB_EXTRACTION_PROMPT.replace("{content}", content.substring(0, 3000));
 
   const response = await callGroqAPI([
     {
       role: "system",
-      content: "You are a job information extraction AI. Respond only with valid JSON.",
+      content: "You are a job posting extraction AI. Extract ALL requested fields accurately. Vendor/recruiter contact information is critical. Respond ONLY with valid JSON.",
     },
     { role: "user", content: prompt },
   ]);
 
-  return extractJSON(response) as ExtractedJobDetails;
+  console.log('Raw AI response:', response);
+
+  const extracted = extractJSON(response) as ExtractedJobDetails;
+  
+  // Clean the job description of contact details
+  let cleanedDescription = extracted.jobDescription || "";
+  cleanedDescription = removeContactDetails(cleanedDescription);
+  
+  const result: ExtractedJobDetails = {
+    jobTitle: extracted.jobTitle?.trim() || "",
+    hiringCompany: extracted.hiringCompany?.trim() || "",
+    keySkills: Array.isArray(extracted.keySkills) ? extracted.keySkills.filter(s => s) : [],
+    rate: extracted.rate?.trim() || undefined,
+    workLocationType: extracted.workLocationType?.trim() || undefined,
+    duration: extracted.duration?.trim() || undefined,
+    vendor: extracted.vendor?.trim() || "",
+    vendorContact: extracted.vendorContact?.trim() || "",
+    vendorEmail: extracted.vendorEmail?.trim() || "",
+    vendorPhone: extracted.vendorPhone?.trim() || "",
+    jobDescription: cleanedDescription,
+  };
+
+  console.log('Extracted and cleaned result:', result);
+  
+  return result;
 }
 
 serve(async (req: Request) => {
@@ -157,13 +151,13 @@ serve(async (req: Request) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
+                "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey, prefer",
             },
         });
     }
 
     try {
-        const { emailContent, emailSubject = "Job Posting", emailFrom = "unknown@company.com" } = await req.json() as JobExtractionRequest;
+        const { emailContent } = await req.json() as JobExtractionRequest;
 
         if (!emailContent) {
             return new Response(
@@ -178,19 +172,59 @@ serve(async (req: Request) => {
             );
         }
 
-        // Step 1: Detect if it's a job posting
-        const detection = await detectJobPosting(emailSubject, emailFrom, emailContent);
+        // Extract job details
+        const jobDetails = await extractJobDetails(emailContent);
 
-        if (!detection.isJobPosting || detection.confidence < 30) {
+        return new Response(
+            JSON.stringify({
+                success: true,
+                data: jobDetails,
+            }),
+            {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            }
+        );
+    } catch (error) {
+        console.error("Error:", error);
+        return new Response(
+            JSON.stringify({
+                error: error instanceof Error ? error.message : "Unknown error",
+            }),
+            {
+                status: 500,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            }
+        );
+    }
+});
+
+serve(async (req: Request) => {
+    // Handle CORS
+    if (req.method === "OPTIONS") {
+        return new Response("ok", {
+            headers: {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey, prefer",
+            },
+        });
+    }
+
+    try {
+        const { emailContent } = await req.json() as JobExtractionRequest;
+
+        if (!emailContent) {
             return new Response(
-                JSON.stringify({
-                    success: false,
-                    error: "Email is not a job posting",
-                    confidence: detection.confidence,
-                    isJobPosting: false,
-                }),
+                JSON.stringify({ error: "emailContent is required" }),
                 {
-                    status: 200,
+                    status: 400,
                     headers: {
                         "Content-Type": "application/json",
                         "Access-Control-Allow-Origin": "*",
@@ -199,15 +233,13 @@ serve(async (req: Request) => {
             );
         }
 
-        // Step 2: Extract job details
-        const jobDetails = await extractJobDetails(emailSubject, emailFrom, emailContent);
+        // Extract job details
+        const jobDetails = await extractJobDetails(emailContent);
 
         return new Response(
             JSON.stringify({
                 success: true,
                 data: jobDetails,
-                confidence: detection.confidence,
-                isJobPosting: true,
             }),
             {
                 status: 200,

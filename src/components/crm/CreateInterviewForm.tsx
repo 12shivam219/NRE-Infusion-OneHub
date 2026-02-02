@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { X, AlertCircle, CheckCircle2, Info, Sparkles, Calendar, Clock, Users, Briefcase, MessageSquare, MapPin, FileText, CheckCircle } from 'lucide-react';
+import { mutate as globalMutate } from 'swr';
+import { X, AlertCircle, CheckCircle2, Info, Calendar, Clock, Users, Briefcase, MessageSquare, MapPin, FileText, CheckCircle } from 'lucide-react';
 import { keyframes } from '@mui/system';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
-import { createInterview } from '../../lib/api/interviews';
+import { createInterview, getInterviewsByRequirementGrouped } from '../../lib/api/interviews';
 import { getRequirements } from '../../lib/api/requirements';
 import { getConsultants } from '../../lib/api/consultants';
-import { generateInterviewFocus } from '../../lib/api/groq-interview';
+// Interview focus generator removed per request
 import { validateInterviewForm, getAllInterviewStatuses } from '../../lib/interviewValidation';
 import { sanitizeText } from '../../lib/utils';
 import type { Database } from '../../lib/database.types';
@@ -383,8 +384,14 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
   const [consultants, setConsultants] = useState<Consultant[]>([]);
   const [loading, setLoading] = useState(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [aiGenerating, setAiGenerating] = useState(false);
+  // interview focus generation disabled
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [roundOptions, setRoundOptions] = useState<FormFieldOption[]>([
+    { label: '1st Round', value: '1st Round' },
+    { label: '2nd Round', value: '2nd Round' },
+    { label: '3rd Round', value: '3rd Round' },
+    { label: 'Final Round', value: 'Final Round' },
+  ]);
 
 
   const [formData, setFormData] = useState({
@@ -494,29 +501,55 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
           ...prev,
           job_description_excerpt: jobDescExcerpt,
           vendor_company: vendorCompany,
+          // Prefill consultant from requirement if present
+          consultant_id: requirement.consultant_id || prev.consultant_id || '',
+          // Use primary_tech_stack (key skills) as interview focus
+          interview_focus: (requirement.primary_tech_stack && requirement.primary_tech_stack.length > 0) ? requirement.primary_tech_stack : prev.interview_focus,
         }));
 
-        // Generate interview focus using AI if tech stack exists
-        const techStack = requirement.primary_tech_stack || '';
-        if (techStack) {
-          setAiGenerating(true);
-          const result = await generateInterviewFocus({
-            techStack,
-            jobDescription: jobDescExcerpt,
-            jobTitle: requirement.title || '',
-            company: vendorCompany,
-          });
+        // Fetch existing interviews for this requirement to suggest new rounds
+        if (user) {
+          const result = await getInterviewsByRequirementGrouped(formData.requirement_id, user.id);
+          if (result.success && result.grouped) {
+            // Extract round labels from grouped result
+            const existingRounds = Object.keys(result.grouped);
 
-          if (!cancelled) {
-            if (result.success && result.interviewFocus) {
-              setFormData(prev => ({
-                ...prev,
-                interview_focus: result.interviewFocus || '',
-              }));
+            // Build round options: existing rounds first, then standard options, then "New Round" option
+            const roundLabels: FormFieldOption[] = [];
+            
+            // Add existing rounds
+            existingRounds.sort().forEach(round => {
+              roundLabels.push({ label: round, value: round });
+            });
+
+            // Add standard options if not already present
+            const standardOptions = [
+              { label: '1st Round', value: '1st Round' },
+              { label: '2nd Round', value: '2nd Round' },
+              { label: '3rd Round', value: '3rd Round' },
+              { label: 'Final Round', value: 'Final Round' },
+            ];
+            standardOptions.forEach(opt => {
+              if (!roundLabels.find(r => r.value === opt.value)) {
+                roundLabels.push(opt);
+              }
+            });
+
+            // Add "New Round" option if there are existing interviews
+            if (existingRounds.length > 0) {
+              const nextRoundNum = existingRounds.length + 1;
+              const newRoundLabel = `${nextRoundNum}${nextRoundNum === 1 ? 'st' : nextRoundNum === 2 ? 'nd' : nextRoundNum === 3 ? 'rd' : 'th'} Round`;
+              if (!roundLabels.find(r => r.value === newRoundLabel)) {
+                roundLabels.push({ label: newRoundLabel, value: newRoundLabel });
+              }
             }
-            setAiGenerating(false);
+
+            setRoundOptions(roundLabels);
           }
         }
+
+        // Check local cache first to avoid regenerating on every open
+        // Interview focus auto-generation has been removed.
       }
     };
 
@@ -525,7 +558,19 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
     return () => {
       cancelled = true;
     };
-  }, [formData.requirement_id, requirements]);
+  }, [formData.requirement_id, requirements, user]);
+
+  // Auto-generate subject_line if it's empty and key fields are set
+  useEffect(() => {
+    if (!formData.subject_line.trim() && formData.requirement_id && formData.round && formData.type) {
+      const requirement = requirements.find(r => r.id === formData.requirement_id);
+      if (requirement) {
+        const generatedSubject = `${requirement.title} - ${formData.type} - ${formData.round}`;
+        setFormData(prev => ({ ...prev, subject_line: generatedSubject }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.requirement_id, formData.round, formData.type, requirements]);
 
   const requirementOptions = useMemo(
     () => requirements.map(r => ({ label: `${r.title} - ${r.company}`, value: r.id })),
@@ -612,6 +657,71 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
       });
       
       // Close dialog and trigger callback after animation completes
+      // Dispatch a global event so listing views can update optimistically
+      // Prepare optimistic interview object for SWR mutation and event dispatch
+      const created = result.interview ?? {
+        id: `temp-${Date.now()}`,
+        user_id: user.id,
+        requirement_id: formData.requirement_id,
+        scheduled_date: formData.scheduled_date,
+        scheduled_time: formData.scheduled_time || null,
+        timezone: formData.timezone || null,
+        duration_minutes: parseInt(formData.duration_minutes),
+        type: formData.type || null,
+        status: formData.status,
+        consultant_id: formData.consultant_id || null,
+        vendor_company: sanitizeText(formData.vendor_company),
+        interview_with: sanitizeText(formData.interview_with),
+        result: sanitizeText(formData.result),
+        round: formData.round || null,
+        mode: formData.mode || null,
+        meeting_type: formData.meeting_type || null,
+        subject_line: sanitizeText(formData.subject_line),
+        interviewer: sanitizeText(formData.interviewer),
+        location: sanitizeText(formData.location),
+        interview_focus: sanitizeText(formData.interview_focus),
+        special_note: sanitizeText(formData.special_note),
+        job_description_excerpt: sanitizeText(formData.job_description_excerpt),
+        feedback_notes: sanitizeText(formData.feedback_notes),
+        created_by: user.id,
+        updated_by: user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as any;
+
+      // Optimistically update common SWR keys if present
+      try {
+        void globalMutate('interviews', (curr: any) => {
+          if (!curr) return [created];
+          // if curr is array
+          if (Array.isArray(curr)) {
+            if (curr.some((c: any) => c.id === created.id)) return curr;
+            return [created, ...curr];
+          }
+          return curr;
+        }, false);
+
+        if (created.requirement_id) {
+          const key = `interviews:requirement:${created.requirement_id}`;
+          void globalMutate(key, (curr: any) => {
+            if (!curr) return [created];
+            if (Array.isArray(curr)) {
+              if (curr.some((c: any) => c.id === created.id)) return curr;
+              return [created, ...curr];
+            }
+            return curr;
+          }, false);
+        }
+      } catch {
+        // swallow SWR mutation errors
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent('interview-created', { detail: created }));
+      } catch {
+        // ignore
+      }
+
       setTimeout(() => {
         onSuccess();
       }, 1500);
@@ -664,6 +774,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               onChange={handleChange}
               options={requirementOptions}
               required
+              readOnly={!!requirementId}
               error={formErrors.requirement_id}
               icon={<Briefcase size={18} />}
               onKeyDown={(e) => handleKeyDown(e)}
@@ -746,12 +857,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
               type="select"
               value={formData.round}
               onChange={handleChange}
-              options={[
-                { label: '1st Round', value: '1st Round' },
-                { label: '2nd Round', value: '2nd Round' },
-                { label: '3rd Round', value: '3rd Round' },
-                { label: 'Final Round', value: 'Final Round' },
-              ]}
+              options={roundOptions}
               icon={<MessageSquare size={18} />}
               onKeyDown={(e) => handleKeyDown(e)}
             />
@@ -913,73 +1019,25 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
         {/* Interview Notes & Feedback */}
         <AccordionSection title="Notes & Feedback" defaultOpen={false}>
           <Stack spacing={2.5} sx={{ animation: `${slideIn} 0.4s ease-out 0.4s backwards` }}>
-            {/* Interview Focus - Enhanced UI */}
+            {/* Interview Focus (manual entry) */}
             <Box>
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                mb: 1.5,
-              }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <MessageSquare size={18} style={{ color: '#2563EB' }} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                    Interview Focus                  </Typography>
-                  <Box sx={{
-                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    border: '1px solid rgba(212, 175, 55, 0.3)',
-                  }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: 'rgba(212, 175, 55, 0.9)' }}>
-                      AI-Powered
-                    </Typography>
-                  </Box>
+                    Interview Focus
+                  </Typography>
                 </Box>
-                {aiGenerating && (
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.8,
-                    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                    padding: '6px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(59, 130, 246, 0.2)',
-                    animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                  }}>
-                    <Sparkles size={16} style={{ color: '#3b82f6' }} />
-                    <Typography variant="caption" sx={{ color: '#3b82f6', fontWeight: 600, fontSize: '0.75rem' }}>
-                      Generating...
-                    </Typography>
-                  </Box>
-                )}
-                {formData.interview_focus && !aiGenerating && (
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.6,
-                    backgroundColor: 'rgba(34, 197, 94, 0.12)',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(34, 197, 94, 0.2)',
-                  }}>
-                    <CheckCircle2 size={14} style={{ color: '#22c55e' }} />
-                    <Typography variant="caption" sx={{ color: '#22c55e', fontWeight: 600, fontSize: '0.72rem' }}>
-                      Generated
-                    </Typography>
-                  </Box>
-                )}
               </Box>
               <TextField
                 fullWidth
                 multiline
                 minRows={5}
                 maxRows={20}
-                placeholder="AI will generate key areas to discuss, technical focus areas, and preparation points based on the job description and tech stack..."
+                placeholder="Enter key areas to discuss, technical focus areas, and preparation points..."
                 value={formData.interview_focus}
                 onChange={handleChange}
                 name="interview_focus"
-                disabled={aiGenerating}
                 slotProps={{
                   input: {
                     sx: {
@@ -987,17 +1045,11 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                       fontSize: '0.9rem',
                       lineHeight: 1.6,
                       color: formData.interview_focus ? 'text.primary' : 'text.secondary',
-                      backgroundColor: formData.interview_focus 
-                        ? 'rgba(212, 175, 55, 0.03)' 
-                        : aiGenerating 
-                          ? 'rgba(59, 130, 246, 0.02)' 
-                          : 'background.paper',
+                      backgroundColor: formData.interview_focus ? 'rgba(212, 175, 55, 0.03)' : 'background.paper',
                       transition: 'all 0.3s ease',
                       resize: 'vertical',
                       '&:hover': {
-                        backgroundColor: formData.interview_focus 
-                          ? 'rgba(212, 175, 55, 0.05)' 
-                          : 'background.paper',
+                        backgroundColor: formData.interview_focus ? 'rgba(212, 175, 55, 0.05)' : 'background.paper',
                         borderColor: formData.interview_focus ? 'rgba(212, 175, 55, 0.4)' : 'action.hover',
                       },
                       '&.Mui-focused': {
@@ -1031,7 +1083,7 @@ export const CreateInterviewForm = ({ onClose, onSuccess, requirementId, showDia
                   color: 'text.secondary',
                   fontSize: '0.8rem',
                 }}>
-                  💡 Tip: This AI-generated content is editable. Customize it to match your interview style.
+                  💡 Tip: This content is editable. Customize it to match your interview style.
                 </Typography>
               )}
             </Box>

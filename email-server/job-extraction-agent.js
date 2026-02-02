@@ -20,7 +20,7 @@ dotenv.config();
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 // Confidence threshold for auto-creating requirements (0-100)
 const CONFIDENCE_THRESHOLD = 75;
@@ -46,11 +46,43 @@ async function extractJobWithGroq(emailContent, retries = 3) {
     throw new Error('GROQ_API_KEY not configured');
   }
 
-  // Limit email content to first 1000 chars to reduce tokens
-  const limitedContent = emailContent.substring(0, 1000);
+  // Limit email content to first 3000 chars to preserve context
+  const limitedContent = emailContent.substring(0, 3000);
 
-  const prompt = `Is this a job email? Extract key info. Return JSON.
-{"isJobEmail":true/false,"title":"","company":"","location":"","salary":"","skills":"","confidence":0-100}`;
+  const prompt = `You are an expert recruiter. Extract job posting information from this text.
+IMPORTANT: This is a REMOTE JOBS ONLY system. Filter jobs by work location.
+IMPORTANT: Extract ALL vendor/recruiter contact information (name, email, phone, company).
+
+TEXT TO PARSE:
+${limitedContent}
+
+Extract ONLY the following information and return a JSON object:
+{
+  "isJobEmail": true/false,
+  "jobTitle": "string - the position/job title (REQUIRED if true)",
+  "hiringCompany": "string - the end client or hiring company name",
+  "keySkills": ["array of required technical/professional skills"],
+  "rate": "string - hourly/daily/yearly rate if mentioned",
+  "workLocationType": "string - Remote, On-site, Hybrid, Hybrid-Remote, etc. (CRITICAL: MUST CHECK THIS)",
+  "duration": "string - contract duration if mentioned",
+  "vendor": "string - the staffing/recruiting/vendor company name (REQUIRED)",
+  "vendorContact": "string - the contact person's full name (REQUIRED)",
+  "vendorEmail": "string - the contact person's email address",
+  "vendorPhone": "string - the contact person's phone number",
+  "jobDescription": "string - complete job description with ALL contact details REMOVED",
+  "confidence": 0-100
+}
+
+Rules:
+1. isJobEmail: true ONLY if legitimate job opportunity with clear position, company, requirements
+2. REMOTE JOBS ONLY: workLocationType MUST contain 'remote'. If only 'On-site', set isJobEmail to false
+3. Extract vendor/recruiter information - this is staffing email
+4. Remove ALL emails from jobDescription
+5. Remove ALL phone numbers from jobDescription
+6. Remove recruiter names from jobDescription
+7. Keep job details, requirements, location info
+8. confidence: 0-100 for how confident this is a legitimate remote job
+9. Never use empty strings for required fields when isJobEmail is true`;
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
@@ -64,12 +96,16 @@ async function extractJobWithGroq(emailContent, retries = 3) {
           model: GROQ_MODEL,
           messages: [
             {
+              role: 'system',
+              content: 'You are a job posting extraction AI. Extract ALL requested fields accurately. Vendor/recruiter contact information is critical. Remote job location validation is critical. Respond ONLY with valid JSON.',
+            },
+            {
               role: 'user',
-              content: `${prompt}\n\n${limitedContent}`,
+              content: prompt,
             },
           ],
-          temperature: 0.1,
-          max_tokens: 300,
+          temperature: 0.2,
+          max_tokens: 2000,
         }),
       });
 
@@ -216,17 +252,24 @@ function extractEmailContent(message) {
 
 async function createRequirementFromJob(userId, jobData, emailInfo) {
   try {
-    // Map compact field names from AI response
+    // Map all fields from standardized 11-field extraction
+    const keySkills = Array.isArray(jobData.keySkills) ? jobData.keySkills.filter(s => s).join(', ') : jobData.keySkills || null;
+    
     const requirementPayload = {
       user_id: userId,
-      title: jobData.jobTitle || jobData.title || 'Job Opening',
-      company: jobData.companyName || jobData.company || 'Unknown Company',
-      location: jobData.location || null,
-      rate: jobData.salary || null,
-      primary_tech_stack: jobData.requirements || jobData.skills || null,
-      remote: (jobData.jobType || jobData.type || '').toLowerCase().includes('remote') ? 'Yes' : null,
-      description: buildDescription(jobData, emailInfo),
-      next_step: `Email: "${emailInfo.subject}" | From: ${emailInfo.from} | AI Confidence: ${jobData.confidenceScore || jobData.confidence || 0}%`,
+      title: jobData.jobTitle || 'Job Opening',
+      company: jobData.hiringCompany || 'Unknown Company',
+      vendor: jobData.vendor || null,
+      imp_name: jobData.vendorContact || null,
+      vendor_email: jobData.vendorEmail || null,
+      vendor_phone: jobData.vendorPhone || null,
+      location: jobData.workLocationType || 'Remote',
+      rate: jobData.rate || null,
+      duration: jobData.duration || null,
+      primary_tech_stack: keySkills,
+      remote: jobData.workLocationType?.toLowerCase().includes('remote') ? 'Yes' : null,
+      description: jobData.jobDescription || buildDescription(jobData, emailInfo),
+      next_step: `Email: "${emailInfo.subject}" | From: ${emailInfo.from} | AI Confidence: ${jobData.confidence || 0}%`,
       status: 'NEW',
       created_by: userId,
       updated_by: userId,
@@ -327,17 +370,24 @@ async function processUserEmails(userId, accessToken) {
           // Extract job information using Groq AI
           const jobData = await extractJobWithGroq(emailContent.fullContent);
 
-          // If not a job email, skip
+          // If not a job email or not remote, skip
           if (!jobData.isJobEmail) {
-            console.log(`   ⏭️  Not a job email (confidence: ${jobData.confidence || jobData.confidenceScore || 0}%)`);
+            console.log(`   ⏭️  Not a job email (confidence: ${jobData.confidence || 0}%)`);
+            continue;
+          }
+
+          // Check if remote job
+          const isRemote = jobData.workLocationType?.toLowerCase().includes('remote');
+          if (!isRemote) {
+            console.log(`   ⏭️  Not a remote job (location: ${jobData.workLocationType || 'Not specified'})`);
             continue;
           }
 
           jobsFound++;
-          console.log(`   ✅ Found job: "${jobData.jobTitle || jobData.title || 'Unknown'}" (Confidence: ${jobData.confidence || jobData.confidenceScore || 0}%)`);
+          console.log(`   ✅ Found remote job: "${jobData.jobTitle || 'Unknown'}" (${jobData.workLocationType}) (Confidence: ${jobData.confidence || 0}%)`);
 
           // Auto-create requirement if confidence is high enough
-          if ((jobData.confidence || jobData.confidenceScore || 0) >= CONFIDENCE_THRESHOLD) {
+          if ((jobData.confidence || 0) >= CONFIDENCE_THRESHOLD) {
             try {
               const requirement = await createRequirementFromJob(userId, jobData, {
                 messageId: message.id,
@@ -353,7 +403,7 @@ async function processUserEmails(userId, accessToken) {
               console.error(`   ❌ Error creating requirement:`, err.message);
             }
           } else {
-            console.log(`   📌 Confidence too low (${jobData.confidenceScore}%) - skipping auto-creation`);
+            console.log(`   📌 Confidence too low (${jobData.confidence}%) - skipping auto-creation`);
           }
         } catch (err) {
           errors.push(`Error processing email: ${err.message}`);

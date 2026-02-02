@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, lazy, useRef } from 'react';
-import { Download, XCircle, ArrowUpDown, X, SlidersHorizontal, Zap, Settings, Filter } from 'lucide-react';
+import { mutate as globalMutate } from 'swr';
+import { X, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { useToast } from '../../contexts/ToastContext';
@@ -10,39 +11,23 @@ import type { Database, RequirementStatus } from '../../lib/database.types';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsTable } from './RequirementsTable';
-import { JDParserDialog } from './JDParserDialog';
-import { BatchJDParserDialog } from './BatchJDParserDialog';
-import { AIAutoFillJobParser } from './AIAutoFillJobParser';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
 import { processSyncQueue } from '../../lib/offlineDB';
-import type { ExtractedJobDetails as JdExtractionResult } from '../../lib/agents/types';
+
 import SearchIcon from '@mui/icons-material/Search';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import InputBase from '@mui/material/InputBase';
 import Button from '@mui/material/Button';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
 import Chip from '@mui/material/Chip';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Popper from '@mui/material/Popper';
-import Grow from '@mui/material/Grow';
-import ClickAwayListener from '@mui/material/ClickAwayListener';
-import Portal from '@mui/material/Portal';
 import Tooltip from '@mui/material/Tooltip';
 import { styled } from '@mui/material/styles';
 
@@ -52,19 +37,8 @@ const ConfirmDialog = lazy(() => import('../common/ConfirmDialog').then((m) => (
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 
-const statusColors: Record<RequirementStatus, { badge: string; label: string }> = {
-  NEW: { badge: 'bg-primary-50 text-primary-800', label: 'New' },
-  IN_PROGRESS: { badge: 'bg-yellow-100 text-yellow-800', label: 'In Progress' },
-  SUBMITTED: { badge: 'bg-cyan-100 text-cyan-800', label: 'Submitted' },
-  INTERVIEW: { badge: 'bg-purple-100 text-purple-800', label: 'Interview' },
-  OFFER: { badge: 'bg-green-100 text-green-800', label: 'Offer' },
-  REJECTED: { badge: 'bg-red-100 text-red-800', label: 'Rejected' },
-  CLOSED: { badge: 'bg-gray-100 text-gray-800', label: 'Closed' },
-};
-
 interface RequirementsManagementProps {
   onCreateInterview?: (requirementId: string) => void;
-  onParsedJDData?: (extraction: JdExtractionResult, cleanedText: string) => void;
   toolbarPortalTargetId?: string;
 }
 
@@ -136,7 +110,7 @@ const StyledInputBase = styled(InputBase)({
   },
 });
 
-export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData, toolbarPortalTargetId }: RequirementsManagementProps) => {
+export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsManagementProps) => {
   const { user, isAdmin } = useAuth();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
@@ -151,14 +125,9 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
   const [isErrorDismissed, setIsErrorDismissed] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
-  const [selectedJDRequirement, setSelectedJDRequirement] = useState<Requirement | null>(null);
-  const [selectedCreatedBy, setSelectedCreatedBy] = useState<string | null>(null);
-  const [selectedUpdatedBy, setSelectedUpdatedBy] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [requirementToDelete, setRequirementToDelete] = useState<Requirement | null>(null);
-  const [showJDParser, setShowJDParser] = useState(false);
-  const [showBatchJDParser, setShowBatchJDParser] = useState(false);
-  const [showAIAutoFill, setShowAIAutoFill] = useState(false);
+  
 
   // Sync queue UI state
   const { pendingItems, updateItemStatus, clearSynced, pendingCount } = useSyncQueue();
@@ -180,8 +149,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     to: savedFilters?.dateRangeTo || ''
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [rowsPerPage, setRowsPerPage] = useState<number>(100);
-  const pageSize = rowsPerPage;
+  const pageSize = 100;
 
   const dateFromIso = useMemo(() => {
     return dateRange.from ? new Date(`${dateRange.from}T00:00:00`).toISOString() : undefined;
@@ -228,30 +196,31 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
     }
   }, [requirementsSWR.error]);
 
-  const [toolsAnchorEl, setToolsAnchorEl] = useState<HTMLElement | null>(null);
-  const toolsOpen = Boolean(toolsAnchorEl);
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<RequirementStatus | 'ALL'>('ALL');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const [toolbarTarget, setToolbarTarget] = useState<HTMLElement | null>(() => {
-    if (!toolbarPortalTargetId || typeof document === 'undefined') return null;
-    return document.getElementById(toolbarPortalTargetId) as HTMLElement | null;
-  });
 
-  useEffect(() => {
-    if (!toolbarPortalTargetId) {
-      setToolbarTarget(null);
-      return;
+  const handleManualRefresh = useCallback(() => {
+    void mutateRequirements(undefined, { revalidate: true });
+    try {
+      const key0 = `requirements-page:${JSON.stringify({
+        userId: user?.id || 'anonymous',
+        page: 0,
+        pageSize,
+        search: searchTerm,
+        status: filterStatus,
+        dateFrom: dateFromIso || '',
+        dateTo: dateToIso || '',
+        sortBy,
+        sortOrder,
+        minRate: minRate || '',
+        maxRate: maxRate || '',
+        remoteFilter: remoteFilter || 'ALL',
+      })}`;
+
+      void globalMutate(key0, undefined, { revalidate: true });
+    } catch (err) {
+      console.warn('Failed to manual-refresh page-0 key', err);
     }
-    setToolbarTarget(document.getElementById(toolbarPortalTargetId) as HTMLElement | null);
-  }, [toolbarPortalTargetId]);
-
-  const isToolbarPortaled = Boolean(toolbarTarget);
-
-  const toolbar = (
-    <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-      <Box sx={{ flex: { xs: 1, sm: 'unset' } }} />
-    </Stack>
-  );
+  }, [mutateRequirements, user?.id, pageSize, searchTerm, filterStatus, dateFromIso, dateToIso, sortBy, sortOrder, minRate, maxRate, remoteFilter]);
 
   const tableSearch = (
     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -303,14 +272,26 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
       <Tooltip title="Tools">
         <IconButton
           color="inherit"
-          onClick={(e) => setToolsAnchorEl(e.currentTarget)}
+          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
           size="small"
         >
           <SlidersHorizontal className="w-4 h-4" />
         </IconButton>
       </Tooltip>
+      <Tooltip title="Refresh">
+        <IconButton
+          color="inherit"
+          onClick={() => handleManualRefresh()}
+          size="small"
+          disabled={isFetchingPage}
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetchingPage ? 'animate-spin' : ''}`} />
+        </IconButton>
+      </Tooltip>
     </Box>
   );
+
+  
 
   // ⚡ OPTIMIZATION: Instant search with request cancellation (AbortController)
   const handleSearchChange = useCallback((value: string) => {
@@ -353,7 +334,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
   // Effect to handle filter changes - resets to page 0
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to, rowsPerPage]);
+  }, [searchTerm, filterStatus, sortBy, sortOrder, minRate, maxRate, remoteFilter, dateRange.from, dateRange.to, pageSize]);
 
   useEffect(() => {
     // Subscribe to real-time changes
@@ -401,12 +382,14 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
           if (page !== 0) {
             return;
           }
-          if (matchesServerSideFilters(update.record)) {
+            if (matchesServerSideFilters(update.record)) {
             void mutateRequirements((curr: any) => {
               if (!curr) return curr;
+              const existing = curr.requirements || [];
+              const deduped = existing.filter((r: any) => r.id !== update.record.id);
               return {
                 ...curr,
-                requirements: [update.record as unknown as RequirementWithLogs, ...curr.requirements].slice(0, pageSize),
+                requirements: [update.record as unknown as RequirementWithLogs, ...deduped].slice(0, pageSize),
               };
             }, { revalidate: false });
           }
@@ -432,9 +415,11 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
             }
 
             if (page === 0 && shouldInclude) {
+              const existing = curr.requirements || [];
+              const deduped = existing.filter((r: any) => r.id !== update.record.id);
               return {
                 ...curr,
-                requirements: [update.record as unknown as RequirementWithLogs, ...curr.requirements].slice(0, pageSize),
+                requirements: [update.record as unknown as RequirementWithLogs, ...deduped].slice(0, pageSize),
               };
             }
 
@@ -471,16 +456,107 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
 
   // Listen for requirement creation event to immediately reload
   useEffect(() => {
-    const handleRequirementCreated = () => {
-      // Reload requirements from current page to show the newly created one
-      void mutateRequirements();
+    const handleRequirementCreated = (event: any) => {
+      const newRequirement = event.detail;
+      console.log('requirement-created event received:', newRequirement);
+      if (!newRequirement) {
+        console.warn('Event received but no requirement detail found');
+        return;
+      }
+
+      // Reset to first page to show the newly created requirement
+      setPage(0);
+      
+      // Optimistically add the new requirement to the current data immediately
+      void mutateRequirements((curr: any) => {
+        if (!curr) return curr;
+        console.log('Updating SWR cache with new requirement:', newRequirement);
+        // Prepend the new requirement and limit to pageSize, dedup by id
+        const existing = curr.requirements || [];
+        const deduped = existing.filter((r: any) => r.id !== newRequirement.id);
+        return {
+          ...curr,
+          requirements: [newRequirement as RequirementWithLogs, ...deduped].slice(0, pageSize),
+        };
+      }, { revalidate: true }); // Also revalidate to ensure fresh data
+
+      // DEBUG: log current cache contents for this key after mutate
+      try {
+        void mutateRequirements((curr: any) => {
+          try {
+            console.log('Post-mutate current-key requirement ids:', (curr?.requirements || []).map((r: any) => r.id).slice(0, 10));
+          } catch (e) {
+            console.warn('Failed to log current-key cache', e);
+          }
+          return curr;
+        }, { revalidate: false });
+      } catch (e) {
+        console.warn('Failed to run debug mutate on current key', e);
+      }
+
+      // Also update the page-0 cache key directly so users on other pages see the new item after reset
+      try {
+        const key0 = `requirements-page:${JSON.stringify({
+          userId: user?.id || 'anonymous',
+          page: 0,
+          pageSize,
+          search: searchTerm,
+          status: filterStatus,
+          dateFrom: dateFromIso || '',
+          dateTo: dateToIso || '',
+          sortBy,
+          sortOrder,
+          minRate: minRate || '',
+          maxRate: maxRate || '',
+          remoteFilter: remoteFilter || 'ALL',
+        })}`;
+
+        void globalMutate(key0, (curr: any) => {
+          if (!curr) return { requirements: [newRequirement as RequirementWithLogs], hasNextPage: false };
+          const existing = curr.requirements || [];
+          const deduped = existing.filter((r: any) => r.id !== newRequirement.id);
+          return {
+            ...curr,
+            requirements: [newRequirement as RequirementWithLogs, ...deduped].slice(0, pageSize),
+          };
+        }, { revalidate: true });
+
+        // DEBUG: read and log page-0 cache contents
+        try {
+          void globalMutate(key0, (curr: any) => {
+            try {
+              console.log('Post-mutate page-0 requirement ids:', (curr?.requirements || []).map((r: any) => r.id).slice(0, 10));
+            } catch (e) {
+              console.warn('Failed to log page-0 cache', e);
+            }
+            return curr;
+          }, { revalidate: false });
+        } catch (e) {
+          console.warn('Failed to run debug globalMutate on page-0 key', e);
+        }
+      } catch (err) {
+        console.warn('Failed to mutate page-0 key for new requirement', err);
+      }
     };
 
     window.addEventListener('requirement-created', handleRequirementCreated as EventListener);
     return () => {
       window.removeEventListener('requirement-created', handleRequirementCreated as EventListener);
     };
-  }, [mutateRequirements]);
+  }, [
+    mutateRequirements,
+    user?.id,
+    pageSize,
+    searchTerm,
+    filterStatus,
+    dateFromIso,
+    dateToIso,
+    sortBy,
+    sortOrder,
+    minRate,
+    maxRate,
+    remoteFilter,
+  ]);
 
   const handleDeleteClick = useCallback((requirementOrId: Requirement | string) => {
     if (!isAdmin) {
@@ -546,17 +622,7 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
 
   const handleViewDetails = (req: Requirement) => {
     setSelectedRequirement(req);
-    setSelectedCreatedBy(req.created_by || null);
-    setSelectedUpdatedBy(req.updated_by || null);
   };
-
-  const filteredRequirements = useMemo(() => {
-    let filtered = requirements;
-    if (selectedStatusFilter !== 'ALL') {
-      filtered = filtered.filter(req => req.status === selectedStatusFilter);
-    }
-    return filtered;
-  }, [requirements, selectedStatusFilter]);
 
   const handleSortChange = useCallback((field: 'title' | 'company' | 'status' | 'created_at' | 'rate', order: 'asc' | 'desc') => {
     const serverField = field === 'created_at' ? 'created_at' : field === 'company' ? 'company' : 'created_at';
@@ -605,376 +671,6 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {isToolbarPortaled ? <Portal container={toolbarTarget}>{toolbar}</Portal> : null}
-
-      {/* Replaced Popover with Popper + ClickAwayListener to fix focus/aria-hidden issues */}
-      <Popper
-        open={toolsOpen && Boolean(toolsAnchorEl)}
-        anchorEl={toolsAnchorEl}
-        placement="bottom-end"
-        transition
-        style={{ zIndex: 1300 }}
-      >
-        {({ TransitionProps }) => (
-          <Grow {...TransitionProps} style={{ transformOrigin: 'right top' }}>
-            <Paper 
-              elevation={8}
-              sx={{
-                width: { xs: 'calc(100vw - 32px)', sm: 480 },
-                maxWidth: 'calc(100vw - 32px)',
-                borderRadius: '12px',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                overflow: 'hidden'
-              }}
-            >
-              <ClickAwayListener onClickAway={() => setToolsAnchorEl(null)}>
-                <Box>
-                  {/* Header */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      px: 2,
-                      py: 1.5,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      bgcolor: 'background.paper',
-                    }}
-                  >
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <SlidersHorizontal className="w-4 h-4" style={{ color: 'var(--gold)' }} />
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.75rem' }}>
-                        Tools & Settings
-                      </Typography>
-                    </Stack>
-                    <IconButton size="small" onClick={() => setToolsAnchorEl(null)} aria-label="Close tools" sx={{ color: 'text.secondary' }}>
-                      <X className="w-4 h-4" />
-                    </IconButton>
-                  </Box>
-
-                  <Box sx={{ p: 2 }}>
-                    <Stack spacing={3}>
-                      {/* Data Tools Section */}
-                      <Box>
-                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5 }}>
-                          <Zap className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                              letterSpacing: '0.5px',
-                              textTransform: 'uppercase',
-                              color: 'text.secondary',
-                            }}
-                          >
-                            Data Tools
-                          </Typography>
-                        </Stack>
-                        <Stack spacing={1}>
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="inherit"
-                            onClick={() => {
-                              setShowJDParser(true);
-                              setToolsAnchorEl(null);
-                            }}
-                            sx={{
-                              justifyContent: 'flex-start',
-                              textTransform: 'none',
-                              fontWeight: 500,
-                              fontSize: '0.75rem',
-                              py: 1,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
-                            }}
-                          >
-                            📄 JD Parser
-                          </Button>
-
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="inherit"
-                            onClick={() => {
-                              setShowBatchJDParser(true);
-                              setToolsAnchorEl(null);
-                            }}
-                            sx={{
-                              justifyContent: 'flex-start',
-                              textTransform: 'none',
-                              fontWeight: 500,
-                              fontSize: '0.75rem',
-                              py: 1,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
-                            }}
-                          >
-                            📑 Batch JD Parser
-                          </Button>
-
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="inherit"
-                            onClick={() => {
-                              setShowAIAutoFill(true);
-                              setToolsAnchorEl(null);
-                            }}
-                            sx={{
-                              justifyContent: 'flex-start',
-                              textTransform: 'none',
-                              fontWeight: 500,
-                              fontSize: '0.75rem',
-                              py: 1,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
-                            }}
-                          >
-                            🤖 AI Auto-Fill
-                          </Button>
-
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="inherit"
-                            startIcon={<Download className="w-4 h-4" />}
-                            onClick={() => {
-                              setShowReport(true);
-                              setToolsAnchorEl(null);
-                            }}
-                            sx={{
-                              justifyContent: 'flex-start',
-                              textTransform: 'none',
-                              fontWeight: 500,
-                              fontSize: '0.75rem',
-                              py: 1,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
-                            }}
-                          >
-                            Export Report
-                          </Button>
-                        </Stack>
-                      </Box>
-
-                      {/* Display Settings Section */}
-                      <Box>
-                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1.5 }}>
-                          <Settings className="w-3.5 h-3.5" style={{ color: 'var(--gold)' }} />
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: '0.75rem',
-                              letterSpacing: '0.5px',
-                              textTransform: 'uppercase',
-                              color: 'text.secondary',
-                            }}
-                          >
-                            Display Settings
-                          </Typography>
-                        </Stack>
-                        <Stack spacing={1.5}>
-                          <Box>
-                            <FormControl size="small" fullWidth>
-                              <InputLabel id="req-rowsperpage-label" sx={{ fontSize: '0.75rem' }}>
-                                Rows Per Page
-                              </InputLabel>
-                              <Select
-                                labelId="req-rowsperpage-label"
-                                value={String(rowsPerPage)}
-                                label="Rows Per Page"
-                                onChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
-                                title="Rows per page"
-                                sx={{ fontSize: '0.75rem' }}
-                              >
-                                <MenuItem value="100" sx={{ fontSize: '0.75rem' }}>100 rows</MenuItem>
-                                <MenuItem value="200" sx={{ fontSize: '0.75rem' }}>200 rows</MenuItem>
-                                <MenuItem value="500" sx={{ fontSize: '0.75rem' }}>500 rows</MenuItem>
-                                <MenuItem value="1000" sx={{ fontSize: '0.75rem' }}>1000 rows</MenuItem>
-                              </Select>
-                            </FormControl>
-                          </Box>
-
-                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-                            <FormControl size="small" sx={{ flex: 1 }}>
-                              <InputLabel id="req-sortby-label" sx={{ fontSize: '0.75rem' }}>
-                                Sort By
-                              </InputLabel>
-                              <Select
-                                labelId="req-sortby-label"
-                                value={sortBy}
-                                label="Sort By"
-                                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                                title="Sort requirements by selected criteria"
-                                sx={{ fontSize: '0.75rem' }}
-                              >
-                                <MenuItem value="date" sx={{ fontSize: '0.75rem' }}>📅 Date (newest first)</MenuItem>
-                                <MenuItem value="company" sx={{ fontSize: '0.75rem' }}>🏢 Company Name</MenuItem>
-                                <MenuItem value="daysOpen" sx={{ fontSize: '0.75rem' }}>⏱️ Days Open</MenuItem>
-                              </Select>
-                            </FormControl>
-
-                            <Button
-                              variant="outlined"
-                              color="inherit"
-                              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                              startIcon={<ArrowUpDown className="w-4 h-4" />}
-                              title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
-                              sx={{
-                                textTransform: 'none',
-                                fontWeight: 500,
-                                fontSize: '0.75rem',
-                                whiteSpace: 'nowrap',
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
-                              }}
-                            >
-                              {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-                            </Button>
-                          </Stack>
-                        </Stack>
-                      </Box>
-
-                      {/* Advanced Filters Section */}
-                      <Box>
-                        <Button
-                          fullWidth
-                          variant={showAdvancedFilters ? 'contained' : 'outlined'}
-                          color={showAdvancedFilters ? 'primary' : 'inherit'}
-                          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                          startIcon={<Filter className="w-4 h-4" />}
-                          title="Toggle advanced filters"
-                          sx={{
-                            justifyContent: 'flex-start',
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            fontSize: '0.75rem',
-                            py: 1,
-                            mb: 1,
-                            borderColor: 'divider',
-                          }}
-                        >
-                          Advanced Filters {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to) ? '✓' : ''}
-                        </Button>
-
-                        {showAdvancedFilters ? (
-                          <Paper
-                            variant="outlined"
-                            sx={{
-                              p: 1.5,
-                              bgcolor: 'rgba(212,175,55,0.08)',
-                              borderColor: 'rgba(212,175,55,0.25)',
-                              borderRadius: '8px',
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                display: 'grid',
-                                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                                gap: 1.5,
-                              }}
-                            >
-                              <TextField
-                                size="small"
-                                label="Min Rate"
-                                placeholder="e.g., 50"
-                                value={minRate}
-                                onChange={(e) => setMinRate(e.target.value)}
-                                title="Minimum hourly/daily rate"
-                                sx={{ fontSize: '0.75rem' }}
-                              />
-                              <TextField
-                                size="small"
-                                label="Max Rate"
-                                placeholder="e.g., 150"
-                                value={maxRate}
-                                onChange={(e) => setMaxRate(e.target.value)}
-                                title="Maximum hourly/daily rate"
-                                sx={{ fontSize: '0.75rem' }}
-                              />
-
-                              <FormControl size="small">
-                                <InputLabel id="req-worktype-label" sx={{ fontSize: '0.75rem' }}>
-                                  Work Type
-                                </InputLabel>
-                                <Select
-                                  labelId="req-worktype-label"
-                                  value={remoteFilter}
-                                  label="Work Type"
-                                  onChange={(e) => setRemoteFilter(e.target.value as typeof remoteFilter)}
-                                  title="Filter by remote/onsite preference"
-                                  sx={{ fontSize: '0.75rem' }}
-                                >
-                                  <MenuItem value="ALL" sx={{ fontSize: '0.75rem' }}>All Types</MenuItem>
-                                  <MenuItem value="REMOTE" sx={{ fontSize: '0.75rem' }}>🌐 Remote</MenuItem>
-                                  <MenuItem value="ONSITE" sx={{ fontSize: '0.75rem' }}>🏢 On-site</MenuItem>
-                                </Select>
-                              </FormControl>
-
-                              <TextField
-                                size="small"
-                                label="From Date"
-                                type="date"
-                                value={dateRange.from}
-                                onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-                                title="Filter requirements created from this date"
-                                InputLabelProps={{ shrink: true }}
-                                sx={{ fontSize: '0.75rem' }}
-                              />
-
-                              <TextField
-                                size="small"
-                                label="To Date"
-                                type="date"
-                                value={dateRange.to}
-                                onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-                                title="Filter requirements created until this date"
-                                InputLabelProps={{ shrink: true }}
-                                sx={{ fontSize: '0.75rem' }}
-                              />
-                            </Box>
-
-                            {(minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to || searchTerm || filterStatus !== 'ALL') ? (
-                              <Button
-                                variant="text"
-                                color="primary"
-                                size="small"
-                                onClick={() => {
-                                  setSearchTerm('');
-                                  setFilterStatus('ALL');
-                                  setMinRate('');
-                                  setMaxRate('');
-                                  setRemoteFilter('ALL');
-                                  setDateRange({ from: '', to: '' });
-                                  clearFilters();
-                                }}
-                                sx={{ mt: 1, px: 0, fontSize: '0.75rem', fontWeight: 500 }}
-                                title="Reset all advanced filters"
-                              >
-                                ↺ Clear all filters
-                              </Button>
-                            ) : null}
-                          </Paper>
-                        ) : null}
-                      </Box>
-                    </Stack>
-                  </Box>
-                </Box>
-              </ClickAwayListener>
-            </Paper>
-          </Grow>
-        )}
-      </Popper>
-
       {/* Search and Filter */}
       <Stack spacing={2}>
         {/* Active Filters Summary */}
@@ -992,9 +688,9 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
               {dateRange.from ? <Chip size="small" label={`From: ${dateRange.from}`} /> : null}
               {dateRange.to ? <Chip size="small" label={`To: ${dateRange.to}`} /> : null}
               <Box sx={{ flexGrow: 1 }} />
-              {filteredRequirements.length > 0 ? (
+              {requirements.length > 0 ? (
                 <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                  {filteredRequirements.length} result{filteredRequirements.length !== 1 ? 's' : ''}
+                  {requirements.length} result{requirements.length !== 1 ? 's' : ''}
                 </Typography>
               ) : null}
               <Button
@@ -1165,12 +861,10 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
         {/* Removed: Showing recent requirements info message */}
 
         <RequirementsTable
-          requirements={filteredRequirements}
+          requirements={requirements}
           onViewDetails={handleViewDetails}
-          onRowClick={handleViewDetails}
           onCreateInterview={onCreateInterview}
           onDelete={handleDeleteClick}
-          statusColors={statusColors}
           headerSearch={tableSearch}
           isAdmin={isAdmin}
           serverSortField={sortBy === 'date' ? 'created_at' : sortBy}
@@ -1180,80 +874,8 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
           hasNextPage={hasNextPage}
           isFetchingPage={isFetchingPage}
           onPageChange={setPage}
-          selectedStatusFilter={selectedStatusFilter}
-          onStatusFilterChange={setSelectedStatusFilter}
-          badge={''} label={''} />
+        />
       </div>
-
-
-
-      {/* JD Modal */}
-      {selectedJDRequirement && (
-        <Dialog
-          open={Boolean(selectedJDRequirement)}
-          onClose={() => setSelectedJDRequirement(null)}
-          fullWidth
-          maxWidth="lg"
-          scroll="paper"
-        >
-          <DialogTitle sx={{ pr: 7 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800 }} noWrap>
-              {selectedJDRequirement.title}
-            </Typography>
-            <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
-              <Chip
-                size="small"
-                label={statusColors[selectedJDRequirement.status].label}
-                variant="outlined"
-              />
-              {selectedJDRequirement.company ? (
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {selectedJDRequirement.company}
-                </Typography>
-              ) : null}
-            </Stack>
-            <IconButton
-              onClick={() => setSelectedJDRequirement(null)}
-              title="Close modal"
-              sx={{ position: 'absolute', right: 8, top: 8 }}
-            >
-              <XCircle className="w-5 h-5" />
-            </IconButton>
-          </DialogTitle>
-
-          <DialogContent dividers>
-            <Typography
-              variant="body2"
-              sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, color: 'text.primary' }}
-            >
-              {selectedJDRequirement.description}
-            </Typography>
-          </DialogContent>
-
-          <DialogActions>
-            <Button variant="outlined" color="inherit" onClick={() => setSelectedJDRequirement(null)}>
-              Close
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
-
-      <JDParserDialog
-        open={showJDParser}
-        onClose={() => setShowJDParser(false)}
-        onParsedData={onParsedJDData}
-      />
-
-      <BatchJDParserDialog
-        open={showBatchJDParser}
-        onClose={() => setShowBatchJDParser(false)}
-        onParsedData={onParsedJDData}
-      />
-
-      <AIAutoFillJobParser
-        open={showAIAutoFill}
-        onClose={() => setShowAIAutoFill(false)}
-      />
 
       {/* Detail Modal */}
       <RequirementDetailModal
@@ -1261,8 +883,6 @@ export const RequirementsManagement = memo(({ onCreateInterview, onParsedJDData,
         requirement={selectedRequirement}
         onClose={() => setSelectedRequirement(null)}
         onUpdate={() => void mutateRequirements()}
-        createdBy={selectedCreatedBy}
-        updatedBy={selectedUpdatedBy}
       />
 
       {/* Report Modal */}

@@ -420,39 +420,70 @@ export const createRequirement = async (
   userId?: string
 ): Promise<{ success: boolean; requirement?: Requirement; error?: string }> => {
   try {
-    // Don't set requirement_number - let the database handle it via trigger or default
-    // This avoids race conditions and duplicate key violations
     const dataToInsert = {
       ...requirement,
       created_by: userId || null,
       updated_by: userId || null,
     };
 
-    const { data, error } = await supabase
-      .from('requirements')
-      .insert(dataToInsert)
-      .select()
-      .single();
+    console.log('Creating requirement with data:', dataToInsert);
 
-    if (error) {
-      return { success: false, error: error.message };
+    // First, try to insert
+    const { error: insertError } = await supabase
+      .from('requirements')
+      .insert(dataToInsert);
+
+    if (insertError) {
+      console.error('Insert error:', insertError);
+      return { success: false, error: insertError.message };
     }
 
-    // Write audit entry (best effort)
-    await logActivity({
-      action: 'requirement_created',
-      actorId: userId,
-      resourceType: 'requirement',
-      resourceId: data.id,
-      details: {
-        requirement_number: data.requirement_number,
-        title: data.title,
-      },
-    });
+    console.log('Insert successful');
 
-    return { success: true, requirement: data };
-  } catch {
-    return { success: false, error: 'Failed to create requirement' };
+    // Try to fetch the inserted record by querying with filters
+    const { data: fetchedData, error: fetchError } = await supabase
+      .from('requirements')
+      .select()
+      .eq('user_id', userId || '')
+      .eq('title', requirement.title || '')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.warn('Failed to fetch inserted record:', fetchError);
+    }
+
+    if (fetchedData) {
+      // Write audit entry (best effort)
+      try {
+        await logActivity({
+          action: 'requirement_created',
+          actorId: userId,
+          resourceType: 'requirement',
+          resourceId: fetchedData.id,
+          details: {
+            requirement_number: fetchedData.requirement_number,
+            title: fetchedData.title,
+          },
+        });
+      } catch (auditErr) {
+        console.warn('Failed to log audit entry:', auditErr);
+      }
+
+      return { success: true, requirement: fetchedData };
+    }
+
+    // If we can't fetch it back, still return success since insert succeeded
+    console.log('Insert succeeded but could not fetch record back');
+    return { 
+      success: true,
+      error: 'Created successfully (could not fetch record back)'
+    };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Failed to create requirement';
+    console.error('Requirement creation error:', errorMsg, err);
+    return { success: false, error: errorMsg };
   }
 };
 

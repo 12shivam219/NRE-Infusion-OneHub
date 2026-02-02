@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { TrendingUp, Download, Plus, BarChart3, Calendar, UserPlus, ChevronDown } from 'lucide-react';
+import { TrendingUp, Plus, Calendar, UserPlus, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { getRequirementsPage } from '../../lib/api/requirements';
 import { getInterviewsPage } from '../../lib/api/interviews';
 import { getConsultantsPage } from '../../lib/api/consultants';
-import { clearCachedRequirements } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
@@ -33,7 +32,6 @@ interface MarketingHubDashboardProps {
 
 export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboardProps) => {
   const { user } = useAuth();
-  const [showOrgWide, setShowOrgWide] = useState(false);
   const [requirements, setRequirements] = useState<Requirement[]>([]);
   const [interviews, setInterviews] = useState<Interview[]>([]);
   const [consultants, setConsultants] = useState<Consultant[]>([]);
@@ -45,9 +43,6 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
   const [counts, setCounts] = useState({
     activeRequirements: 0,
     newRequirements: 0,
-    inProgressRequirements: 0,
-    interviewRequirements: 0,
-    offerRequirements: 0,
     upcomingInterviews: 0,
     completedInterviews: 0,
     activeConsultants: 0,
@@ -70,18 +65,12 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
   const loadData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    // Clear cached requirements to ensure fresh data from server
-    await clearCachedRequirements(user.id);
 
-    const reqUserId = showOrgWide ? undefined : user.id;
     const nowIso = new Date().toISOString();
 
     const [
       totalReqRes,
       newReqRes,
-      inProgressReqRes,
-      interviewReqRes,
-      offerReqRes,
       closedReqRes,
       rejectedReqRes,
       recentReqRes,
@@ -93,14 +82,11 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
       placedConsultantsRes,
       consultantsPreviewRes,
     ] = await Promise.all([
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0 }),
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0, status: 'NEW' }),
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0, status: 'IN_PROGRESS' }),
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0, status: 'INTERVIEW' }),
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0, status: 'OFFER' }),
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0, status: 'CLOSED' }),
-      getRequirementsPage({ userId: reqUserId, includeCount: true, limit: 1, offset: 0, status: 'REJECTED' }),
-      getRequirementsPage({ userId: reqUserId, includeCount: false, limit: 10, offset: 0, orderBy: 'created_at', orderDir: 'desc' }),
+      getRequirementsPage({ userId: user.id, includeCount: true, limit: 1, offset: 0 }),
+      getRequirementsPage({ userId: user.id, includeCount: true, limit: 1, offset: 0, status: 'NEW' }),
+      getRequirementsPage({ userId: user.id, includeCount: true, limit: 1, offset: 0, status: 'CLOSED' }),
+      getRequirementsPage({ userId: user.id, includeCount: true, limit: 1, offset: 0, status: 'REJECTED' }),
+      getRequirementsPage({ userId: user.id, includeCount: false, limit: 10, offset: 0, orderBy: 'created_at', orderDir: 'desc' }),
       getInterviewsPage({ userId: user.id, includeCount: true, limit: 1, offset: 0, scheduledFrom: nowIso, excludeStatus: 'Cancelled', orderBy: 'scheduled_date', orderDir: 'asc' }),
       getInterviewsPage({ userId: user.id, includeCount: true, limit: 1, offset: 0, status: 'Completed', orderBy: 'scheduled_date', orderDir: 'desc' }),
       getInterviewsPage({ userId: user.id, includeCount: false, limit: 10, offset: 0, orderBy: 'scheduled_date', orderDir: 'asc' }),
@@ -112,9 +98,6 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
 
     const totalReq = totalReqRes.success ? (totalReqRes.total ?? 0) : 0;
     const newReq = newReqRes.success ? (newReqRes.total ?? 0) : 0;
-    const inProgressReq = inProgressReqRes.success ? (inProgressReqRes.total ?? 0) : 0;
-    const interviewReq = interviewReqRes.success ? (interviewReqRes.total ?? 0) : 0;
-    const offerReq = offerReqRes.success ? (offerReqRes.total ?? 0) : 0;
     const closedReq = closedReqRes.success ? (closedReqRes.total ?? 0) : 0;
     const rejectedReq = rejectedReqRes.success ? (rejectedReqRes.total ?? 0) : 0;
     const activeReq = Math.max(0, totalReq - closedReq - rejectedReq);
@@ -130,9 +113,6 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
     setCounts({
       activeRequirements: activeReq,
       newRequirements: newReq,
-      inProgressRequirements: inProgressReq,
-      interviewRequirements: interviewReq,
-      offerRequirements: offerReq,
       upcomingInterviews: upcomingCount,
       completedInterviews: completedCount,
       activeConsultants: activeCon,
@@ -145,7 +125,7 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
     if (consultantsPreviewRes.success && consultantsPreviewRes.consultants) setConsultants(consultantsPreviewRes.consultants);
 
     setLoading(false);
-  }, [user, showOrgWide]);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,33 +273,6 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
                 Manage requirements, interviews & consultants in one place
               </Typography>
             </Box>
-
-            <Stack direction="row" spacing={1.5} flexWrap="wrap">
-              <Button
-                variant="contained"
-                color="secondary"
-                startIcon={<Plus className="w-4 h-4" />}
-                onClick={() => onQuickAdd?.('requirement')}
-              >
-                Quick Add
-              </Button>
-              <Button
-                variant={showOrgWide ? 'contained' : 'outlined'}
-                color="secondary"
-                onClick={() => {
-                  setShowOrgWide(prev => !prev);
-                  setLoading(true);
-                }}
-              >
-                {showOrgWide ? 'Org: All' : 'Org: Mine'}
-              </Button>
-              <Button variant="outlined" color="secondary" startIcon={<Download className="w-4 h-4" />} disabled>
-                Export
-              </Button>
-              <Button variant="outlined" color="secondary" startIcon={<BarChart3 className="w-4 h-4" />} disabled>
-                Analytics
-              </Button>
-            </Stack>
           </Stack>
         </Paper>
 
@@ -360,7 +313,7 @@ export const MarketingHubDashboard = memo(({ onQuickAdd }: MarketingHubDashboard
                 <StatCard
                   title="Active Requirements"
                   value={counts.activeRequirements}
-                  subtitle={`New: ${counts.newRequirements} | In Progress: ${counts.inProgressRequirements}`}
+                  subtitle={`New: ${counts.newRequirements}`}
                   icon={<TrendingUp className="w-6 h-6" />}
                 />
                 <StatCard

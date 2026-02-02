@@ -140,7 +140,7 @@ serve(async (req: Request) => {
             headers: {
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
+                "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey, prefer",
             },
         });
     }

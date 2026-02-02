@@ -35,6 +35,8 @@ export interface DataTableProps<T extends { id: string } = any> {
   headerSearch?: JSX.Element | null;
   emptyStateIcon?: React.FC<{ className?: string }>;
   emptyStateMessage?: string;
+  hideHeader?: boolean;
+  hideFooter?: boolean;
 }
 
 const DataTableRow = memo(({
@@ -165,6 +167,8 @@ export const DataTable = memo(({
   headerSearch,
   emptyStateIcon: EmptyStateIcon,
   emptyStateMessage,
+  hideHeader,
+  hideFooter,
   // serverSortField and serverSortOrder are available for future sorting implementation
   onSortChange,
 }: DataTableProps) => {
@@ -218,19 +222,21 @@ export const DataTable = memo(({
   return (
     <div className="w-full bg-white rounded-lg border border-[#E5E7EB]">
       {/* Toolbar - Header with Title and Search */}
-      <div className="px-6 py-4 border-b border-[#EAECEF] bg-white">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-[16px] font-semibold text-[#0F172A]">{title}</h3>
-            <p className="text-[12px] text-[#64748B] mt-1">{sortedData.length} items total</p>
-          </div>
-          
-          {/* Search Bar */}
-          <div className="w-full sm:w-auto">
-            {headerSearch ?? null}
+      {!hideHeader && (
+        <div className="px-6 py-4 border-b border-[#EAECEF] bg-white">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-[16px] font-semibold text-[#0F172A]">{title}</h3>
+              <p className="text-[12px] text-[#64748B] mt-1">{sortedData.length} items total</p>
+            </div>
+            
+            {/* Search Bar */}
+            <div className="w-full sm:w-auto">
+              {headerSearch ?? null}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Table */}
       <Box
@@ -355,38 +361,40 @@ export const DataTable = memo(({
       </Box>
 
       {/* Footer - Pagination */}
-      <div className="px-6 py-4 border-t border-[#EAECEF] bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-[13px] text-[#64748B]">
-          <span>
-            Page: <span className="font-semibold text-[#0F172A]">{page + 1}</span>
-          </span>
-          <span className="w-px h-4 bg-[#E5E7EB]" />
-          <span>
-            Rows: <span className="font-semibold text-[#0F172A]">{sortedData.length}</span>
-          </span>
-          <span className="w-px h-4 bg-[#E5E7EB]" />
-          <span>
-            Selected: <span className="font-semibold text-[#0F172A]">{selectedRows.size}</span>
-          </span>
+      {!hideFooter && (
+        <div className="px-6 py-4 border-t border-[#EAECEF] bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-[13px] text-[#64748B]">
+            <span>
+              Page: <span className="font-semibold text-[#0F172A]">{page + 1}</span>
+            </span>
+            <span className="w-px h-4 bg-[#E5E7EB]" />
+            <span>
+              Rows: <span className="font-semibold text-[#0F172A]">{sortedData.length}</span>
+            </span>
+            <span className="w-px h-4 bg-[#E5E7EB]" />
+            <span>
+              Selected: <span className="font-semibold text-[#0F172A]">{selectedRows.size}</span>
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={page === 0 || isFetchingPage}
+              className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
+            >
+              ← Previous
+            </button>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={!hasNextPage || isFetchingPage}
+              className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
+            >
+              Next →
+            </button>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 0 || isFetchingPage}
-            className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
-          >
-            ← Previous
-          </button>
-          <button
-            onClick={() => onPageChange(page + 1)}
-            disabled={!hasNextPage || isFetchingPage}
-            className="px-4 py-2 text-[13px] font-medium text-[#475569] bg-white border border-[#D1D5DB] rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-all"
-          >
-            Next →
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 });

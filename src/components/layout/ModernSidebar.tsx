@@ -57,13 +57,6 @@ const MENU_ITEMS: MenuItem[] = [
         roles: ['user', 'marketing', 'admin'],
       },
       {
-        id: 'interviews',
-        label: 'Interviews',
-        icon: FileText,
-        path: '/crm?view=interviews',
-        roles: ['user', 'marketing', 'admin'],
-      },
-      {
         id: 'consultants',
         label: 'Consultants',
         icon: Users,
@@ -77,14 +70,6 @@ const MENU_ITEMS: MenuItem[] = [
     label: 'Resume Editor',
     icon: FileText,
     path: '/documents',
-    roles: ['user', 'admin'],
-    section: 'tools',
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Shield,
-    path: '/settings',
     roles: ['user', 'admin'],
     section: 'tools',
   },

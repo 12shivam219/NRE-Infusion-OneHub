@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, useRef } from 'react';
+import React, { useState, useMemo, memo, useRef, useCallback, useEffect } from 'react';
 import { 
   Eye, 
   Calendar, 
@@ -6,9 +6,16 @@ import {
   CheckSquare, 
   Square,
   MoreHorizontal,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Database, RequirementStatus } from '../../lib/database.types';
+import { useAuth } from '../../hooks/useAuth';
+import { getInterviewsByRequirementGrouped, deleteInterview } from '../../lib/api/interviews';
+import { getConsultants } from '../../lib/api/consultants';
+import { InterviewDetailModal } from './InterviewDetailModal';
+import { InterviewPipeline } from './InterviewPipeline';
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Menu from '@mui/material/Menu';
@@ -17,6 +24,7 @@ import MenuItem from '@mui/material/MenuItem';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
 type RequirementWithLogs = Requirement & { logs?: { action: string; timestamp: string }[] };
+type Interview = Database['public']['Tables']['interviews']['Row'];
 
 type SortField = 'title' | 'company' | 'status' | 'created_at' | 'rate';
 type SortOrder = 'asc' | 'desc';
@@ -24,12 +32,8 @@ type SortOrder = 'asc' | 'desc';
 interface RequirementsTableProps {
   requirements: RequirementWithLogs[];
   onViewDetails: (req: Requirement) => void;
-  onRowClick?: (req: Requirement) => void; // Direct row click handler
   onCreateInterview?: (id: string) => void;
   onDelete: (id: string) => void;
-  statusColors: Record<RequirementStatus, { badge: string; label: string }>;
-  badge: string;
-  label: string;
   isAdmin: boolean;
   serverSortField?: string;
   serverSortOrder?: 'asc' | 'desc';
@@ -43,17 +47,7 @@ interface RequirementsTableProps {
   onStatusFilterChange?: (status: RequirementStatus | 'ALL') => void;
 }
 
-const statusColorMap: Record<RequirementStatus, { bg: string; text: string; border: string; dot: string }> = {
-  'NEW': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border border-blue-200', dot: 'bg-blue-500' },
-  'IN_PROGRESS': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border border-amber-200', dot: 'bg-amber-500' },
-  'INTERVIEW': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border border-purple-200', dot: 'bg-purple-500' },
-  'OFFER': { bg: 'bg-green-50', text: 'text-green-700', border: 'border border-green-200', dot: 'bg-green-500' },
-  'CLOSED': { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border border-gray-200', dot: 'bg-gray-500' },
-  'REJECTED': { bg: 'bg-red-50', text: 'text-red-700', border: 'border border-red-200', dot: 'bg-red-500' },
-  'SUBMITTED': { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border border-indigo-200', dot: 'bg-indigo-500' },
-};
-
-// Enhanced status color map with compact styling
+// Status color map with compact styling
 const enhancedStatusColors: Record<RequirementStatus, { bg: string; text: string }> = {
   'NEW': { bg: 'bg-blue-100', text: 'text-blue-700' },
   'IN_PROGRESS': { bg: 'bg-amber-100', text: 'text-amber-700' },
@@ -77,10 +71,12 @@ const TableRow = memo(({
   dataIndex,
   selectedStatusFilter,
   onStatusFilterChange,
+  toggleExpandRequirement,
+  isExpanded,
+  isLoadingInterviews,
 }: {
   req: RequirementWithLogs;
   isSelected: boolean;
-  colors: { bg: string; text: string; border: string; dot: string };
   toggleRowSelected: (id: string) => void;
   onViewDetails: (req: Requirement) => void;
   onCreateInterview?: (id: string) => void;
@@ -91,9 +87,13 @@ const TableRow = memo(({
   dataIndex?: number;
   selectedStatusFilter?: RequirementStatus | 'ALL';
   onStatusFilterChange?: (status: RequirementStatus | 'ALL') => void;
+  toggleExpandRequirement: (reqId: string) => void;
+  isExpanded: boolean;
+  isLoadingInterviews: boolean;
 }) => {
   const isAlternate = rowIndex % 2 === 1;
   const statusColor = enhancedStatusColors[req.status as RequirementStatus];
+  const rowBgColor = isAlternate ? '#FAFBFC' : '#ffffff';
   const [actionMenuAnchorEl, setActionMenuAnchorEl] = useState<HTMLElement | null>(null);
   const actionMenuOpen = Boolean(actionMenuAnchorEl);
   
@@ -125,6 +125,7 @@ const TableRow = memo(({
     <tr
       ref={rowRef}
       data-index={dataIndex}
+      data-req-id={req.id}
       className={`
         transition-colors duration-150
         border-b border-[#EAECEF]
@@ -134,7 +135,7 @@ const TableRow = memo(({
       `}
     >
       {/* Checkbox */}
-      <td className="px-4 py-0 text-center align-middle bg-white" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 20 }}>
+      <td className="px-4 py-0 text-center align-middle" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: rowBgColor }}>
         <div className="flex items-center justify-center">
           <button
             onClick={(e) => {
@@ -156,23 +157,43 @@ const TableRow = memo(({
       </td>
       
       {/* Requirement ID */}
-      <td className="px-4 py-0 text-left align-middle bg-white" style={{ width: '60px', position: 'sticky', left: '44px', zIndex: 20 }}>
+      <td className="px-4 py-0 text-left align-middle" style={{ width: '60px', position: 'sticky', left: '44px', zIndex: 29, backgroundColor: rowBgColor }}>
         <span className="font-mono font-medium text-[#6B7280]" style={{ fontSize: '0.8125rem' }}>
-          REQ-{String(req.requirement_number || 1).padStart(3, '0')}
+          {String(req.requirement_number || 1).padStart(3, '0')}
         </span>
       </td>
       
       {/* Title & Company */}
       <td className="px-4 py-0 text-left align-middle" style={{ width: '24%' }}>
-        <div className="w-full text-left">
-          <div className="font-semibold text-[#0F172A] leading-tight truncate" style={{ fontSize: '0.8125rem' }}>
-            {req.title}
-          </div>
-          {req.company && (
-            <div className="font-normal text-[#64748B] mt-1 truncate" style={{ fontSize: '0.75rem' }}>
-              {req.company}
+        <div className="w-full text-left flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpandRequirement(req.id);
+            }}
+            className="p-1 hover:bg-gray-200 hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors flex-shrink-0"
+            aria-expanded={isExpanded}
+            title={isExpanded ? 'Collapse interviews' : 'Expand to see interviews'}
+            aria-label={isExpanded ? `Collapse interviews for ${req.title}` : `Expand to see interviews for ${req.title}`}
+          >
+            {isLoadingInterviews ? (
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+            ) : isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-[#6B7280]" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-[#6B7280]" />
+            )}
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-[#0F172A] leading-tight truncate" style={{ fontSize: '0.8125rem' }}>
+              {req.title}
             </div>
-          )}
+            {req.company && (
+              <div className="font-normal text-[#64748B] mt-1 truncate" style={{ fontSize: '0.75rem' }}>
+                {req.company}
+              </div>
+            )}
+          </div>
         </div>
       </td>
       
@@ -262,7 +283,7 @@ const TableRow = memo(({
       </td>
       
       {/* Actions */}
-      <td className="px-4 py-0 text-center align-middle bg-white" style={{ width: '56px', position: 'sticky', right: 0, zIndex: 20 }}>
+      <td className="px-4 py-0 text-center align-middle" style={{ width: '56px', position: 'sticky', right: 0, zIndex: 30, backgroundColor: rowBgColor }}>
         <div className="flex items-center justify-center h-14">
           <Tooltip title="Actions">
             <button
@@ -378,23 +399,29 @@ export const RequirementsTable = memo(({
   onStatusFilterChange,
 }: RequirementsTableProps) => {
   // State for table functionality
-  const sortField: SortField = 'created_at';
-  const sortOrder: SortOrder = 'desc';
+  const { user } = useAuth();
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [expandedReqs, setExpandedReqs] = useState<Set<string>>(new Set());
+  const [reqInterviews, setReqInterviews] = useState<Record<string, Interview[]>>({});
+  const [loadingInterviews, setLoadingInterviews] = useState<Set<string>>(new Set());
+  const [consultants, setConsultants] = useState<Database['public']['Tables']['consultants']['Row'][]>([]);
+  const [selectedInterview, setSelectedInterview] = useState<Interview | null>(null);
 
   const parentRef = useRef<HTMLDivElement | null>(null);
+  const lastScrollYRef = useRef<number>(0);
 
-  const effectiveSortField = (onSortChange ? (serverSortField as SortField | undefined) : undefined) ?? sortField;
-  const effectiveSortOrder = (onSortChange ? (serverSortOrder as SortOrder | undefined) : undefined) ?? sortOrder;
+  const effectiveSortField = (onSortChange ? (serverSortField as SortField | undefined) : undefined) ?? 'created_at';
+  const effectiveSortOrder = (onSortChange ? (serverSortOrder as SortOrder | undefined) : undefined) ?? 'desc';
 
-  // Sorting logic (client-side for demo)
+  // Sorting logic (client-side when not using server sorting)
   const sortedRequirements = useMemo(() => {
     if (onSortChange) return requirements;
 
     const sorted = [...requirements].sort((a, b) => {
       let aVal: string | number | Date = '';
       let bVal: string | number | Date = '';
-      switch (effectiveSortField) {
+      const sortField = effectiveSortField as SortField;
+      switch (sortField) {
         case 'title':
           aVal = (a.title || '').toLowerCase();
           bVal = (b.title || '').toLowerCase();
@@ -421,7 +448,7 @@ export const RequirementsTable = memo(({
       return 0;
     });
     return sorted;
-  }, [requirements, effectiveSortField, effectiveSortOrder, onSortChange]);
+  }, [requirements, effectiveSortField, effectiveSortOrder, onSortChange])
 
   const toggleRowSelected = (id: string) => {
     const newSelected = new Set(selectedRows);
@@ -432,6 +459,112 @@ export const RequirementsTable = memo(({
     }
     setSelectedRows(newSelected);
   };
+
+  const toggleExpandRequirement = useCallback(async (reqId: string) => {
+    const newExpanded = new Set(expandedReqs);
+    
+    if (newExpanded.has(reqId)) {
+      // Collapse
+      newExpanded.delete(reqId);
+      setExpandedReqs(newExpanded);
+    } else {
+      // Expand and fetch interviews if not already loaded
+      if (!reqInterviews[reqId]) {
+        setLoadingInterviews(prev => new Set([...prev, reqId]));
+        try {
+          const result = await getInterviewsByRequirementGrouped(reqId);
+          if (result.success && result.grouped) {
+            // Flatten grouped interviews into a single array
+            const flattenedInterviews: Interview[] = [];
+            Object.values(result.grouped).forEach(interviews => {
+              flattenedInterviews.push(...interviews);
+            });
+            setReqInterviews(prev => ({
+              ...prev,
+              [reqId]: flattenedInterviews,
+            }));
+          }
+        } catch (err) {
+          console.error('Failed to load interviews:', err);
+        } finally {
+          setLoadingInterviews(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(reqId);
+            return newSet;
+          });
+        }
+      }
+      newExpanded.add(reqId);
+      setExpandedReqs(newExpanded);
+    }
+  }, [expandedReqs, reqInterviews]);
+
+  // Helper to (re)fetch interviews for a requirement and update cache
+  const fetchInterviewsForRequirement = useCallback(async (reqId: string) => {
+    setLoadingInterviews(prev => new Set([...prev, reqId]));
+    try {
+      const result = await getInterviewsByRequirementGrouped(reqId);
+      if (result.success && result.grouped) {
+        const flattenedInterviews: Interview[] = [];
+        Object.values(result.grouped).forEach(interviews => {
+          flattenedInterviews.push(...interviews);
+        });
+        setReqInterviews(prev => ({
+          ...prev,
+          [reqId]: flattenedInterviews,
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to refresh interviews:', err);
+    } finally {
+      setLoadingInterviews(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reqId);
+        return newSet;
+      });
+    }
+  }, []);
+
+  // Load consultants for display
+  useEffect(() => {
+    const loadConsultants = async () => {
+      try {
+        const result = await getConsultants(isAdmin ? undefined : user?.id);
+        if (result.success && result.consultants) {
+          setConsultants(result.consultants);
+        }
+      } catch (err) {
+        console.error('Failed to load consultants:', err);
+      }
+    };
+    loadConsultants();
+  }, [isAdmin, user?.id]);
+
+  const handleViewInterview = (interview: Interview) => {
+    setSelectedInterview(interview);
+  };
+
+  const handleDeleteInterview = async (interviewId: string) => {
+    try {
+      const result = await deleteInterview(interviewId);
+      if (result.success) {
+        // Refresh the expanded requirement
+        const reqId = Object.keys(reqInterviews).find(key => 
+          reqInterviews[key]?.some(i => i.id === interviewId)
+        );
+        if (reqId) {
+          const newInterviews = reqInterviews[reqId].filter(i => i.id !== interviewId);
+          setReqInterviews(prev => ({
+            ...prev,
+            [reqId]: newInterviews,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete interview:', err);
+    }
+  };
+
   const toggleSelectAll = () => {
     if (selectedRows.size === sortedRequirements.length) {
       setSelectedRows(new Set());
@@ -439,6 +572,72 @@ export const RequirementsTable = memo(({
       setSelectedRows(new Set(sortedRequirements.map(r => r.id)));
     }
   };
+
+  // Listen for interview creation events to refresh cached interviews
+  useEffect(() => {
+    const handleInterviewCreated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const detail: any = customEvent.detail || {};
+
+      // Support multiple shapes: { requirementId } or { requirement_id } or full interview object
+      const reqId = detail.requirementId ?? detail.requirement_id ?? detail.requirement?.id ?? detail.requirement_id?.toString();
+
+      if (reqId) {
+        // If the requirement is currently expanded, refresh its interviews in-place
+        if (expandedReqs.has(reqId)) {
+          fetchInterviewsForRequirement(reqId);
+        }
+      }
+    };
+
+    window.addEventListener('interview-created', handleInterviewCreated);
+    return () => {
+      window.removeEventListener('interview-created', handleInterviewCreated);
+    };
+  }, [expandedReqs, fetchInterviewsForRequirement]);
+
+  // Collapse expanded requirements when user scrolls vertically away from them
+  useEffect(() => {
+    const scrollContainer = parentRef.current;
+    if (!scrollContainer) return;
+
+    const handleVerticalScroll = () => {
+      const currentScrollY = scrollContainer.scrollTop;
+      const scrollDelta = Math.abs(currentScrollY - lastScrollYRef.current);
+
+      // Only collapse if user scrolled significantly (>5px) AND there are expanded requirements
+      if (scrollDelta > 5 && expandedReqs.size > 0) {
+        // Check if any expanded requirement row is still visible in viewport
+        let shouldCollapse = true;
+        
+        for (const reqId of expandedReqs) {
+          // Try to find the row element for this expanded requirement
+          const rowElement = scrollContainer.querySelector(`[data-req-id="${reqId}"]`);
+          if (rowElement) {
+            const rect = rowElement.getBoundingClientRect();
+            const containerRect = scrollContainer.getBoundingClientRect();
+            
+            // If the expanded row is still visible in the container, don't collapse
+            if (rect.top < containerRect.bottom && rect.bottom > containerRect.top) {
+              shouldCollapse = false;
+              break;
+            }
+          }
+        }
+        
+        if (shouldCollapse) {
+          setExpandedReqs(new Set());
+        }
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    scrollContainer.addEventListener('scroll', handleVerticalScroll);
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleVerticalScroll);
+    };
+  }, [expandedReqs]);
 
   const rowVirtualizer = useVirtualizer({
     count: sortedRequirements.length,
@@ -496,15 +695,15 @@ export const RequirementsTable = memo(({
           '& thead': {
             position: 'sticky',
             top: 0,
-            zIndex: 10,
+            zIndex: 40,
           },
         }}
       >
         <table className="w-full">
           <thead>
-            <tr className="bg-[#F8FAFC] border-b border-[#EAECEF]">
+            <tr style={{ backgroundColor: '#F3F4F6', borderBottom: '1px solid #E5E7EB' }}>
               {/* Checkbox Header */}
-              <th className="px-4 py-3 text-center align-middle bg-[#F8FAFC]" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 30 }}>
+              <th className="px-4 py-3 text-center align-middle" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: '#F3F4F6', borderBottom: '1px solid #E5E7EB' }}>
                 <button
                   onClick={toggleSelectAll}
                   className="p-1.5 hover:bg-gray-200 hover:bg-opacity-50 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors"
@@ -520,36 +719,36 @@ export const RequirementsTable = memo(({
                 </button>
               </th>
               
-              <th className="px-4 py-3 text-left align-middle bg-[#F8FAFC]" style={{ width: '60px', position: 'sticky', left: '44px', zIndex: 30, fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">ID</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '60px', position: 'sticky', left: '44px', zIndex: 30, backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                REQ ID
               </th>
               
-              <th className="px-4 py-3 text-left align-middle" style={{ width: '24%', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Title</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '24%', backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Title
               </th>
               
-              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Status</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Status
               </th>
               
-              <th className="px-4 py-3 text-left align-middle" style={{ width: '18%', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Vendor Company</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '18%', backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Vendor Company
               </th>
               
-              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Contact</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Contact
               </th>
               
-              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Phone</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '15%', backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Phone
               </th>
               
-              <th className="px-4 py-3 text-left align-middle" style={{ width: '18%', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Email</span>
+              <th className="px-4 py-3 text-left align-middle" style={{ width: '18%', backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Email
               </th>
               
-              <th className="px-4 py-3 text-center align-middle bg-[#F8FAFC]" style={{ width: '56px', position: 'sticky', right: 0, zIndex: 30, fontSize: '0.75rem', fontWeight: 600 }}>
-                <span className="text-[#475569] uppercase tracking-wide">Actions</span>
+              <th className="px-4 py-3 text-center align-middle" style={{ width: '56px', position: 'sticky', right: 0, zIndex: 30, backgroundColor: '#F3F4F6', color: '#374151', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid #E5E7EB' }}>
+                Actions
               </th>
             </tr>
           </thead>
@@ -580,23 +779,74 @@ export const RequirementsTable = memo(({
                 {virtualItems.map(virtualRow => {
                   const req = sortedRequirements[virtualRow.index];
                   const isSelected = selectedRows.has(req.id);
-                  const colors = statusColorMap[req.status as RequirementStatus];
+                  const isExpanded = expandedReqs.has(req.id);
+                  const isLoading = loadingInterviews.has(req.id);
+                  const interviews = reqInterviews[req.id];
+                  
                   return (
-                    <TableRow
-                      key={req.id}
-                      req={req}
-                      isSelected={isSelected}
-                      colors={colors}
-                      toggleRowSelected={toggleRowSelected}
-                      onViewDetails={onViewDetails}
-                      onCreateInterview={onCreateInterview}
-                      onDelete={onDelete}
-                      isAdmin={isAdmin}
-                      rowIndex={virtualRow.index}
-                      dataIndex={virtualRow.index}
-                      selectedStatusFilter={selectedStatusFilter}
-                      onStatusFilterChange={onStatusFilterChange}
-                    />
+                    <React.Fragment key={req.id}>
+                      <TableRow
+                        req={req}
+                        isSelected={isSelected}
+                        toggleRowSelected={toggleRowSelected}
+                        onViewDetails={onViewDetails}
+                        onCreateInterview={onCreateInterview}
+                        onDelete={onDelete}
+                        isAdmin={isAdmin}
+                        rowIndex={virtualRow.index}
+                        dataIndex={virtualRow.index}
+                        selectedStatusFilter={selectedStatusFilter}
+                        onStatusFilterChange={onStatusFilterChange}
+                        toggleExpandRequirement={toggleExpandRequirement}
+                        isExpanded={isExpanded}
+                        isLoadingInterviews={isLoading}
+                      />
+                      
+                      {/* Interview Details Row */}
+                      {isExpanded && (
+                        <tr key={`interviews-${req.id}`} className="border-t border-blue-100" style={{ width: '100%', display: 'table-row' }}>
+                          <td colSpan={9} className="px-0 py-0" style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+                            {isLoading ? (
+                              <div className="flex items-center justify-center py-8">
+                                <div className="w-6 h-6 border-3 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                              </div>
+                            ) : interviews && interviews.length > 0 ? (
+                              <InterviewPipeline
+                                interviews={interviews}
+                                consultants={consultants}
+                                onViewDetails={handleViewInterview}
+                                onDelete={handleDeleteInterview}
+                              />
+                            ) : (
+                              <div style={{
+                                backgroundColor: '#F9FAFB',
+                                borderLeft: '3px solid #2563EB',
+                                padding: '16px 24px',
+                                marginLeft: 0,
+                              }}>
+                                <h3 style={{
+                                  fontSize: '14px',
+                                  fontWeight: 600,
+                                  color: '#0F172A',
+                                  margin: '0 0 12px 0',
+                                  fontFamily: '"Instrument Sans", sans-serif',
+                                }}>
+                                  Interview Pipeline
+                                </h3>
+                                <p style={{
+                                  fontSize: '13px',
+                                  color: '#64748B',
+                                  margin: 0,
+                                  fontFamily: '"Instrument Sans", sans-serif',
+                                }}>
+                                  No interviews found for this requirement
+                                </p>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
 
@@ -644,6 +894,22 @@ export const RequirementsTable = memo(({
           </button>
         </div>
       </div>
+
+      {/* Interview Detail Modal */}
+      {selectedInterview && (
+        <InterviewDetailModal
+          interview={selectedInterview}
+          isOpen={!!selectedInterview}
+          onClose={() => setSelectedInterview(null)}
+          onUpdate={() => {
+            // Refresh the interviews for the expanded requirement
+            const reqId = selectedInterview.requirement_id;
+            if (reqId && expandedReqs.has(reqId)) {
+              toggleExpandRequirement(reqId);
+            }
+          }}
+        />
+      )}
     </div>
   );
 });

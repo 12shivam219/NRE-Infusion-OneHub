@@ -20,7 +20,6 @@ export const preloadDashboard = () => import('../components/dashboard/Dashboard'
 export const preloadDocumentsPage = () => import('../components/documents/DocumentsPage');
 export const preloadCRMPage = () => import('../components/crm/CRMPage');
 export const preloadAdminPage = () => import('../components/admin/AdminPage');
-export const preloadSettingsPage = () => import('../pages/SettingsPage');
 
 // Pre-configured lazy components - simple dynamic imports
 // These will only load when needed, reducing initial bundle
@@ -48,12 +47,6 @@ export const LazyAdminPage = lazy(() =>
   }))
 );
 
-export const LazySettingsPage = lazy(() =>
-  import('../pages/SettingsPage').then(m => ({
-    default: m.default,
-  }))
-);
-
 // Lazy load CRM sub-components
 export const LazyConsultantProfiles = lazy(() =>
   import('../components/crm/ConsultantProfiles').then(m => ({
@@ -64,12 +57,6 @@ export const LazyConsultantProfiles = lazy(() =>
 export const LazyRequirementsManagement = lazy(() =>
   import('../components/crm/RequirementsManagement').then(m => ({
     default: m.RequirementsManagement,
-  }))
-);
-
-export const LazyInterviewTracking = lazy(() =>
-  import('../components/crm/InterviewTracking').then(m => ({
-    default: m.InterviewTracking,
   }))
 );
 
@@ -86,16 +73,6 @@ export const LazyKanbanBoard = lazy(() =>
 );
 
 // Lazy load admin sub-components
-export const LazyGmailSyncSettings = lazy(() =>
-  import('../components/admin/GmailSyncSettings')
-);
-
-export const LazyEmailAccountsSettings = lazy(() =>
-  import('../components/admin/EmailAccountsSettings').then(m => ({
-    default: m.EmailAccountsSettings,
-  }))
-);
-
 // Lazy load modals and overlays
 export const LazyConsultantDetailModal = lazy(() =>
   import('../components/crm/ConsultantDetailModal').then(m => ({

@@ -1,5 +1,5 @@
 import { useState, useCallback, memo } from 'react';
-import { Bell, Menu as MenuIcon, LogOut, ChevronDown, FileText, Bot, LayoutDashboard, Briefcase, MessagesSquare, Users } from 'lucide-react';
+import { Bell, Menu as MenuIcon, LogOut, ChevronDown, FileText, Bot, LayoutDashboard, Briefcase, Users } from 'lucide-react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import SyncStatusBadge from '../common/SyncStatusBadge';
 import { CreateDropdown } from '../common/CreateDropdown';
@@ -29,8 +29,6 @@ const getPageTitle = (pathname: string, searchParams?: URLSearchParams) => {
     switch (view) {
       case 'requirements':
         return 'Requirements';
-      case 'interviews':
-        return 'Interviews';
       case 'consultants':
         return 'Consultants';
       default:
@@ -58,8 +56,6 @@ const getPageIcon = (pathname: string, searchParams?: URLSearchParams) => {
     switch (view) {
       case 'requirements':
         return 'briefcase';
-      case 'interviews':
-        return 'messages-square';
       case 'consultants':
         return 'users';
       default:
@@ -108,8 +104,6 @@ export const Header = memo(({ onMenuClick }: HeaderProps) => {
         return <FileText {...iconProps} />;
       case 'briefcase':
         return <Briefcase {...iconProps} />;
-      case 'messages-square':
-        return <MessagesSquare {...iconProps} />;
       case 'users':
         return <Users {...iconProps} />;
       case 'bot':

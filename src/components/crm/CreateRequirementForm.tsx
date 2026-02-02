@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { AlertCircle, Mail, Loader } from 'lucide-react';
+import { AlertCircle, Mail, Loader, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
@@ -12,8 +12,16 @@ import { ErrorAlert } from '../common/ErrorAlert';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import { supabase } from '../../lib/supabase';
 import type { Database } from '../../lib/database.types';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import { JDParserDialog } from './JDParserDialog';
+import { BatchJDParserDialog } from './BatchJDParserDialog';
 import type { SelectChangeEvent } from '@mui/material/Select';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
@@ -35,6 +43,7 @@ interface FormFieldProps {
   error?: string;
   id?: string;
   autoComplete?: string;
+  rows?: number;
 }
 
 // Create FormField component outside the parent component for stability
@@ -50,6 +59,7 @@ const FormField = memo(function FormField({
   error,
   id,
   autoComplete,
+  rows,
 }: FormFieldProps) {
   // Generate a unique ID if one isn't provided to ensure accessibility
   const fieldId = id || `field-${name}`;
@@ -74,34 +84,38 @@ const FormField = memo(function FormField({
           InputLabelProps={{
             shrink: true,
             sx: {
-              fontSize: '0.85rem',
-              color: '#666',
-              '&.Mui-focused': { color: '#007bff' },
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#3A445D',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              '&.Mui-focused': { color: '#4F46E5' },
             }
           }}
           sx={{
-            mb: 0.5,
+            mb: 1,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '5px',
+              borderRadius: '8px',
               backgroundColor: '#fff',
               fontSize: '0.9rem',
               '& fieldset': {
-                borderColor: '#ddd',
+                borderColor: '#D5DAE1',
               },
               '&:hover fieldset': {
-                borderColor: '#999',
+                borderColor: '#C7CEDB',
               },
               '&.Mui-focused fieldset': {
-                borderColor: '#007bff',
-                boxShadow: '0 0 0 2px rgba(0, 123, 255, 0.15)',
+                borderColor: '#4F46E5',
+                boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.08)',
               },
             },
             '& .MuiFormHelperText-root': {
               fontSize: '0.75rem',
-              mt: 0.25,
+              mt: 0.5,
+              color: '#ef4444',
             },
             '& .MuiOutlinedInput-input::placeholder': {
-              color: '#999',
+              color: '#9CA3B0',
               opacity: 1,
               fontSize: '0.9rem',
             },
@@ -130,39 +144,43 @@ const FormField = memo(function FormField({
           fullWidth
           autoComplete={autoComplete}
           multiline={type === 'textarea'}
-          rows={type === 'textarea' ? 2 : undefined}
+          rows={type === 'textarea' ? (rows ?? 2) : undefined}
           // Rely on MUI's default label-input association via the 'id' prop
           InputLabelProps={{
             shrink: true,
             sx: {
-              fontSize: '0.85rem',
-              color: '#666',
-              '&.Mui-focused': { color: '#007bff' },
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#3A445D',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              '&.Mui-focused': { color: '#4F46E5' },
             }
           }}
           sx={{
-            mb: 0.5,
+            mb: 1,
             '& .MuiOutlinedInput-root': {
-              borderRadius: '5px',
+              borderRadius: '8px',
               backgroundColor: '#fff',
               fontSize: '0.9rem',
               '& fieldset': {
-                borderColor: '#ddd',
+                borderColor: '#D5DAE1',
               },
               '&:hover fieldset': {
-                borderColor: '#999',
+                borderColor: '#C7CEDB',
               },
               '&.Mui-focused fieldset': {
-                borderColor: '#007bff',
-                boxShadow: '0 0 0 2px rgba(0, 123, 255, 0.15)',
+                borderColor: '#4F46E5',
+                boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.08)',
               },
             },
             '& .MuiFormHelperText-root': {
               fontSize: '0.75rem',
-              mt: 0.25,
+              mt: 0.5,
+              color: '#ef4444',
             },
             '& .MuiOutlinedInput-input::placeholder': {
-              color: '#999',
+              color: '#9CA3B0',
               opacity: 1,
               fontSize: '0.9rem',
             },
@@ -195,17 +213,17 @@ interface CreateRequirementFormProps {
 const FormSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section
     style={{
-      background: '#fafafa',
-      border: '1px solid #e8e8e8',
-      borderRadius: '6px',
-      padding: '0.875rem',
-      marginBottom: '0.875rem',
+      background: 'transparent',
+      border: 'none',
+      borderRadius: '0',
+      padding: '0',
+      marginBottom: '2rem',
     }}
   >
-    <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#333', marginBottom: '0.625rem', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+    <h3 style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', marginBottom: '1.25rem', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
       {title}
     </h3>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.625rem' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
       {children}
     </div>
   </section>
@@ -219,9 +237,11 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
   const [allRequirements, setAllRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [loading, setLoading] = useState(false);
   const [scanningGmail, setScanningGmail] = useState(false);
-  const [gmailJobs, setGmailJobs] = useState<Array<{ title: string; company: string; description: string; skills: string }>>([]);
+  const [gmailJobs, setGmailJobs] = useState<Array<{ title: string; company: string; description: string; skills: string; location: string; vendor: string; vendorContact: string; vendorEmail: string; vendorPhone: string }>>([]);
   const [showGmailJobs, setShowGmailJobs] = useState(false);
   const [selectedGmailJob, setSelectedGmailJob] = useState<number | null>(null);
+  const [showJDParser, setShowJDParser] = useState(false);
+  const [showBatchJDParser, setShowBatchJDParser] = useState(false);
   const [similarRequirements, setSimilarRequirements] = useState<Database['public']['Tables']['requirements']['Row'][]>([]);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -231,12 +251,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
     company: initialData?.company || '',
     status: 'NEW' as const,
     consultant_id: '',
-    applied_for: '',
     rate: initialData?.rate || '',
     primary_tech_stack: initialData?.primary_tech_stack || '',
-    imp_name: '',
-    client_website: '',
-    imp_website: '',
     vendor_company: initialData?.vendor_company || '',
     vendor_website: '',
     vendor_person_name: initialData?.vendor_person_name || '',
@@ -246,7 +262,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
     next_step: '',
     remote: initialData?.remote || '',
     duration: initialData?.duration || '',
-    location: initialData?.location || '',
   });
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | SelectChangeEvent<string>) => {
@@ -344,7 +359,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
       }
 
       // Process each email with job extraction
-      const jobs: Array<{ title: string; company: string; description: string; skills: string }> = [];
+      const jobs: Array<{ title: string; company: string; description: string; skills: string; location: string; vendor: string; vendorContact: string; vendorEmail: string; vendorPhone: string }> = [];
       
       for (const email of emailsData.emails || []) {
         const { data: jobData } = await supabase.functions.invoke('extract-job-details', {
@@ -360,19 +375,30 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
         });
 
         if (jobData?.success && jobData.data) {
-          jobs.push({
-            title: jobData.data.jobTitle || 'N/A',
-            company: jobData.data.company || 'N/A',
-            description: jobData.data.jobDescription || '',
-            skills: jobData.data.skills?.join(', ') || '',
-          });
+          const data = jobData.data;
+          // Filter for remote jobs only
+          const isRemote = data.workLocationType?.toLowerCase().includes('remote');
+          
+          if (isRemote) {
+            jobs.push({
+              title: data.jobTitle || 'N/A',
+              company: data.hiringCompany || 'N/A',
+              description: data.jobDescription || '',
+              skills: Array.isArray(data.keySkills) ? data.keySkills.join(', ') : '',
+              location: data.workLocationType || 'Remote',
+              vendor: data.vendor || '',
+              vendorContact: data.vendorContact || '',
+              vendorEmail: data.vendorEmail || '',
+              vendorPhone: data.vendorPhone || '',
+            });
+          }
         }
       }
 
       if (jobs.length === 0) {
         showToast({
           type: 'info',
-          message: 'No job postings found in recent emails',
+          message: 'No remote job postings found in recent emails',
         });
         return;
       }
@@ -396,13 +422,17 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
     }
   }, [showToast, user?.id]);
 
-  const handleSelectGmailJob = useCallback((job: { title: string; company: string; description: string; skills: string }) => {
+  const handleSelectGmailJob = useCallback((job: { title: string; company: string; description: string; skills: string; location: string; vendor: string; vendorContact: string; vendorEmail: string; vendorPhone: string }) => {
     setFormData(prevState => ({
       ...prevState,
       title: job.title,
       company: job.company,
       description: job.description,
       primary_tech_stack: job.skills,
+      vendor: job.vendor,
+      imp_name: job.vendorContact,
+      vendor_email: job.vendorEmail,
+      vendor_phone: job.vendorPhone,
     }));
     setShowGmailJobs(false);
   }, []);
@@ -416,8 +446,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
       title: formData.title,
       company: formData.company,
       vendor_email: formData.vendor_email,
-      client_website: formData.client_website,
-      imp_website: formData.imp_website,
       vendor_website: formData.vendor_website,
       rate: formData.rate,
     });
@@ -443,12 +471,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
         company: sanitizeText(formData.company),
         status: formData.status,
         consultant_id: formData.consultant_id || null,
-        applied_for: formData.applied_for || null,
         rate: formData.rate || null,
         primary_tech_stack: sanitizeText(formData.primary_tech_stack),
-        imp_name: sanitizeText(formData.imp_name),
-        client_website: formData.client_website || null,
-        imp_website: formData.imp_website || null,
         vendor_company: sanitizeText(formData.vendor_company),
         vendor_website: formData.vendor_website || null,
         vendor_person_name: sanitizeText(formData.vendor_person_name),
@@ -458,7 +482,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
         next_step: sanitizeText(formData.next_step),
         remote: formData.remote || null,
         duration: formData.duration || null,
-        location: sanitizeText(formData.location),
       };
 
       // Check if offline - queue operation
@@ -491,9 +514,35 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
       const result = await createRequirement(requirementData, user.id);
 
       setLoading(false);
-      if (result.success && result.requirement) {
+      if (result.success) {
+        // Use returned requirement or create an optimistic one if fetch failed on server
+        const createdRequirement = result.requirement || ({
+          id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          requirement_number: 0,
+          user_id: user.id,
+          title: sanitizeText(formData.title),
+          company: sanitizeText(formData.company),
+          status: formData.status,
+          consultant_id: formData.consultant_id || null,
+          rate: formData.rate || null,
+          primary_tech_stack: sanitizeText(formData.primary_tech_stack),
+          vendor_company: sanitizeText(formData.vendor_company),
+          vendor_website: formData.vendor_website || null,
+          vendor_person_name: sanitizeText(formData.vendor_person_name),
+          vendor_phone: formData.vendor_phone || null,
+          vendor_email: formData.vendor_email || null,
+          description: sanitizeText(formData.description),
+          next_step: sanitizeText(formData.next_step),
+          remote: formData.remote || null,
+          duration: formData.duration || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          created_by: user.id,
+          updated_by: user.id,
+        } as any);
+
         // Create initial next step comment if next_step has a value
-        if (formData.next_step.trim()) {
+        if (formData.next_step.trim() && result.requirement?.id) {
           try {
             await supabase
               .from('next_step_comments' as const)
@@ -516,7 +565,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
           message: 'New requirement has been successfully created',
         });
         // Dispatch event to refresh requirements list
-        window.dispatchEvent(new CustomEvent('requirement-created', { detail: result.requirement }));
+        console.log('Dispatching requirement-created event with:', createdRequirement);
+        window.dispatchEvent(new CustomEvent('requirement-created', { detail: createdRequirement }));
         onSuccess();
       } else {
         setSubmitError(result.error || 'Failed to create requirement');
@@ -539,85 +589,197 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
   };
 
   return (
-    <div style={{ padding: '1rem' }}>
-        {/* Gmail Jobs Scanner */}
-        {showGmailJobs && gmailJobs.length > 0 ? (
-          <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f0f9ff', borderRadius: '6px', border: '1px solid #0ea5e9' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontWeight: 600, color: '#0369a1', margin: 0 }}>Jobs Found in Gmail ({gmailJobs.length})</h3>
+    <Dialog 
+      open 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="sm" 
+      scroll="paper"
+      PaperProps={{
+        sx: {
+          borderRadius: '12px',
+          background: '#FFFFFF',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        },
+      }}
+      slotProps={{
+        backdrop: {
+          sx: {
+            backgroundColor: 'rgba(15, 23, 42, 0.55)',
+          },
+        },
+      }}
+    >
+      <DialogTitle 
+        sx={{ 
+          pr: 7, 
+          fontWeight: 700,
+          fontSize: '1.25rem',
+          fontFamily: '"Poppins", sans-serif',
+          color: '#0B1220',
+          borderBottom: '1px solid #E9EBF0',
+          paddingBottom: '16px',
+        }}
+      >
+        Create New Requirement
+        <IconButton 
+          onClick={onClose} 
+          sx={{ 
+            position: 'absolute', 
+            right: 8, 
+            top: 8,
+            color: '#6B7280',
+            '&:hover': {
+              backgroundColor: 'rgba(15, 23, 42, 0.08)',
+            },
+          }} 
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent 
+        dividers 
+        sx={{ 
+          backgroundColor: '#FFFFFF',
+          padding: '32px',
+          overflowY: 'auto',
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: '#F6F7FB',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: '#D5DAE1',
+            borderRadius: '4px',
+            '&:hover': {
+              backgroundColor: '#C7CEDB',
+            },
+          },
+        }}
+      >
+        <div style={{ padding: '0' }}>
+          {/* Gmail Jobs Scanner */}
+          {showGmailJobs && gmailJobs.length > 0 ? (
+            <div style={{ marginBottom: '2rem', padding: '1rem', backgroundColor: '#EEF3FF', borderRadius: '8px', border: '1px solid #D5DAE1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontWeight: 600, color: '#4F46E5', margin: 0, fontSize: '0.9rem' }}>Jobs Found in Gmail ({gmailJobs.length})</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowGmailJobs(false)}
+                  style={{ padding: '0.5rem 1rem', backgroundColor: 'transparent', color: '#4F46E5', border: '1px solid #D5DAE1', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}
+                >
+                  Cancel
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {gmailJobs.map((job, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectGmailJob(job)}
+                    style={{
+                      padding: '1rem',
+                      backgroundColor: selectedGmailJob === idx ? '#F5F4FF' : '#ffffff',
+                      border: selectedGmailJob === idx ? '2px solid #4F46E5' : '1px solid #E9EBF0',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms ease',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: '#0B1220', marginBottom: '0.25rem', fontSize: '0.95rem' }}>{job.title}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#6B7280', marginBottom: '0.25rem' }}>{job.company}</div>
+                    {job.skills && <div style={{ fontSize: '0.75rem', color: '#4F46E5', marginBottom: '0.25rem' }}>Skills: {job.skills}</div>}
+                    <div style={{ fontSize: '0.8rem', color: '#6B7280', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {job.description}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginBottom: '2rem' }}>
               <button
                 type="button"
-                onClick={() => setShowGmailJobs(false)}
-                style={{ padding: '0.5rem 1rem', backgroundColor: '#e0e7ff', color: '#4f46e5', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                onClick={handleScanGmail}
+                disabled={scanningGmail}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  padding: '0.875rem 1.25rem',
+                  backgroundColor: scanningGmail ? '#F1F3F8' : '#ffffff',
+                  border: '1px solid #D5DAE1',
+                  color: scanningGmail ? '#9CA3B0' : '#3A445D',
+                  borderRadius: '8px',
+                  cursor: scanningGmail ? 'not-allowed' : 'pointer',
+                  fontWeight: 500,
+                  width: '100%',
+                  fontSize: '0.9rem',
+                  transition: 'all 200ms ease',
+                }}
               >
-                Cancel
+                {scanningGmail ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Scanning Gmail...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Scan Gmail for Jobs
+                  </>
+                )}
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {gmailJobs.map((job, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handleSelectGmailJob(job)}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: selectedGmailJob === idx ? '#dbeafe' : '#ffffff',
-                    border: selectedGmailJob === idx ? '2px solid #0ea5e9' : '1px solid #cbd5e1',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms ease',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: '0.25rem' }}>{job.title}</div>
-                  <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>{job.company}</div>
-                  {job.skills && <div style={{ fontSize: '0.75rem', color: '#0369a1', marginBottom: '0.25rem' }}>Skills: {job.skills}</div>}
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280', maxHeight: '60px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {job.description}
-                  </div>
-                </div>
-              ))}
-            </div>
+          )}
+          
+          <div style={{ marginBottom: '2rem' }}>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="outlined"
+                onClick={() => setShowJDParser(true)}
+                sx={{ 
+                  textTransform: 'none',
+                  borderColor: '#D5DAE1',
+                  color: '#3A445D',
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  '&:hover': {
+                    borderColor: '#C7CEDB',
+                    backgroundColor: '#F1F3F8',
+                  }
+                }}
+              >
+                📄 JD Parser
+              </Button>
+
+              <Button
+                variant="outlined"
+                onClick={() => setShowBatchJDParser(true)}
+                sx={{ 
+                  textTransform: 'none',
+                  borderColor: '#D5DAE1',
+                  color: '#3A445D',
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  '&:hover': {
+                    borderColor: '#C7CEDB',
+                    backgroundColor: '#F1F3F8',
+                  }
+                }}
+              >
+                📑 Batch JD Parser
+              </Button>
+            </Stack>
           </div>
-        ) : (
-          <div style={{ marginBottom: '1rem' }}>
-            <button
-              type="button"
-              onClick={handleScanGmail}
-              disabled={scanningGmail}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 1rem',
-                backgroundColor: scanningGmail ? '#e0e7ff' : '#f0f9ff',
-                border: '1px solid #0ea5e9',
-                color: scanningGmail ? '#9ca3af' : '#0369a1',
-                borderRadius: '6px',
-                cursor: scanningGmail ? 'not-allowed' : 'pointer',
-                fontWeight: 500,
-                width: '100%',
-                fontSize: '0.9rem',
-              }}
-            >
-              {scanningGmail ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  Scanning Gmail...
-                </>
-              ) : (
-                <>
-                  <Mail className="w-4 h-4" />
-                  Scan Gmail for Jobs
-                </>
-              )}
-            </button>
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit}>
+
+          <form onSubmit={handleSubmit}>
           {/* Submit Error Alert */}
           {submitError && (
-            <div style={{ marginBottom: '1rem' }}>
+            <div style={{ marginBottom: '2rem' }}>
               <ErrorAlert
                 title="Failed to Create Requirement"
                 message={submitError}
@@ -629,11 +791,11 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
 
           {/* Similar Requirements Warning */}
           {similarRequirements.length > 0 && (
-            <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '5px', padding: '0.75rem', marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
-              <AlertCircle className="w-4 h-4 text-yellow-700 flex-shrink-0 mt-0.5" />
+            <div style={{ backgroundColor: '#FEF3C7', border: '1px solid #FBCA04', borderRadius: '8px', padding: '1rem', marginBottom: '2rem', display: 'flex', gap: '0.75rem' }}>
+              <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" style={{ marginTop: '2px' }} />
               <div style={{ fontSize: '0.85rem' }}>
-                <p style={{ fontWeight: 600, color: '#856404', marginBottom: '0.25rem' }}>Similar requirements found</p>
-                <p style={{ color: '#856404' }}>
+                <p style={{ fontWeight: 600, color: '#92400E', marginBottom: '0.25rem' }}>Similar requirements found</p>
+                <p style={{ color: '#92400E' }}>
                   {similarRequirements.length} similar requirement(s) exist. Review before creating.
                 </p>
               </div>
@@ -654,7 +816,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
               error={formErrors.title}
             />
             <FormField
-              label="Company Name"
+              label="Client"
               name="company"
               id="req-company"
               autoComplete="organization"
@@ -717,7 +879,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
               name="rate"
               id="req-rate"
               autoComplete="off"
-              placeholder="e.g., $80k - $120k"
+              placeholder="Any format: $80k, $80,000-$120,000, 80k-120k, £50-70k, $80k/year, etc."
               value={formData.rate}
               onChange={handleChange}
               error={formErrors.rate}
@@ -738,57 +900,6 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
               autoComplete="off"
               placeholder="e.g., 6 months, Full-time"
               value={formData.duration}
-              onChange={handleChange}
-            />
-          </FormSection>
-
-          {/* Client Information */}
-          <FormSection title="Client">
-            <FormField
-              label="Internal Contact"
-              name="imp_name"
-              id="req-internal-contact"
-              autoComplete="name"
-              placeholder="e.g., John Smith"
-              value={formData.imp_name}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Source"
-              name="applied_for"
-              id="req-source"
-              autoComplete="off"
-              placeholder="e.g., LinkedIn, Referral"
-              value={formData.applied_for}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Client Website"
-              name="client_website"
-              id="req-client-website"
-              autoComplete="url"
-              type="url"
-              placeholder="https://example.com"
-              value={formData.client_website}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Partner Website"
-              name="imp_website"
-              id="req-partner-website"
-              autoComplete="url"
-              type="url"
-              placeholder="https://partner.com"
-              value={formData.imp_website}
-              onChange={handleChange}
-            />
-            <FormField
-              label="Work Location"
-              name="location"
-              id="req-location"
-              autoComplete="address-level2"
-              placeholder="e.g., 123 Main St, New York, NY"
-              value={formData.location}
               onChange={handleChange}
             />
           </FormSection>
@@ -859,28 +970,35 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
                 placeholder="Full job description and key responsibilities..."
                 value={formData.description}
                 onChange={handleChange}
+                rows={8}
               />
             </div>
           </FormSection>
 
           {/* Form Actions */}
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #E9EBF0' }}>
             <button
               type="button"
               onClick={onClose}
               style={{
-                backgroundColor: '#f0f0f0',
-                color: '#333',
-                border: '1px solid #ddd',
-                padding: '0.625rem 1.25rem',
-                borderRadius: '5px',
+                backgroundColor: '#F1F3F8',
+                color: '#3A445D',
+                border: '1px solid #D5DAE1',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontSize: '0.9rem',
                 transition: 'all 0.2s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#e0e0e0')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#f0f0f0')}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#E9EBF0';
+                e.currentTarget.style.borderColor = '#C7CEDB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#F1F3F8';
+                e.currentTarget.style.borderColor = '#D5DAE1';
+              }}
             >
               Cancel
             </button>
@@ -888,24 +1006,78 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
               type="submit"
               disabled={loading}
               style={{
-                backgroundColor: loading ? '#0056b3' : '#007bff',
-                color: '#fff',
+                backgroundColor: loading ? '#8B7EEF' : '#4F46E5',
+                color: '#FFFFFF',
                 border: 'none',
-                padding: '0.625rem 1.25rem',
-                borderRadius: '5px',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '8px',
                 fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 fontSize: '0.9rem',
                 transition: 'all 0.2s ease',
-                opacity: loading ? 0.8 : 1,
+                opacity: loading ? 0.85 : 1,
+                boxShadow: loading ? 'none' : '0 1px 3px rgba(79, 70, 229, 0.3)',
               }}
-              onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#0056b3')}
-              onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = '#007bff')}
+              onMouseEnter={(e) => !loading && (
+                e.currentTarget.style.backgroundColor = '#4338CA',
+                e.currentTarget.style.boxShadow = '0 4px 6px rgba(79, 70, 229, 0.4)'
+              )}
+              onMouseLeave={(e) => !loading && (
+                e.currentTarget.style.backgroundColor = '#4F46E5',
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(79, 70, 229, 0.3)'
+              )}
             >
               {loading ? 'Creating...' : 'Create'}
             </button>
           </div>
         </form>
-      </div>
+        </div>
+
+        <JDParserDialog
+          open={showJDParser}
+          onClose={() => setShowJDParser(false)}
+          onParsedData={(extraction, cleanedText) => {
+            setFormData(prev => ({
+              ...prev,
+              title: extraction.jobTitle ?? prev.title,
+              company: extraction.hiringCompany ?? prev.company,
+              primary_tech_stack: (extraction.keySkills ?? []).length > 0 ? (extraction.keySkills ?? []).join(', ') : prev.primary_tech_stack,
+              rate: extraction.rate ?? prev.rate,
+              remote: extraction.workLocationType ?? prev.remote,
+              duration: extraction.duration ?? prev.duration,
+              vendor_company: extraction.vendor ?? prev.vendor_company,
+              vendor_person_name: extraction.vendorContact ?? prev.vendor_person_name,
+              vendor_phone: extraction.vendorPhone ?? prev.vendor_phone,
+              vendor_email: extraction.vendorEmail ?? prev.vendor_email,
+              description: cleanedText || prev.description,
+            }));
+            setShowJDParser(false);
+          }}
+        />
+
+        <BatchJDParserDialog
+          open={showBatchJDParser}
+          onClose={() => setShowBatchJDParser(false)}
+          onParsedData={(extraction, cleanedText) => {
+            setFormData(prev => ({
+              ...prev,
+              title: extraction.jobTitle ?? prev.title,
+              company: extraction.hiringCompany ?? prev.company,
+              primary_tech_stack: (extraction.keySkills ?? []).length > 0 ? (extraction.keySkills ?? []).join(', ') : prev.primary_tech_stack,
+              rate: extraction.rate ?? prev.rate,
+              remote: extraction.workLocationType ?? prev.remote,
+              duration: extraction.duration ?? prev.duration,
+              vendor_company: extraction.vendor ?? prev.vendor_company,
+              vendor_person_name: extraction.vendorContact ?? prev.vendor_person_name,
+              vendor_phone: extraction.vendorPhone ?? prev.vendor_phone,
+              vendor_email: extraction.vendorEmail ?? prev.vendor_email,
+              description: cleanedText || prev.description,
+            }));
+            setShowBatchJDParser(false);
+          }}
+        />
+
+      </DialogContent>
+    </Dialog>
   );
 };

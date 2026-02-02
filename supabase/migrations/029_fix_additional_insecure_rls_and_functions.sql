@@ -9,7 +9,6 @@
 --   - email_threads has unrestricted DELETE, INSERT, UPDATE policies
 --   - error_reports has unrestricted DELETE, INSERT, UPDATE policies
 --   - google_drive_tokens has unrestricted DELETE, INSERT, UPDATE policies
---   - interview_focus_cache has unrestricted DELETE, INSERT, UPDATE policies
 
 BEGIN;
 
@@ -334,44 +333,9 @@ CREATE POLICY "Users can delete own google drive tokens"
   USING (user_id = auth.uid()::uuid);
 
 -- =========================================================================
--- 9. FIX INTERVIEW_FOCUS_CACHE TABLE RLS POLICIES
+-- 9. REMOVED - INTERVIEW_FOCUS_CACHE TABLE (Deprecated Feature)
 -- =========================================================================
--- Cache tables should be service_role only
-
-DROP POLICY IF EXISTS "Allow service role to delete interview focus cache" ON public.interview_focus_cache;
-DROP POLICY IF EXISTS "Allow service role to insert interview focus cache" ON public.interview_focus_cache;
-DROP POLICY IF EXISTS "Allow service role to update interview focus cache" ON public.interview_focus_cache;
-DROP POLICY IF EXISTS "Allow service role to read interview focus cache" ON public.interview_focus_cache;
-
-ALTER TABLE public.interview_focus_cache ENABLE ROW LEVEL SECURITY;
-
--- Service role can SELECT cache entries
-CREATE POLICY "Service role can read interview focus cache"
-  ON public.interview_focus_cache
-  FOR SELECT
-  TO service_role
-  USING (true);
-
--- Service role can INSERT cache entries
-CREATE POLICY "Service role can insert interview focus cache"
-  ON public.interview_focus_cache
-  FOR INSERT
-  TO service_role
-  WITH CHECK (true);
-
--- Service role can UPDATE cache entries
-CREATE POLICY "Service role can update interview focus cache"
-  ON public.interview_focus_cache
-  FOR UPDATE
-  TO service_role
-  USING (true)
-  WITH CHECK (true);
-
--- Service role can DELETE cache entries
-CREATE POLICY "Service role can delete interview focus cache"
-  ON public.interview_focus_cache
-  FOR DELETE
-  TO service_role
-  USING (true);
+-- The interview_focus_cache table and RLS policies have been removed
+-- as part of the feature deprecation. See migration 042_remove_interview_focus_cache.sql
 
 COMMIT;

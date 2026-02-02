@@ -49,11 +49,12 @@ export const isValidPhone = (phone: string): boolean => {
 };
 
 /**
- * Validate rate format (e.g., "80k", "$80k-120k", "80000")
+ * Validate rate format - accepts any non-empty string to be flexible
+ * Examples: "80k", "$80k-120k", "80000", "$80,000 - $120,000 per year", "£50-70k", etc.
  */
 export const isValidRate = (rate: string): boolean => {
-  if (!rate.trim()) return false;
-  return /^\$?\d+k?(-\$?\d+k?)?$/.test(rate.replace(/\s/g, ''));
+  // Simply check if the rate field has any content (non-empty after trimming)
+  return rate.trim().length > 0;
 };
 
 /**
@@ -97,7 +98,7 @@ export const validateRequirementForm = (data: {
   }
 
   if (data.rate && !isValidRate(data.rate)) {
-    errors.rate = 'Invalid rate format (e.g., 80k or $80k-120k)';
+    errors.rate = 'Rate cannot be empty';
   }
 
   return {
@@ -142,7 +143,7 @@ export const validateConsultantForm = (data: {
   }
 
   if (data.expected_rate && !isValidRate(data.expected_rate)) {
-    errors.expected_rate = 'Invalid rate format';
+    errors.expected_rate = 'Rate cannot be empty';
   }
 
   return {

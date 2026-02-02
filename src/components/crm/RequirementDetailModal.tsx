@@ -13,9 +13,6 @@ import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/r
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
 import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import IconButton from '@mui/material/IconButton';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
@@ -50,7 +47,7 @@ export const RequirementDetailModal = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Requirement> | null>(null);
-  const [activeTab, setActiveTab] = useState<'details' | 'emails' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'emails' | 'description' | 'history'>('details');
   const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
 
   useEffect(() => {
@@ -163,6 +160,20 @@ export const RequirementDetailModal = ({
     setIsLoading(false);
   };
 
+  // Helper to get status badge color
+  const getStatusColor = (status: string) => {
+    const statusMap: Record<string, string> = {
+      'NEW': 'bg-blue-100 text-blue-800 border-blue-300',
+      'IN_PROGRESS': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'SUBMITTED': 'bg-purple-100 text-purple-800 border-purple-300',
+      'INTERVIEW': 'bg-indigo-100 text-indigo-800 border-indigo-300',
+      'OFFER': 'bg-green-100 text-green-800 border-green-300',
+      'REJECTED': 'bg-red-100 text-red-800 border-red-300',
+      'CLOSED': 'bg-gray-100 text-gray-800 border-gray-300',
+    };
+    return statusMap[status] || 'bg-gray-100 text-gray-800 border-gray-300';
+  };
+
   return (
     <Dialog
       open={isOpen}
@@ -175,342 +186,626 @@ export const RequirementDetailModal = ({
       disableScrollLock
       PaperProps={{
         sx: {
-          width: { xs: '100%', sm: 'calc(100% - 32px)' },
-          maxWidth: { xs: '100%', sm: 1200 },
-          m: { xs: 0, sm: 2 },
-          overflow: 'hidden',
+          width: '90vw',
+          height: '90vh',
+          maxWidth: 'none',
+          borderRadius: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         },
       }}
     >
-      <DialogTitle
+      {/* Premium Header with Key Meta */}
+      <Box
         sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 2,
-          background: 'linear-gradient(90deg, rgba(212,175,55,0.18), rgba(212,175,55,0.08))',
-          borderBottom: 1,
-          borderColor: 'divider',
-          pr: 7,
+          position: 'relative',
+          background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+          borderBottom: '1px solid #E2E8F0',
+          padding: '24px 32px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 3,
+          flexShrink: 0,
         }}
       >
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 500 }} noWrap>
-              {isEditing ? 'Edit Requirement' : 'Requirement Details'}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
-              Req No: {String(requirement.requirement_number || 'N/A')}
-            </Typography>
+        {/* Left: Job Title & Company */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              fontSize: '28px',
+              color: '#0F172A',
+              marginBottom: '8px',
+              lineHeight: 1.2,
+            }}
+            noWrap
+          >
+            {formData?.title || 'Untitled'}
+          </Typography>
+          <Typography
+            variant="body1"
+            sx={{
+              fontSize: '16px',
+              color: '#475569',
+              fontWeight: 500,
+              marginBottom: '16px',
+            }}
+            noWrap
+          >
+            {formData?.company || 'No Company'}
+          </Typography>
+
+          {/* Key Meta: Rate, Work Type, Duration */}
+          <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
+            {formData?.rate && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748B' }}>
+                  Rate:
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0F172A' }}>
+                  {formData.rate}
+                </Typography>
+              </Box>
+            )}
+            {formData?.remote && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748B' }}>
+                  Work Type:
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0F172A' }}>
+                  {formData.remote}
+                </Typography>
+              </Box>
+            )}
+            {formData?.duration && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748B' }}>
+                  Duration:
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0F172A' }}>
+                  {formData.duration}
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </Box>
+
+        {/* Right: Status Badge + Req Number + Close */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          {/* Status Badge */}
+          <Box
+            className={`px-4 py-2 rounded-lg border font-semibold text-sm ${getStatusColor(formData?.status || 'NEW')}`}
+          >
+            {formData?.status || 'NEW'}
           </Box>
-        </Stack>
+
+          {/* Req Number */}
+          <Typography
+            variant="caption"
+            sx={{
+              color: '#64748B',
+              fontWeight: 600,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              fontSize: '11px',
+            }}
+          >
+            Req #{String(requirement.requirement_number || 'N/A')}
+          </Typography>
+        </Box>
+
+        {/* Close Button */}
         <IconButton
           onClick={onClose}
           aria-label="Close modal"
-          sx={{ position: 'absolute', right: 8, top: 8 }}
+          sx={{
+            position: 'absolute',
+            right: 16,
+            top: 16,
+            color: '#64748B',
+            '&:hover': { backgroundColor: 'rgba(15, 23, 42, 0.08)' },
+          }}
         >
           <X className="w-5 h-5" />
         </IconButton>
+      </Box>
 
+      {/* Tab Navigation */}
+      <Box
+        sx={{
+          borderBottom: '1px solid #E2E8F0',
+          backgroundColor: '#FFFFFF',
+          paddingX: 4,
+          flexShrink: 0,
+        }}
+      >
         <Tabs
           value={activeTab}
-          onChange={(_, value) => setActiveTab(value as 'details' | 'emails' | 'history')}
-          variant="fullWidth"
-          sx={{ mt: 2 }}
+          onChange={(_, value) => setActiveTab(value as 'details' | 'emails' | 'description' | 'history')}
+          variant="standard"
+          sx={{
+            '& .MuiTab-root': {
+              fontWeight: 600,
+              fontSize: '14px',
+              textTransform: 'none',
+              color: '#64748B',
+              padding: '16px 24px',
+              minWidth: '140px',
+              '&.Mui-selected': {
+                color: '#4F46E5',
+                borderBottom: '2px solid #4F46E5',
+              },
+            },
+          }}
         >
-          <Tab value="details" label="Details" />
-          <Tab value="emails" label="Emails" icon={<Mail className="w-4 h-4" />} iconPosition="start" />
+          <Tab value="details" label="Overview" />
+          <Tab value="emails" label="Activity" icon={<Mail className="w-4 h-4" />} iconPosition="start" />
+          <Tab value="description" label="Job Description" />
           <Tab value="history" label="History" icon={<History className="w-4 h-4" />} iconPosition="start" />
         </Tabs>
-      </DialogTitle>
+      </Box>
 
-      <DialogContent sx={{ p: 0 }}>
-        <Box sx={{ maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: 'grey.50' }}>
-          {/* Details Tab */}
+      {/* Content Area */}
+      <Box
+        sx={{
+          flex: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: '#F8FAFC',
+        }}
+      >
+        {/* Scrollable Content */}
+        <Box sx={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+          {/* Overview Tab */}
           {activeTab === 'details' && (
-            <>
-              <div className="p-3 sm:p-4 space-y-4">
-                {/* Form Section Header */}
-                <div className="border-b border-gray-200 pb-2 mb-3">
-                  <h3 className="text-xs font-semibold text-gray-900 flex items-center gap-2">
-                    <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                    Requirement Details
-                  </h3>
-                </div>
-
-                <div className="bg-white rounded-lg border border-gray-200 p-3">
-                  {!isEditing ? (
-                    // View Mode - Organized Grid
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Title</p>
-                          <p className="text-sm text-gray-700">{formData.title || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Company</p>
-                          <p className="text-sm text-gray-700">{formData.company || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Status</p>
-                          <p className="text-sm text-gray-700">{formData.status || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Rate</p>
-                          <p className="text-sm text-gray-700">{formData.rate || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Location</p>
-                          <p className="text-sm text-gray-700">{formData.location || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Work Type</p>
-                          <p className="text-sm text-gray-700">{formData.remote || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Duration</p>
-                          <p className="text-sm text-gray-700">{formData.duration || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Source</p>
-                          <p className="text-sm text-gray-700">{formData.applied_for || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Vendor Email</p>
-                          <p className="text-sm text-gray-700">{formData.vendor_email || '-'}</p>
-                        </div>
-                      </div>
-
-                      {/* Next Step moved to dedicated tab */}
-
-                      <div className="pt-2 border-t border-gray-200">
-                        <p className="text-xs font-medium text-gray-500 mb-3">Next Steps</p>
-                        {requirement && <NextStepThread requirementId={requirement.id} readOnly={false} />}
-                      </div>
-
-                      <div className="pt-2 border-t border-gray-200">
-                        <p className="text-xs font-medium text-gray-500 mb-1">Tech Stack</p>
-                        <p className="text-sm text-gray-700">{formData.primary_tech_stack || '-'}</p>
-                      </div>
-
-                      <div className="pt-2 border-t border-gray-200">
-                        <p className="text-xs font-medium text-gray-500 mb-1">Description</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{formData.description || '-'}</p>
-                      </div>
-
-                      <div className="pt-2 border-t border-gray-200 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Vendor Company</p>
-                          <p className="text-sm text-gray-700">{formData.vendor_company || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Vendor Contact</p>
-                          <p className="text-sm text-gray-700">{formData.vendor_person_name || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Vendor Phone</p>
-                          <p className="text-sm text-gray-700">{formData.vendor_phone || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Internal Contact</p>
-                          <p className="text-sm text-gray-700">{formData.imp_name || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Client Website</p>
-                          <p className="text-sm text-blue-600 truncate">{formData.client_website ? <a href={formData.client_website} target="_blank" rel="noopener noreferrer">{formData.client_website}</a> : '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Partner Website</p>
-                          <p className="text-sm text-blue-600 truncate">{formData.imp_website ? <a href={formData.imp_website} target="_blank" rel="noopener noreferrer">{formData.imp_website}</a> : '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-gray-500">Vendor Website</p>
-                          <p className="text-sm text-blue-600 truncate">{formData.vendor_website ? <a href={formData.vendor_website} target="_blank" rel="noopener noreferrer">{formData.vendor_website}</a> : '-'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // Edit Mode - Compact Grid
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <TextField
-                        label="Title"
-                        value={formData.title || ''}
-                        onChange={(e) => handleFieldChange('title', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Company"
-                        value={formData.company || ''}
-                        onChange={(e) => handleFieldChange('company', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        select
-                        label="Status"
-                        value={String(formData.status || 'NEW')}
-                        onChange={(e) => handleFieldChange('status', e.target.value)}
-                        size="small"
-                        fullWidth
-                      >
-                        <MenuItem value="NEW">New</MenuItem>
-                        <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
-                        <MenuItem value="SUBMITTED">Submitted</MenuItem>
-                        <MenuItem value="INTERVIEW">Interview</MenuItem>
-                        <MenuItem value="OFFER">Offer</MenuItem>
-                        <MenuItem value="REJECTED">Rejected</MenuItem>
-                        <MenuItem value="CLOSED">Closed</MenuItem>
-                      </TextField>
-                      <TextField
-                        label="Rate"
-                        value={formData.rate || ''}
-                        onChange={(e) => handleFieldChange('rate', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Location"
-                        value={formData.location || ''}
-                        onChange={(e) => handleFieldChange('location', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        select
-                        label="Work Type"
-                        value={String(formData.remote || '')}
-                        onChange={(e) => handleFieldChange('remote', e.target.value)}
-                        size="small"
-                        fullWidth
-                      >
-                        <MenuItem value="">Select</MenuItem>
-                        <MenuItem value="Remote">Remote</MenuItem>
-                        <MenuItem value="Hybrid">Hybrid</MenuItem>
-                        <MenuItem value="Onsite">Onsite</MenuItem>
-                      </TextField>
-                      <TextField
-                        label="Duration"
-                        value={formData.duration || ''}
-                        onChange={(e) => handleFieldChange('duration', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder="e.g., 6 months"
-                      />
-                      <TextField
-                        label="Source"
-                        value={formData.applied_for || ''}
-                        onChange={(e) => handleFieldChange('applied_for', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder="e.g., LinkedIn"
-                      />
-                      <TextField
-                        label="Vendor Email"
-                        type="email"
-                        value={formData.vendor_email || ''}
-                        onChange={(e) => handleFieldChange('vendor_email', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Vendor Phone"
-                        type="tel"
-                        value={formData.vendor_phone || ''}
-                        onChange={(e) => handleFieldChange('vendor_phone', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      {/* Next Step moved to dedicated tab */}
-                      <TextField
-                        label="Tech Stack"
-                        value={formData.primary_tech_stack || ''}
-                        onChange={(e) => handleFieldChange('primary_tech_stack', e.target.value)}
-                        size="small"
-                        fullWidth
-                        multiline
-                        rows={2}
-                      />
-                      <TextField
-                        label="Vendor Company"
-                        value={formData.vendor_company || ''}
-                        onChange={(e) => handleFieldChange('vendor_company', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Internal Contact"
-                        value={formData.imp_name || ''}
-                        onChange={(e) => handleFieldChange('imp_name', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Vendor Contact"
-                        value={formData.vendor_person_name || ''}
-                        onChange={(e) => handleFieldChange('vendor_person_name', e.target.value)}
-                        size="small"
-                        fullWidth
-                      />
-                      <TextField
-                        label="Client Website"
-                        type="url"
-                        value={formData.client_website || ''}
-                        onChange={(e) => handleFieldChange('client_website', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder="https://example.com"
-                      />
-                      <TextField
-                        label="Partner Website"
-                        type="url"
-                        value={formData.imp_website || ''}
-                        onChange={(e) => handleFieldChange('imp_website', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder="https://example.com"
-                      />
-                      <TextField
-                        label="Vendor Website"
-                        type="url"
-                        value={formData.vendor_website || ''}
-                        onChange={(e) => handleFieldChange('vendor_website', e.target.value)}
-                        size="small"
-                        fullWidth
-                        placeholder="https://example.com"
-                      />
-                      <TextField
-                        label="Description"
-                        value={formData.description || ''}
-                        onChange={(e) => handleFieldChange('description', e.target.value)}
-                        size="small"
-                        fullWidth
-                        multiline
-                        rows={2}
-                        placeholder="Role description and requirements..."
-                        sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Audit Log - Admin Only */}
-                {isAdmin && (
-                  <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-                    <ResourceAuditTimeline
-                      resourceType="requirement"
-                      resourceId={requirement.id}
-                      title="Admin & CRM actions"
-                    />
+            <Box>
+              {!isEditing ? (
+                // View Mode - Premium Grid Layout
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 3 }}>
+                  {/* Core Details - Grouped */}
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      padding: '24px',
+                      borderRadius: '12px',
+                      gridColumn: 'span 1',
+                      borderColor: '#E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: 'block',
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '16px',
+                        fontSize: '11px',
+                      }}
+                    >
+                      📋 Core Details
+                    </Typography>
+                    <Stack spacing={3}>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Tech Stack
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.primary_tech_stack || '-'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Location
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.location || '-'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Source
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.applied_for || '-'}
+                        </Typography>
+                      </Box>
+                    </Stack>
                   </Paper>
-                )}
-              </div>
-            </>
+
+                  {/* Vendor Information */}
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      padding: '24px',
+                      borderRadius: '12px',
+                      gridColumn: 'span 1',
+                      borderColor: '#E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: 'block',
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '16px',
+                        fontSize: '11px',
+                      }}
+                    >
+                      🤝 Vendor Info
+                    </Typography>
+                    <Stack spacing={3}>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Vendor Company
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.vendor_company || '-'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Contact Person
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.vendor_person_name || '-'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Email
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: formData?.vendor_email ? '#4F46E5' : '#0F172A',
+                            fontWeight: 500,
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {formData?.vendor_email ? (
+                            <a href={`mailto:${formData.vendor_email}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                              {formData.vendor_email}
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Phone
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.vendor_phone || '-'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Website
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.vendor_website ? (
+                            <a
+                              href={formData.vendor_website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#4F46E5', textDecoration: 'none' }}
+                            >
+                              Visit →
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Paper>
+
+                  {/* Client & Partner Information */}
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      padding: '24px',
+                      borderRadius: '12px',
+                      gridColumn: 'span 1',
+                      borderColor: '#E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: 'block',
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '16px',
+                        fontSize: '11px',
+                      }}
+                    >
+                      🏢 Client & Partner
+                    </Typography>
+                    <Stack spacing={3}>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Client Website
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.client_website ? (
+                            <a
+                              href={formData.client_website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#4F46E5', textDecoration: 'none' }}
+                            >
+                              Visit →
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Internal Contact
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.imp_name || '-'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                          Partner Website
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
+                          {formData?.imp_website ? (
+                            <a
+                              href={formData.imp_website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: '#4F46E5', textDecoration: 'none' }}
+                            >
+                              Visit →
+                            </a>
+                          ) : (
+                            '-'
+                          )}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Paper>
+
+                  {/* Next Steps - Timeline View (Full Width) */}
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      padding: '24px',
+                      borderRadius: '12px',
+                      gridColumn: '1 / -1',
+                      borderColor: '#E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: 'block',
+                        fontWeight: 700,
+                        color: '#64748B',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        marginBottom: '16px',
+                        fontSize: '11px',
+                      }}
+                    >
+                      📍 Activity Timeline
+                    </Typography>
+                    {requirement && <NextStepThread requirementId={requirement.id} readOnly={false} />}
+                  </Paper>
+
+                  {/* Admin Audit Log */}
+                  {isAdmin && (
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        padding: '24px',
+                        borderRadius: '12px',
+                        gridColumn: '1 / -1',
+                        borderColor: '#E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: 'block',
+                          fontWeight: 700,
+                          color: '#64748B',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          marginBottom: '16px',
+                          fontSize: '11px',
+                        }}
+                      >
+                        🔐 Admin & CRM Actions
+                      </Typography>
+                      <ResourceAuditTimeline
+                        resourceType="requirement"
+                        resourceId={requirement.id}
+                        title=""
+                      />
+                    </Paper>
+                  )}
+                </Box>
+              ) : (
+                // Edit Mode - Compact Form Grid
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2 }}>
+                  <TextField
+                    label="Job Title"
+                    value={formData?.title || ''}
+                    onChange={(e) => handleFieldChange('title', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Company"
+                    value={formData?.company || ''}
+                    onChange={(e) => handleFieldChange('company', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    select
+                    label="Status"
+                    value={String(formData?.status || 'NEW')}
+                    onChange={(e) => handleFieldChange('status', e.target.value)}
+                    size="small"
+                    fullWidth
+                  >
+                    <MenuItem value="NEW">New</MenuItem>
+                    <MenuItem value="IN_PROGRESS">In Progress</MenuItem>
+                    <MenuItem value="SUBMITTED">Submitted</MenuItem>
+                    <MenuItem value="INTERVIEW">Interview</MenuItem>
+                    <MenuItem value="OFFER">Offer</MenuItem>
+                    <MenuItem value="REJECTED">Rejected</MenuItem>
+                    <MenuItem value="CLOSED">Closed</MenuItem>
+                  </TextField>
+                  <TextField
+                    label="Rate"
+                    value={formData?.rate || ''}
+                    onChange={(e) => handleFieldChange('rate', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Location"
+                    value={formData?.location || ''}
+                    onChange={(e) => handleFieldChange('location', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    select
+                    label="Work Type"
+                    value={String(formData?.remote || '')}
+                    onChange={(e) => handleFieldChange('remote', e.target.value)}
+                    size="small"
+                    fullWidth
+                  >
+                    <MenuItem value="">Select</MenuItem>
+                    <MenuItem value="Remote">Remote</MenuItem>
+                    <MenuItem value="Hybrid">Hybrid</MenuItem>
+                    <MenuItem value="Onsite">Onsite</MenuItem>
+                  </TextField>
+                  <TextField
+                    label="Duration"
+                    value={formData?.duration || ''}
+                    onChange={(e) => handleFieldChange('duration', e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder="e.g., 6 months"
+                  />
+                  <TextField
+                    label="Source"
+                    value={formData?.applied_for || ''}
+                    onChange={(e) => handleFieldChange('applied_for', e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder="e.g., LinkedIn"
+                  />
+                  <TextField
+                    label="Tech Stack"
+                    value={formData?.primary_tech_stack || ''}
+                    onChange={(e) => handleFieldChange('primary_tech_stack', e.target.value)}
+                    size="small"
+                    fullWidth
+                    multiline
+                    rows={2}
+                  />
+                  <TextField
+                    label="Vendor Company"
+                    value={formData?.vendor_company || ''}
+                    onChange={(e) => handleFieldChange('vendor_company', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Vendor Contact"
+                    value={formData?.vendor_person_name || ''}
+                    onChange={(e) => handleFieldChange('vendor_person_name', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Vendor Email"
+                    type="email"
+                    value={formData?.vendor_email || ''}
+                    onChange={(e) => handleFieldChange('vendor_email', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Vendor Phone"
+                    type="tel"
+                    value={formData?.vendor_phone || ''}
+                    onChange={(e) => handleFieldChange('vendor_phone', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Vendor Website"
+                    type="url"
+                    value={formData?.vendor_website || ''}
+                    onChange={(e) => handleFieldChange('vendor_website', e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder="https://example.com"
+                  />
+                  <TextField
+                    label="Internal Contact"
+                    value={formData?.imp_name || ''}
+                    onChange={(e) => handleFieldChange('imp_name', e.target.value)}
+                    size="small"
+                    fullWidth
+                  />
+                  <TextField
+                    label="Client Website"
+                    type="url"
+                    value={formData?.client_website || ''}
+                    onChange={(e) => handleFieldChange('client_website', e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder="https://example.com"
+                  />
+                  <TextField
+                    label="Partner Website"
+                    type="url"
+                    value={formData?.imp_website || ''}
+                    onChange={(e) => handleFieldChange('imp_website', e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder="https://example.com"
+                  />
+                </Box>
+              )}
+            </Box>
           )}
 
-          {/* Emails Tab */}
+          {/* Activity Tab (Emails) */}
           {activeTab === 'emails' && (
-            <Box sx={{ p: { xs: 2, sm: 4 } }}>
+            <Box sx={{ p: 4 }}>
               <RequirementEmailManager
                 requirementId={requirement.id}
                 requirementTitle={requirement.title}
@@ -519,70 +814,170 @@ export const RequirementDetailModal = ({
             </Box>
           )}
 
+          {/* Job Description Tab */}
+          {activeTab === 'description' && !isEditing && (
+            <Box sx={{ maxWidth: '900px' }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  padding: '32px',
+                  borderRadius: '12px',
+                  borderColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  marginBottom: '32px',
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    color: '#0F172A',
+                    marginBottom: '16px',
+                    fontSize: '16px',
+                  }}
+                >
+                  Role Description
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: '#475569',
+                    lineHeight: 1.8,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontSize: '14px',
+                  }}
+                >
+                  {formData?.description || 'No description provided'}
+                </Typography>
+              </Paper>
+            </Box>
+          )}
+
+          {/* Job Description Tab - Edit Mode */}
+          {activeTab === 'description' && isEditing && (
+            <Box sx={{ maxWidth: '900px' }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  padding: '32px',
+                  borderRadius: '12px',
+                  borderColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                }}
+              >
+                <TextField
+                  label="Role Description"
+                  value={formData?.description || ''}
+                  onChange={(e) => handleFieldChange('description', e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={12}
+                  placeholder="Full job description and key responsibilities..."
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '8px',
+                    },
+                  }}
+                />
+              </Paper>
+            </Box>
+          )}
+
           {/* History Tab */}
           {activeTab === 'history' && (
-            <Box sx={{ p: { xs: 2, sm: 4 }, height: '100%' }}>
+            <Box sx={{ p: 4 }}>
               <EmailHistoryPanel requirementId={requirement.id} />
             </Box>
           )}
-          </Box>
         </Box>
-      </DialogContent>
+      </Box>
 
-      <DialogActions
+      {/* Sticky Footer with Actions */}
+      <Box
         sx={{
           position: 'sticky',
           bottom: 0,
-          bgcolor: 'background.default',
-          borderTop: 1,
-          borderColor: 'divider',
-          px: 2,
-          py: 2,
+          backgroundColor: '#FFFFFF',
+          borderTop: '1px solid #E2E8F0',
+          padding: '20px 32px',
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 2,
+          flexShrink: 0,
+          boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.05)',
         }}
       >
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ width: '100%' }}>
-          {isEditing && activeTab === 'details' ? (
-            <>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleSave}
-                disabled={isLoading}
-                startIcon={isLoading ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : undefined}
-                sx={{ flex: 1 }}
-              >
-                Save Changes
-              </Button>
-              <Button
-                variant="outlined"
-                color="inherit"
-                onClick={() => {
-                  setFormData(requirement);
-                  setIsEditing(false);
-                }}
-                sx={{ flex: 1 }}
-              >
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => setIsEditing(true)}
-                startIcon={<Edit2 className="w-4 h-4" />}
-                sx={{ flex: 1 }}
-              >
-                Edit
-              </Button>
-              <Button variant="outlined" color="inherit" onClick={onClose} sx={{ flex: 1 }}>
-                Close
-              </Button>
-            </>
-          )}
-        </Stack>
-      </DialogActions>
+        {isEditing ? (
+          // Save & Cancel in edit mode
+          <Stack direction="row" spacing={2} sx={{ width: '100%', maxWidth: '400px' }}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                setFormData(requirement);
+                setIsEditing(false);
+              }}
+              sx={{
+                flex: 1,
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: '14px',
+                borderColor: '#E2E8F0',
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSave}
+              disabled={isLoading}
+              startIcon={isLoading ? <span className="w-4 h-4"><LogoLoader size="sm" /></span> : undefined}
+              sx={{
+                flex: 1,
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: '14px',
+              }}
+            >
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </Stack>
+        ) : (
+          // Edit & Close in view mode
+          <Stack direction="row" spacing={2} sx={{ width: '100%', maxWidth: '400px' }}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={onClose}
+              sx={{
+                flex: 1,
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: '14px',
+                borderColor: '#E2E8F0',
+              }}
+            >
+              Close
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => setIsEditing(true)}
+              startIcon={<Edit2 className="w-4 h-4" />}
+              sx={{
+                flex: 1,
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: '14px',
+              }}
+            >
+              Edit Record
+            </Button>
+          </Stack>
+        )}
+      </Box>
     </Dialog>
   );
 };

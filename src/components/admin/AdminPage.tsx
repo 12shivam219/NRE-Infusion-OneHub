@@ -44,7 +44,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 
 // Lazy load admin sub-components to reduce initial load time
-const EmailAccountsSettings = lazy(() => import('./EmailAccountsSettings').then(m => ({ default: m.EmailAccountsSettings })));
+const EmailAccountsAdmin = lazy(() => import('./EmailAccountsAdmin').then(m => ({ default: m.EmailAccountsAdmin })));
 const SyncDashboard = lazy(() => import('./SyncDashboard').then(m => ({ default: m.SyncDashboard })));
 const OfflineCacheSettings = lazy(() => import('./OfflineCacheSettings').then(m => ({ default: m.OfflineCacheSettings })));
 const JobExtractionAgentDashboard = lazy(() => import('./JobExtractionAgentDashboard').then(m => ({ default: m.JobExtractionAgentDashboard })));
@@ -1525,7 +1525,7 @@ export const AdminPage = () => {
 
           {activeTab === 'email-accounts' && (
             <Suspense fallback={<div className="p-8 text-center">Loading email settings...</div>}>
-              <EmailAccountsSettings />
+              <EmailAccountsAdmin />
             </Suspense>
           )}
 

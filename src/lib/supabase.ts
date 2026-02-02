@@ -24,11 +24,9 @@ function initSupabaseClient() {
       detectSessionInUrl: true,
       storage: typeof window !== 'undefined' ? window.sessionStorage : undefined,
     },
-    global: {
-      headers: {
-        Prefer: 'return=minimal', // Reduce response size
-      },
-    },
+    // Note: avoid setting custom global headers here to prevent CORS preflight
+    // issues when calling Supabase Edge Functions from the browser. If specific
+    // PostgREST queries need a `Prefer` header, set it per-request instead.
   }) as unknown as any;
   return _supabaseClient;
 }

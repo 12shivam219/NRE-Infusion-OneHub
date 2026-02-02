@@ -14,7 +14,6 @@ import {
   LazyDocumentsPage,
   LazyCRMPage,
   LazyAdminPage,
-  LazySettingsPage,
 } from './lib/lazyLoader';
 import { OAuthCallbackPage } from './pages/OAuthCallbackPage';
 import { Header } from './components/layout/Header';
@@ -213,14 +212,6 @@ const AppContent = () => {
                 </Suspense>
               </AdminRoute>
             }
-          />
-          <Route 
-            path="/settings" 
-            element={
-              <Suspense fallback={null}>
-                <LazySettingsPage />
-              </Suspense>
-            } 
           />
           <Route 
             path="/oauth/callback" 

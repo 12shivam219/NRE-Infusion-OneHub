@@ -3,17 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import Box from '@mui/material/Box';
 import ScopedCssBaseline from '@mui/material/ScopedCssBaseline';
-import type { ExtractedJobDetails as JdExtractionResult } from '../../lib/agents/types';
+
 
 // Lazy load CRM sub-components to reduce initial load time
 const RequirementsManagement = lazy(() => import('./RequirementsManagement').then(m => ({ default: m.RequirementsManagement })));
-const InterviewTracking = lazy(() => import('./InterviewTracking').then(m => ({ default: m.InterviewTracking })));
 const ConsultantProfiles = lazy(() => import('./ConsultantProfiles').then(m => ({ default: m.ConsultantProfiles })));
 const CreateRequirementForm = lazy(() => import('./CreateRequirementForm').then(m => ({ default: m.CreateRequirementForm })));
 const CreateInterviewForm = lazy(() => import('./CreateInterviewForm').then(m => ({ default: m.CreateInterviewForm })));
 const CreateConsultantForm = lazy(() => import('./CreateConsultantForm').then(m => ({ default: m.CreateConsultantForm })));
 
-type View = 'dashboard' | 'requirements' | 'interviews' | 'consultants';
+type View = 'dashboard' | 'requirements' | 'consultants';
 
 export const CRMPage = () => {
   const [searchParams] = useSearchParams();
@@ -23,20 +22,6 @@ export const CRMPage = () => {
   const [showCreateInterview, setShowCreateInterview] = useState(false);
   const [selectedRequirementIdForInterview, setSelectedRequirementIdForInterview] = useState<string | undefined>();
   const [showCreateConsultant, setShowCreateConsultant] = useState(false);
-  const [parsedFormData, setParsedFormData] = useState<{
-    title?: string;
-    company?: string;
-    primary_tech_stack?: string;
-    rate?: string;
-    remote?: string;
-    location?: string;
-    duration?: string;
-    vendor_company?: string;
-    vendor_person_name?: string;
-    vendor_phone?: string;
-    vendor_email?: string;
-    description?: string;
-  } | undefined>();
 
   // Define all callbacks at top level (before any conditional rendering)
   const handleCreateInterview = useCallback((requirementId: string) => {
@@ -44,23 +29,6 @@ export const CRMPage = () => {
     setShowCreateInterview(true);
   }, []);
 
-  const handleParsedJDData = useCallback((extraction: JdExtractionResult, cleanedText: string) => {
-    setParsedFormData({
-      title: extraction.jobTitle ?? undefined,
-      company: extraction.hiringCompany ?? undefined,
-      primary_tech_stack: (extraction.keySkills ?? []).length > 0 ? (extraction.keySkills ?? []).join(', ') : undefined,
-      rate: extraction.rate ?? undefined,
-      remote: extraction.workLocationType ?? undefined,
-      location: extraction.location ?? undefined,
-      duration: extraction.duration ?? undefined,
-      vendor_company: extraction.vendor ?? undefined,
-      vendor_person_name: extraction.vendorContact ?? undefined,
-      vendor_phone: extraction.vendorPhone ?? undefined,
-      vendor_email: extraction.vendorEmail ?? undefined,
-      description: cleanedText || undefined,
-    });
-    setShowCreateForm(true);
-  }, []);
 
   // Sync currentView with query parameter
   useLayoutEffect(() => {
@@ -132,15 +100,8 @@ export const CRMPage = () => {
                   <Suspense fallback={null}>
                     <RequirementsManagement
                       onCreateInterview={handleCreateInterview}
-                      onParsedJDData={handleParsedJDData}
                       toolbarPortalTargetId="crm-requirements-actions"
                     />
-                  </Suspense>
-                ) : null}
-
-                {currentView === 'interviews' ? (
-                  <Suspense fallback={null}>
-                    <InterviewTracking />
                   </Suspense>
                 ) : null}
 
@@ -155,17 +116,14 @@ export const CRMPage = () => {
 
           {showCreateForm && (
             <Suspense fallback={null}>
-              <CreateRequirementForm
-                onClose={() => {
-                  setShowCreateForm(false);
-                  setParsedFormData(undefined);
-                }}
-                onSuccess={() => {
-                  setShowCreateForm(false);
-                  setParsedFormData(undefined);
-                }}
-                initialData={parsedFormData}
-              />
+                <CreateRequirementForm
+                  onClose={() => {
+                    setShowCreateForm(false);
+                  }}
+                  onSuccess={() => {
+                    setShowCreateForm(false);
+                  }}
+                />
             </Suspense>
           )}
 

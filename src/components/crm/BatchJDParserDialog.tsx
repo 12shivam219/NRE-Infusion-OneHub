@@ -118,6 +118,7 @@ export function BatchJDParserDialog({
           },
         },
       }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <DialogTitle
         sx={{

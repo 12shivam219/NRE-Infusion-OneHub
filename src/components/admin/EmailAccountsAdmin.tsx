@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mail, Plus, Trash2 } from 'lucide-react';
+import { Mail, CheckCircle, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
+import { supabase } from '../../lib/supabase';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import {
   getEmailAccounts,
   addEmailAccount,
   deleteEmailAccount,
   testEmailAccount,
 } from '../../lib/api/emailAccounts';
-import { ConfirmDialog } from '../common/ConfirmDialog';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import CardHeader from '@mui/material/CardHeader';
@@ -32,9 +33,20 @@ interface EmailAccount {
   updated_at: string;
 }
 
-export const EmailConnections = () => {
+/**
+ * Email Accounts Admin Component
+ * Combines Gmail Job Posting Scanner and Email Accounts management
+ * for the admin panel
+ */
+export const EmailAccountsAdmin = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  // Gmail state
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState<string | null>(null);
+  const [gmailLoading, setGmailLoading] = useState(true);
+  const [gmailConnecting, setGmailConnecting] = useState(false);
 
   // Email accounts state
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
@@ -53,6 +65,27 @@ export const EmailConnections = () => {
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Load Gmail status
+  const checkGmailStatus = useCallback(async () => {
+    try {
+      setGmailLoading(true);
+      const { data } = await supabase.auth.getUser();
+      if (data.user?.user_metadata?.gmail_connected) {
+        setGmailConnected(true);
+        setGmailEmail(data.user.user_metadata?.gmail_email || 'Gmail Account');
+      } else {
+        setGmailConnected(false);
+        setGmailEmail(null);
+      }
+    } catch (error) {
+      console.error('Error checking Gmail status:', error);
+      setGmailConnected(false);
+      setGmailEmail(null);
+    } finally {
+      setGmailLoading(false);
+    }
+  }, []);
+
   // Load email accounts
   const loadAccounts = useCallback(async () => {
     if (!user) return;
@@ -66,9 +99,89 @@ export const EmailConnections = () => {
 
   // Load on mount
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    checkGmailStatus();
     loadAccounts();
-  }, [loadAccounts]);
+  }, [checkGmailStatus, loadAccounts]);
+
+  // Check Gmail status when page becomes visible (after OAuth redirect)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkGmailStatus();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [checkGmailStatus]);
+
+  const handleConnectGmail = useCallback(() => {
+    try {
+      setGmailConnecting(true);
+      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      const redirectUri = `${window.location.origin}/oauth/callback`;
+
+      if (!googleClientId) {
+        showToast({
+          type: 'error',
+          message: 'Google OAuth is not configured. Please contact support.',
+        });
+        setGmailConnecting(false);
+        return;
+      }
+
+      showToast({
+        type: 'info',
+        title: 'Redirecting to Google',
+        message: 'You will be redirected to authorize Gmail access. Please complete the process.',
+      });
+
+      const googleOAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      googleOAuthUrl.searchParams.append('client_id', googleClientId);
+      googleOAuthUrl.searchParams.append('redirect_uri', redirectUri);
+      googleOAuthUrl.searchParams.append('response_type', 'code');
+      googleOAuthUrl.searchParams.append('scope', 'https://www.googleapis.com/auth/gmail.readonly');
+      googleOAuthUrl.searchParams.append('access_type', 'offline');
+      googleOAuthUrl.searchParams.append('prompt', 'consent');
+      googleOAuthUrl.searchParams.append('state', 'gmail-connection');
+
+      window.location.href = googleOAuthUrl.toString();
+    } catch (error) {
+      console.error('Error connecting Gmail:', error);
+      setGmailConnecting(false);
+      showToast({
+        type: 'error',
+        message: 'Failed to initiate Gmail connection',
+      });
+    }
+  }, [showToast]);
+
+  const handleDisconnectGmail = useCallback(async () => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          gmail_connected: false,
+          gmail_email: null,
+          gmail_refresh_token: null,
+        },
+      });
+
+      if (error) throw error;
+
+      setGmailConnected(false);
+      setGmailEmail(null);
+      showToast({
+        type: 'success',
+        message: 'Gmail disconnected successfully',
+      });
+    } catch (error) {
+      console.error('Error disconnecting Gmail:', error);
+      showToast({
+        type: 'error',
+        message: 'Failed to disconnect Gmail',
+      });
+    }
+  }, [showToast]);
 
   const handleAddAccount = async () => {
     if (!user) return;
@@ -152,6 +265,14 @@ export const EmailConnections = () => {
     setTesting(null);
   };
 
+  if (!user) {
+    return (
+      <div className="text-center py-8 text-gray-600">
+        Please sign in to manage email accounts
+      </div>
+    );
+  }
+
   return (
     <Box sx={{ maxWidth: '1000px', mx: 'auto' }}>
       {/* Header */}
@@ -160,9 +281,116 @@ export const EmailConnections = () => {
           Email Accounts
         </Typography>
         <Typography sx={{ color: '#6B7280', fontSize: '0.95rem' }}>
-          Configure email accounts for sending bulk emails to candidates.
+          Manage Gmail Job Posting Scanner and Email Accounts for bulk sending.
         </Typography>
       </Box>
+
+      {/* Gmail Job Posting Scanner Section */}
+      <Card sx={{ mb: 3, border: '1px solid #E5E7EB' }}>
+        <CardHeader
+          title={
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Mail size={24} color="#2563EB" />
+              <div>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Gmail - Job Posting Scanner
+                </Typography>
+                <Typography sx={{ fontSize: '0.85rem', color: '#6B7280', mt: 0.25 }}>
+                  Scan incoming emails for job postings automatically
+                </Typography>
+              </div>
+            </Stack>
+          }
+        />
+        <Divider />
+        <CardContent>
+          {gmailLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Stack spacing={2}>
+              {/* Status */}
+              <Box
+                sx={{
+                  p: 2,
+                  backgroundColor: gmailConnected ? '#F0FDF4' : '#FEF2F2',
+                  borderRadius: '8px',
+                  border: `1px solid ${gmailConnected ? '#BBEF63' : '#FECACA'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                {gmailConnected ? (
+                  <>
+                    <CheckCircle size={24} color="#16A34A" />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontWeight: 600, color: '#16A34A' }}>
+                        Gmail Connected ✓
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.85rem', color: '#6B7280', mt: 0.5 }}>
+                        Email: <span style={{ fontWeight: 500, color: '#374151' }}>{gmailEmail}</span>
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                        Ready to scan for job postings
+                      </Typography>
+                    </Box>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={24} color="#DC2626" />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontWeight: 600, color: '#DC2626' }}>
+                        Gmail Not Connected
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                        Connect Gmail to start scanning emails for job postings
+                      </Typography>
+                    </Box>
+                  </>
+                )}
+              </Box>
+
+              {/* Features */}
+              <Box>
+                <Typography sx={{ fontSize: '0.9rem', fontWeight: 500, mb: 1 }}>
+                  When connected, the system will:
+                </Typography>
+                <ul style={{ margin: '0', paddingLeft: '1.25rem', fontSize: '0.875rem' }}>
+                  <li style={{ color: '#6B7280', marginBottom: '0.5rem' }}>Scan your emails for job postings</li>
+                  <li style={{ color: '#6B7280', marginBottom: '0.5rem' }}>Extract job details automatically</li>
+                  <li style={{ color: '#6B7280' }}>Pre-fill job requirement forms</li>
+                </ul>
+              </Box>
+
+              {/* Action Buttons */}
+              <Stack direction="row" spacing={2}>
+                {gmailConnected ? (
+                  <Button
+                    onClick={handleDisconnectGmail}
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Trash2 size={18} />}
+                  >
+                    Disconnect Gmail
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleConnectGmail}
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Mail size={18} />}
+                    disabled={gmailConnecting}
+                  >
+                    {gmailConnecting ? 'Connecting...' : 'Connect Gmail'}
+                  </Button>
+                )}
+              </Stack>
+            </Stack>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Email Accounts Section */}
       <Card sx={{ border: '1px solid #E5E7EB' }}>
@@ -328,4 +556,4 @@ export const EmailConnections = () => {
   );
 };
 
-export default EmailConnections;
+export default EmailAccountsAdmin;

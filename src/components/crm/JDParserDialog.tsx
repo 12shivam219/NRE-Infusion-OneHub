@@ -274,9 +274,28 @@ export const JDParserDialog = ({
         const result = await createRequirement(payload, user.id);
         if (result.success) {
           successCount++;
+          // Ensure we always dispatch a requirement object (fallback to optimistic)
+          const createdRequirement = result.requirement || ({
+            id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            requirement_number: 0,
+            consultant_id: null,
+            applied_for: null,
+            imp_name: null,
+            client_website: null,
+            imp_website: null,
+            vendor_website: null,
+            next_step: null,
+            created_by: user.id,
+            updated_by: user.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...payload,
+          } as RequirementRow);
+
+          console.log('Dispatching requirement-created event with:', createdRequirement);
           window.dispatchEvent(
             new CustomEvent('requirement-created', {
-              detail: result.requirement,
+              detail: createdRequirement,
             })
           );
         } else {
@@ -359,6 +378,7 @@ export const JDParserDialog = ({
           backdropFilter: 'blur(4px)',
         },
       }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <DialogTitle sx={{ pr: 7 }}>
         <Typography sx={{ fontWeight: 800 }}>JD Parser</Typography>
