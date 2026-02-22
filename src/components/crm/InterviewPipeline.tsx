@@ -52,30 +52,36 @@ export const InterviewPipeline = memo(({
   return (
     <div
       style={{
-        backgroundColor: '#F9FAFB',
-        borderLeft: '3px solid #2563EB',
-        padding: '16px 24px',
-        marginLeft: 0,
+        padding: '24px',
+        backgroundColor: '#FFFFFF',
         width: '100%',
-        maxWidth: '100%',
         boxSizing: 'border-box',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       {/* Section Title */}
       <div style={{ marginBottom: '20px' }}>
         <h3 style={{
           fontSize: '14px',
-          fontWeight: 600,
+          fontWeight: 700,
           color: '#0F172A',
-          margin: '0 0 12px 0',
+          margin: '0 0 4px 0',
           fontFamily: '"Instrument Sans", sans-serif',
+          letterSpacing: '0.3px',
         }}>
           Interview Pipeline
         </h3>
+        <p style={{
+          fontSize: '12px',
+          color: '#64748B',
+          margin: 0,
+          fontFamily: '"Instrument Sans", sans-serif',
+        }}>
+          {interviews.length} interview{interviews.length !== 1 ? 's' : ''} in pipeline
+        </p>
       </div>
 
-      {/* Vertical Timeline/Cards */}
+      {/* Interviews List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
         {interviews.map((interview, index) => {
           const consultant = consultants.find(c => c.id === interview.consultant_id);
@@ -106,13 +112,14 @@ export const InterviewPipeline = memo(({
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '12px',
-                padding: '12px 14px',
+                gap: '14px',
+                padding: '14px 16px',
                 backgroundColor: '#FFFFFF',
-                border: '1px solid #E2E8F0',
-                borderRadius: '8px',
+                border: '1px solid #E5E7EB',
+                borderRadius: '6px',
+                borderLeft: '3px solid #2563EB',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.15s ease',
                 position: 'relative',
                 width: '100%',
                 boxSizing: 'border-box',
@@ -120,43 +127,44 @@ export const InterviewPipeline = memo(({
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
-                el.style.backgroundColor = '#F1F5F9';
-                el.style.borderColor = '#CBD5E1';
-                el.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
+                el.style.backgroundColor = '#F9FAFB';
+                el.style.borderColor = '#D1D5DB';
+                el.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.06)';
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
                 el.style.backgroundColor = '#FFFFFF';
-                el.style.borderColor = '#E2E8F0';
+                el.style.borderColor = '#E5E7EB';
                 el.style.boxShadow = 'none';
               }}
             >
-              {/* Timeline Dot & Line */}
+              {/* Timeline Indicator */}
               <div
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  minWidth: '24px',
+                  minWidth: '20px',
+                  flexShrink: 0,
                 }}
               >
                 <div
                   style={{
-                    width: '12px',
-                    height: '12px',
+                    width: '10px',
+                    height: '10px',
                     borderRadius: '50%',
                     backgroundColor: '#2563EB',
                     border: '2px solid #FFFFFF',
-                    boxShadow: '0 0 0 2px #2563EB',
+                    boxShadow: '0 0 0 1px #2563EB',
                   }}
                 />
                 {index < interviews.length - 1 && (
                   <div
                     style={{
-                      width: '2px',
-                      height: '28px',
-                      backgroundColor: '#CBD5E1',
-                      marginTop: '4px',
+                      width: '1px',
+                      height: '24px',
+                      backgroundColor: '#E5E7EB',
+                      marginTop: '2px',
                     }}
                   />
                 )}
@@ -173,28 +181,30 @@ export const InterviewPipeline = memo(({
                     marginBottom: '10px',
                   }}
                 >
-                  {/* Status Badge - FIRST & PROMINENT (Left Side) */}
+                  {/* Status Badge - Compact & Professional */}
                   <span
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '6px',
-                      padding: '5px 12px',
+                      gap: '5px',
+                      padding: '4px 10px',
                       backgroundColor: statusPill.bg,
                       color: statusPill.text,
                       border: `1px solid ${statusPill.border}`,
-                      borderRadius: '20px',
-                      fontSize: '11px',
-                      fontWeight: 600,
+                      borderRadius: '12px',
+                      fontSize: '10px',
+                      fontWeight: 700,
                       fontFamily: '"Instrument Sans", sans-serif',
                       whiteSpace: 'nowrap',
                       flexShrink: 0,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.3px',
                     }}
                   >
                     <span
                       style={{
-                        width: '6px',
-                        height: '6px',
+                        width: '4px',
+                        height: '4px',
                         borderRadius: '50%',
                         backgroundColor: statusPill.text,
                       }}
@@ -202,7 +212,7 @@ export const InterviewPipeline = memo(({
                     {interview.status || 'Unknown'}
                   </span>
 
-                  {/* Round Name */}
+                  {/* Round Name - Clean & Professional */}
                   <div
                     style={{
                       fontSize: '13px',
@@ -213,6 +223,7 @@ export const InterviewPipeline = memo(({
                       minWidth: 0,
                       wordBreak: 'break-word',
                       overflowWrap: 'break-word',
+                      letterSpacing: '0.2px',
                     }}
                   >
                     {roundName}
@@ -251,9 +262,10 @@ export const InterviewPipeline = memo(({
                         textOverflow: 'ellipsis',
                         wordBreak: 'break-word',
                         overflowWrap: 'break-word',
+                        lineHeight: '1.4',
                       }}
                     >
-                      <span style={{ color: '#475569', fontWeight: 500 }}>Consultant:</span>{' '}
+                      <span style={{ color: '#475569', fontWeight: 600 }}>Consultant:</span>{' '}
                       {consultant ? consultant.name : interview.interviewer || '—'}
                     </div>
 
@@ -268,14 +280,15 @@ export const InterviewPipeline = memo(({
                         textOverflow: 'ellipsis',
                         wordBreak: 'break-word',
                         overflowWrap: 'break-word',
+                        lineHeight: '1.4',
                       }}
                     >
-                      <span style={{ color: '#475569', fontWeight: 500 }}>Date/Time:</span>{' '}
+                      <span style={{ color: '#475569', fontWeight: 600 }}>Date/Time:</span>{' '}
                       {dateTimeDisplay}
                     </div>
                   </div>
 
-                  {/* Delete Icon - Subtle */}
+                  {/* Delete Icon - Subtle & Professional */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -292,20 +305,23 @@ export const InterviewPipeline = memo(({
                       border: 'none',
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      color: '#D1D5DB',
-                      transition: 'all 0.2s ease',
+                      color: '#CBD5E1',
+                      transition: 'all 0.15s ease',
                       fontSize: '14px',
                       flexShrink: 0,
+                      opacity: 0.6,
                     }}
                     onMouseEnter={(e) => {
                       const btn = e.currentTarget as HTMLButtonElement;
-                      btn.style.backgroundColor = '#FEE2E2';
+                      btn.style.backgroundColor = '#FECACA';
                       btn.style.color = '#DC2626';
+                      btn.style.opacity = '1';
                     }}
                     onMouseLeave={(e) => {
                       const btn = e.currentTarget as HTMLButtonElement;
                       btn.style.backgroundColor = 'transparent';
-                      btn.style.color = '#D1D5DB';
+                      btn.style.color = '#CBD5E1';
+                      btn.style.opacity = '0.6';
                     }}
                     title="Delete interview"
                   >

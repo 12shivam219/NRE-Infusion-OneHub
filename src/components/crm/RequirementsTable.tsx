@@ -129,10 +129,11 @@ const TableRow = memo(({
       className={`
         transition-colors duration-150
         border-b border-[#EAECEF]
-        ${isAlternate ? 'bg-[#FAFBFC]' : 'bg-white'}
+        ${isExpanded ? 'border-l-2 border-l-[#2563EB] bg-[#F0F7FF]' : `${isAlternate ? 'bg-[#FAFBFC]' : 'bg-white'}`}
         hover:bg-[#F5F7FA]
         h-14
       `}
+      style={isExpanded ? { backgroundColor: '#F0F7FF' } : undefined}
     >
       {/* Checkbox */}
       <td className="px-4 py-0 text-center align-middle" style={{ width: '44px', position: 'sticky', left: 0, zIndex: 30, backgroundColor: rowBgColor }}>
@@ -802,47 +803,64 @@ export const RequirementsTable = memo(({
                         isLoadingInterviews={isLoading}
                       />
                       
-                      {/* Interview Details Row */}
+                      {/* Interview Details Row - Contained Panel */}
                       {isExpanded && (
-                        <tr key={`interviews-${req.id}`} className="border-t border-blue-100" style={{ width: '100%', display: 'table-row' }}>
-                          <td colSpan={9} className="px-0 py-0" style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
-                            {isLoading ? (
-                              <div className="flex items-center justify-center py-8">
-                                <div className="w-6 h-6 border-3 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
-                              </div>
-                            ) : interviews && interviews.length > 0 ? (
-                              <InterviewPipeline
-                                interviews={interviews}
-                                consultants={consultants}
-                                onViewDetails={handleViewInterview}
-                                onDelete={handleDeleteInterview}
-                              />
-                            ) : (
+                        <tr key={`interviews-${req.id}`} className="border-b border-[#EAECEF]" style={{ width: '100%', display: 'table-row', backgroundColor: '#FFFFFF', borderLeft: '3px solid #2563EB', position: 'relative' }}>
+                          <td colSpan={9} className="px-0 py-0" style={{ width: '100%', boxSizing: 'border-box', overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
+                            {/* Constrained Detail Panel Container - Fixed width, anchored to left */}
+                            <div style={{
+                              padding: '20px 24px',
+                              backgroundColor: '#FFFFFF',
+                              maxWidth: '800px',
+                              width: 'calc(100vw - 80px)',
+                              boxSizing: 'border-box',
+                              position: 'relative',
+                            }}>
+                              {/* Detail Panel Content Card */}
                               <div style={{
                                 backgroundColor: '#F9FAFB',
-                                borderLeft: '3px solid #2563EB',
-                                padding: '16px 24px',
-                                marginLeft: 0,
+                                border: '1px solid #E5E7EB',
+                                borderRadius: '8px',
+                                borderLeft: '4px solid #2563EB',
+                                overflow: 'hidden',
                               }}>
-                                <h3 style={{
-                                  fontSize: '14px',
-                                  fontWeight: 600,
-                                  color: '#0F172A',
-                                  margin: '0 0 12px 0',
-                                  fontFamily: '"Instrument Sans", sans-serif',
-                                }}>
-                                  Interview Pipeline
-                                </h3>
-                                <p style={{
-                                  fontSize: '13px',
-                                  color: '#64748B',
-                                  margin: 0,
-                                  fontFamily: '"Instrument Sans", sans-serif',
-                                }}>
-                                  No interviews found for this requirement
-                                </p>
+                                {isLoading ? (
+                                  <div className="flex items-center justify-center py-12">
+                                    <div className="w-6 h-6 border-3 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                                  </div>
+                                ) : interviews && interviews.length > 0 ? (
+                                  <InterviewPipeline
+                                    interviews={interviews}
+                                    consultants={consultants}
+                                    onViewDetails={handleViewInterview}
+                                    onDelete={handleDeleteInterview}
+                                  />
+                                ) : (
+                                  <div style={{
+                                    padding: '24px',
+                                    textAlign: 'left',
+                                  }}>
+                                    <h3 style={{
+                                      fontSize: '14px',
+                                      fontWeight: 600,
+                                      color: '#0F172A',
+                                      margin: '0 0 8px 0',
+                                      fontFamily: '"Instrument Sans", sans-serif',
+                                    }}>
+                                      Interview Pipeline
+                                    </h3>
+                                    <p style={{
+                                      fontSize: '13px',
+                                      color: '#64748B',
+                                      margin: 0,
+                                      fontFamily: '"Instrument Sans", sans-serif',
+                                    }}>
+                                      No interviews found for this requirement
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       )}

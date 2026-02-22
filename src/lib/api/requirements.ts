@@ -270,16 +270,11 @@ export const getRequirementsPage = async (
           `primary_tech_stack.ilike.%${cleaned}%`,
           // Secondary fields (additional context)
           `description.ilike.%${cleaned}%`,
-          `location.ilike.%${cleaned}%`,
           `end_client.ilike.%${cleaned}%`,
           `vendor_company.ilike.%${cleaned}%`,
           `vendor_person_name.ilike.%${cleaned}%`,
           `vendor_phone.ilike.%${cleaned}%`,
           `vendor_website.ilike.%${cleaned}%`,
-          // Additional fields
-          `imp_name.ilike.%${cleaned}%`,
-          `client_website.ilike.%${cleaned}%`,
-          `imp_website.ilike.%${cleaned}%`,
           `next_step.ilike.%${cleaned}%`,
         ];
 
