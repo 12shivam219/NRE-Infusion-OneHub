@@ -115,7 +115,7 @@ export const EmailAccountsAdmin = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [checkGmailStatus]);
 
-  const handleConnectGmail = useCallback(() => {
+  const handleConnectGmail = useCallback(async () => {
     try {
       setGmailConnecting(true);
       const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -145,7 +145,10 @@ export const EmailAccountsAdmin = () => {
       googleOAuthUrl.searchParams.append('prompt', 'consent');
       googleOAuthUrl.searchParams.append('state', 'gmail-connection');
 
-      window.location.href = googleOAuthUrl.toString();
+      const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(googleOAuthUrl.toString(), '_self');
+      if (!ok) {
+        showToast({ type: 'error', message: 'Blocked unsafe redirect to Google OAuth.' });
+      }
     } catch (error) {
       console.error('Error connecting Gmail:', error);
       setGmailConnecting(false);

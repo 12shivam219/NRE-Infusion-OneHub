@@ -56,9 +56,20 @@ if (SUPABASE_URL && SUPABASE_KEY) {
 
 // SECURITY: Add HTTPS enforcement in production
 if (NODE_ENV === 'production') {
+  // Build a trusted host list from ALLOWED_ORIGINS or CANONICAL_HOST to avoid open-redirects
+  const CANONICAL_HOST = process.env.CANONICAL_HOST || ((process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',')[0].replace(/^https?:\/\//, ''));
+  const ALLOWED_HOSTS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
+    .split(',')
+    .map(h => h.trim().replace(/^https?:\/\//, ''));
+
   app.use((req, res, next) => {
     if (req.header('x-forwarded-proto') !== 'https') {
-      res.redirect(`https://${req.header('host')}${req.url}`);
+      const incomingHost = (req.header('host') || '').toLowerCase();
+
+      // Only redirect to a host that is in our allowlist; otherwise use the canonical host
+      const safeHost = ALLOWED_HOSTS.includes(incomingHost) ? incomingHost : CANONICAL_HOST;
+
+      res.redirect(`https://${safeHost}${req.url}`);
     } else {
       next();
     }

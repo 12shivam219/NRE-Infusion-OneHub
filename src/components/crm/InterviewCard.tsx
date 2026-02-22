@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react';
 import { Trash2, Clock, ExternalLink, AlertCircle } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { isValidStatusTransition, isValidUrl, isMeetingLink } from '../../lib/interviewValidation';
+import { safeOpenUrl } from '../../lib/safeRedirect';
 import type { Database } from '../../lib/database.types';
 import { BrandButton } from '../brand';
 import Box from '@mui/material/Box';
@@ -80,12 +81,16 @@ const InterviewCard = memo(({
 
   const handleJoinCall = useCallback(() => {
     if (isMeetingUrl && interview.location) {
-      window.open(interview.location, '_blank', 'noopener,noreferrer');
-      showToast({
-        type: 'success',
-        title: 'Joining Call',
-        message: `Opening meeting link`,
-      });
+      const ok = safeOpenUrl(interview.location, '_blank', 'noopener,noreferrer');
+      if (ok) {
+        showToast({
+          type: 'success',
+          title: 'Joining Call',
+          message: `Opening meeting link`,
+        });
+      } else {
+        showToast({ type: 'error', title: 'Blocked Link', message: 'This meeting link is not allowed.' });
+      }
     }
   }, [isMeetingUrl, interview.location, showToast]);
 

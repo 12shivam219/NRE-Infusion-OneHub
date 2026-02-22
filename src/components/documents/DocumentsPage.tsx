@@ -814,7 +814,10 @@ export const DocumentsPage = () => {
     async (document: Document) => {
       const result = await downloadDocument(document.storage_path);
       if (result.success && result.url) {
-        window.open(result.url, "_blank");
+        const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(result.url, '_blank');
+        if (!ok) {
+          showToast({ type: 'error', title: 'Blocked Link', message: 'This download link is not allowed.' });
+        }
       } else if (result.error) {
         showToast({
           type: "error",

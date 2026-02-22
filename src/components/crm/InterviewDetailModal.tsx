@@ -8,6 +8,7 @@ import { ResourceAuditTimeline } from '../common/ResourceAuditTimeline';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { LogoLoader } from '../common/LogoLoader';
 import { subscribeToInterviewById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
+import { safeOpenUrl } from '../../lib/safeRedirect';
 import type { Database } from '../../lib/database.types';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -244,8 +245,12 @@ export const InterviewDetailModal = ({
 
   const handleJoinCall = () => {
     if (isMeetingUrl && formData.location) {
-      window.open(formData.location as string, '_blank', 'noopener,noreferrer');
-      showToast({ type: 'success', title: 'Joining Call', message: `Opening ${meetingProvider}` });
+      const ok = safeOpenUrl(formData.location as string, '_blank', 'noopener,noreferrer');
+      if (ok) {
+        showToast({ type: 'success', title: 'Joining Call', message: `Opening ${meetingProvider}` });
+      } else {
+        showToast({ type: 'error', title: 'Blocked Link', message: 'This meeting link is not allowed.' });
+      }
     }
   };
 

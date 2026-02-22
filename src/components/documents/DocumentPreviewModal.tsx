@@ -57,7 +57,10 @@ export const DocumentPreviewModal = ({ isOpen, document, onClose }: DocumentPrev
   const handleDownload = async () => {
     const result = await downloadDocument(document.storage_path);
     if (result.success && result.url) {
-      window.open(result.url, '_blank');
+      const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(result.url, '_blank');
+      if (!ok) {
+        showToast({ type: 'error', title: 'Blocked Link', message: 'This download link is not allowed.' });
+      }
     } else {
       showToast({
         type: 'error',
@@ -91,16 +94,18 @@ export const DocumentPreviewModal = ({ isOpen, document, onClose }: DocumentPrev
                 onClick={async (e) => {
                   e.preventDefault();
                   if (previewUrl) {
-                    window.open(previewUrl, '_blank');
+                    const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(previewUrl, '_blank');
+                    if (!ok) showToast({ type: 'error', title: 'Blocked Link', message: 'This preview link is not allowed.' });
                     return;
                   }
 
                   const result = await downloadDocument(document.storage_path);
-                  if (result.success && result.url) window.open(result.url, '_blank');
+                  if (result.success && result.url) {
+                    const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(result.url, '_blank');
+                    if (!ok) showToast({ type: 'error', title: 'Blocked Link', message: 'This download link is not allowed.' });
+                  }
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition flex items-center gap-2"
-                target="_blank"
-                rel="noopener noreferrer"
               >
                 <ExternalLink className="w-4 h-4" />
                 Open in New Tab
