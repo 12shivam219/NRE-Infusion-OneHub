@@ -770,6 +770,9 @@ export const getErrorAttachments = async (
     }
 
     const paths = attachments.map((attachment: Attachment) => attachment.storage_path);
+    if (paths.some(path => path.includes('..'))) {
+      throw new Error('Invalid path');
+    }
     const { data: signedUrls, error: signedError } = await supabase.storage
       .from(DOCUMENTS_BUCKET)
       .createSignedUrls(paths, ATTACHMENT_URL_EXPIRY_SECONDS);
@@ -788,7 +791,7 @@ export const getErrorAttachments = async (
     }
 
     return { success: true, attachments: attachmentsWithUrls };
-  } catch  {
+  } catch (error) {
     return { success: false, error: 'Failed to fetch error attachments' };
   }
 };
@@ -802,6 +805,10 @@ export const uploadErrorAttachment = async (
     const timestamp = Date.now();
     const safeName = sanitizeFileName(file.name) || 'attachment';
     const path = `error-reports/${errorId}/${timestamp}-${safeName}`;
+
+    if (path.includes('..')) {
+      throw new Error('Invalid file path');
+    }
 
     const { error: uploadError } = await supabase.storage
       .from(DOCUMENTS_BUCKET)
@@ -826,6 +833,9 @@ export const uploadErrorAttachment = async (
     });
 
     if (insertError) {
+      if (path.includes('..')) {
+        throw new Error('Invalid file path');
+      }
       await supabase.storage.from(DOCUMENTS_BUCKET).remove([path]);
       return { success: false, error: insertError.message };
     }

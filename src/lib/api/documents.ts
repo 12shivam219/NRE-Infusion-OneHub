@@ -19,8 +19,12 @@ export const uploadDocument = async (
 
     // Retry storage upload with exponential backoff
     const { error: uploadError } = await retryAsync(
-      async () =>
-        supabase.storage.from('documents').upload(storagePath, file),
+      async () => {
+        if (storagePath.includes('..')) {
+          throw new Error('Invalid storage path');
+        }
+        return supabase.storage.from('documents').upload(storagePath, file);
+      },
       {
         maxAttempts: 3,
         initialDelayMs: 200,
@@ -298,10 +302,13 @@ export const deleteDocument = async (
 
     if (document) {
       try {
+        if (document.storage_path.includes('..')) {
+          throw new Error('Invalid storage path');
+        }
         await supabase.storage
           .from('documents')
           .remove([document.storage_path]);
-      } catch {
+      } catch (error) {
         logger.warn('Failed to delete storage file', {
           component: 'deleteDocument',
           resource: documentId,
@@ -344,6 +351,9 @@ export const downloadDocument = async (
   storagePath: string
 ): Promise<{ success: boolean; url?: string; error?: string }> => {
   try {
+    if (storagePath.includes('..')) {
+      throw new Error('Invalid storage path');
+    }
     const { data, error } = await retryAsync(
       async () =>
         supabase.storage
