@@ -3,6 +3,7 @@
  * Handles secure encryption/decryption of sensitive data (email passwords, app credentials)
  * Uses AES-256 encryption with crypto-js
  */
+import crypto from 'node:crypto';
 
 const EMAIL_SERVER_URL = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
 
@@ -77,7 +78,9 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   const computedHash = await hashPassword(password);
-  return computedHash === hash;
+  const actual = crypto.createHash('sha256').update(computedHash).digest();
+  const expected = crypto.createHash('sha256').update(hash).digest();
+  return crypto.timingSafeEqual(actual, expected);
 }
 
 /**

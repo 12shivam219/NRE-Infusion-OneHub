@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import nodemailer from 'nodemailer';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import crypto from 'node:crypto';
 import bodyParser from 'body-parser';
 import rateLimit from 'express-rate-limit';
 import sanitizeHtml from 'sanitize-html';
@@ -151,7 +152,9 @@ function authenticateRequest(req, res, next) {
   }
   
   const token = authHeader.substring(7);
-  if (token !== apiKey) {
+  const actual = crypto.createHash('sha256').update(token).digest();
+  const expected = crypto.createHash('sha256').update(apiKey).digest();
+  if (!crypto.timingSafeEqual(actual, expected)) {
     return res.status(403).json({ success: false, error: 'Invalid credentials' });
   }
   
