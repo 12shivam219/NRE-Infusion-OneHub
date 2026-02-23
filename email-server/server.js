@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from 'helmet';
 import nodemailer from 'nodemailer';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -15,6 +16,7 @@ import { RedisStore } from 'rate-limit-redis';
 dotenv.config();
 
 const app = express();
+app.use(helmet());
 const PORT = process.env.EMAIL_SERVER_PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
