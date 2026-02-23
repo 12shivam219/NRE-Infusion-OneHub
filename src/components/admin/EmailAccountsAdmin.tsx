@@ -159,6 +159,7 @@ export const EmailAccountsAdmin = () => {
     }
   }, [showToast]);
 
+  
   const handleDisconnectGmail = useCallback(async () => {
     try {
       const { error } = await supabase.auth.updateUser({

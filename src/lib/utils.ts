@@ -29,7 +29,37 @@ export const formatDateTime = (date: string | Date): string => {
 };
 
 export const sanitizeFilename = (filename: string): string => {
-  return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return sanitizePathComponent(filename);
+};
+
+/**
+ * Sanitize a path component used with Supabase storage to prevent path traversal.
+ * - Removes forward/back slashes
+ * - Replaces sequences of dots with a single dot and strips leading dots
+ * - Replaces any remaining disallowed chars with `_`
+ * - Truncates to 200 chars
+ */
+export function sanitizePathComponent(input: string): string {
+  if (!input || typeof input !== 'string') return '';
+
+  // Remove slashes to prevent directory separators
+  let s = input.replace(/[\\/]/g, '_');
+
+  // Replace runs of two or more dots with a single dot, then strip leading dots
+  s = s.replace(/\.{2,}/g, '.').replace(/^\.+/, '');
+
+  // Keep only safe characters
+  s = s.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  return s.slice(0, 200);
+}
+
+export const isSafeStoragePath = (path: string): boolean => {
+  if (!path || typeof path !== 'string') return false;
+  if (path.includes('..')) return false;
+  if (path.includes('\\')) return false;
+  if (path.startsWith('/')) return false;
+  return true;
 };
 
 /**

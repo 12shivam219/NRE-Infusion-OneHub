@@ -2,6 +2,7 @@ import { supabase } from '../supabase';
 import type { Database, UserStatus, UserRole, ErrorStatus } from '../database.types';
 import { getCacheValue, setCacheValue, deleteCacheValue } from '../redis';
 import { invalidateAdminCache } from '../cacheManagement';
+import { sanitizePathComponent, isSafeStoragePath } from '../utils';
 
 type User = Database['public']['Tables']['users']['Row'];
 type LoginHistory = Database['public']['Tables']['login_history']['Row'];
@@ -20,13 +21,7 @@ type SessionUpdate = Database['public']['Tables']['user_sessions']['Update'];
 const DOCUMENTS_BUCKET = 'documents';
 const ATTACHMENT_URL_EXPIRY_SECONDS = 60 * 60;
 
-const sanitizeFileName = (name: string) => {
-  return name
-    .replace(/[^a-zA-Z0-9_.-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 200);
-};
+
 
 type ApprovalStatistics = {
   pendingApproval: number;
@@ -770,16 +765,27 @@ export const getErrorAttachments = async (
     }
 
     const paths = attachments.map((attachment: Attachment) => attachment.storage_path);
-    if (paths.some(path => path.includes('..'))) {
-      throw new Error('Invalid path');
+    const safePaths = paths.filter((p) => isSafeStoragePath(p));
+
+    if (safePaths.length === 0) {
+      const attachmentsWithNulls = attachments.map((attachment) => ({
+        ...attachment,
+        download_url: null,
+      }));
+      return { success: true, attachments: attachmentsWithNulls };
     }
+
     const { data: signedUrls, error: signedError } = await supabase.storage
       .from(DOCUMENTS_BUCKET)
-      .createSignedUrls(paths, ATTACHMENT_URL_EXPIRY_SECONDS);
+      .createSignedUrls(safePaths, ATTACHMENT_URL_EXPIRY_SECONDS);
 
-    const attachmentsWithUrls = attachments.map((attachment: Attachment, index: number) => ({
+    const signedMap = new Map<string, string | null>(
+      (signedUrls ?? []).map((s: { signedUrl?: string } | null, i: number) => [safePaths[i], s?.signedUrl ?? null])
+    );
+
+    const attachmentsWithUrls = attachments.map((attachment: Attachment) => ({
       ...attachment,
-      download_url: signedUrls?.[index]?.signedUrl ?? null,
+      download_url: signedMap.get(attachment.storage_path) ?? null,
     }));
 
     if (signedError) {
@@ -791,7 +797,7 @@ export const getErrorAttachments = async (
     }
 
     return { success: true, attachments: attachmentsWithUrls };
-  } catch (error) {
+  } catch {
     return { success: false, error: 'Failed to fetch error attachments' };
   }
 };
@@ -803,8 +809,9 @@ export const uploadErrorAttachment = async (
 ): Promise<{ success: boolean; error?: string }> => {
   try {
     const timestamp = Date.now();
-    const safeName = sanitizeFileName(file.name) || 'attachment';
-    const path = `error-reports/${errorId}/${timestamp}-${safeName}`;
+    const safeErrorId = sanitizePathComponent(errorId);
+    const safeName = sanitizePathComponent(file.name) || 'attachment';
+    const path = `error-reports/${safeErrorId}/${timestamp}-${safeName}`;
 
     if (path.includes('..')) {
       throw new Error('Invalid file path');

@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
 import { logger, handleApiError, retryAsync } from '../errorHandler';
+import { sanitizePathComponent, isSafeStoragePath } from '../utils';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -14,13 +15,14 @@ export const uploadDocument = async (
   googleDriveId?: string
 ): Promise<{ success: boolean; document?: Document; error?: string }> => {
   try {
-    const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const storagePath = `${userId}/${Date.now()}_${sanitizedFilename}`;
+    const sanitizedFilename = sanitizePathComponent(file.name);
+    const sanitizedUserId = sanitizePathComponent(userId);
+    const storagePath = `${sanitizedUserId}/${Date.now()}_${sanitizedFilename}`;
 
     // Retry storage upload with exponential backoff
     const { error: uploadError } = await retryAsync(
       async () => {
-        if (storagePath.includes('..')) {
+        if (!isSafeStoragePath(storagePath)) {
           throw new Error('Invalid storage path');
         }
         return supabase.storage.from('documents').upload(storagePath, file);
@@ -302,13 +304,18 @@ export const deleteDocument = async (
 
     if (document) {
       try {
-        if (document.storage_path.includes('..')) {
-          throw new Error('Invalid storage path');
+        if (isSafeStoragePath(document.storage_path)) {
+          await supabase.storage
+            .from('documents')
+            .remove([document.storage_path]);
+        } else {
+          logger.warn('Refusing to delete unsafe storage path', {
+            component: 'deleteDocument',
+            resource: documentId,
+            storage_path: document.storage_path,
+          });
         }
-        await supabase.storage
-          .from('documents')
-          .remove([document.storage_path]);
-      } catch (error) {
+      } catch {
         logger.warn('Failed to delete storage file', {
           component: 'deleteDocument',
           resource: documentId,
@@ -351,8 +358,8 @@ export const downloadDocument = async (
   storagePath: string
 ): Promise<{ success: boolean; url?: string; error?: string }> => {
   try {
-    if (storagePath.includes('..')) {
-      throw new Error('Invalid storage path');
+    if (!isSafeStoragePath(storagePath)) {
+      return { success: false, error: 'Invalid storage path' };
     }
     const { data, error } = await retryAsync(
       async () =>
