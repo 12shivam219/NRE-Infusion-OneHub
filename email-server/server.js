@@ -13,6 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { RedisStore } from 'rate-limit-redis';
+import apiRoutesV3 from './api-routes-v3.ts';
 
 dotenv.config();
 
@@ -135,30 +136,46 @@ function isValidEmail(email) {
   return emailRegex.test(email);
 }
 
-// SECURITY: Authenticate requests with API key
-function authenticateRequest(req, res, next) {
+// SECURITY: Authenticate requests with API key or a valid Supabase session token
+async function authenticateRequest(req, res, next) {
   const authHeader = req.headers.authorization;
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
-    if (NODE_ENV === 'production') {
-      return res.status(500).json({ error: 'Server misconfiguration' });
-    }
-    return next();
-  }
-  
+  const apiKey = process.env.API_KEY || process.env.EMAIL_SERVER_API_KEY;
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!apiKey && NODE_ENV !== 'production') {
+      return next();
+    }
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
-  
+
   const token = authHeader.substring(7);
-  const actual = crypto.createHash('sha256').update(token).digest();
-  const expected = crypto.createHash('sha256').update(apiKey).digest();
-  if (!crypto.timingSafeEqual(actual, expected)) {
-    return res.status(403).json({ success: false, error: 'Invalid credentials' });
+
+  if (apiKey) {
+    const actual = crypto.createHash('sha256').update(token).digest();
+    const expected = crypto.createHash('sha256').update(apiKey).digest();
+    if (crypto.timingSafeEqual(actual, expected)) {
+      req.auth = { type: 'api_key' };
+      return next();
+    }
   }
-  
-  next();
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error && data?.user) {
+        req.auth = { type: 'supabase_user', user: data.user };
+        return next();
+      }
+    } catch (error) {
+      console.warn('Supabase token validation failed:', error.message);
+    }
+  }
+
+  if (!apiKey && NODE_ENV !== 'production') {
+    return next();
+  }
+
+  return res.status(403).json({ success: false, error: 'Invalid credentials' });
 }
 
 // Store multiple email transports
@@ -638,20 +655,24 @@ app.post('/api/emails/sync-now', async (req, res) => {
 /**
  * Manually trigger the job extraction agent
  * This endpoint allows admin users to run the agent on demand
+ * Phase 2: Uses v3 agent with real-time embedding support
  */
 app.post('/api/job-extraction/run', async (req, res) => {
   try {
-    const { runJobExtractionAgent } = await import('./job-extraction-agent.js');
+    const agentVersion = process.env.USE_JOB_EXTRACTION_V3 === 'true' ? 'v3' : 'v2';
+    const { runJobExtractionAgent } = await import(
+      agentVersion === 'v3' ? './job-extraction-agent-v3.js' : './job-extraction-agent-v2.js'
+    );
     
-    console.log(`\n🚀 Manual job extraction agent trigger at ${new Date().toISOString()}`);
+    console.log(`\n🚀 Manual job extraction agent trigger at ${new Date().toISOString()} (${agentVersion}${agentVersion === 'v3' ? ' with embeddings' : ''})`);
     
     // Run agent asynchronously without blocking the response
     runJobExtractionAgent()
       .then(() => {
-        console.log('✅ Job extraction agent completed successfully');
+        console.log(`✅ Job extraction agent (${agentVersion}) completed successfully`);
       })
       .catch(err => {
-        console.error('❌ Job extraction agent failed:', err);
+        console.error(`❌ Job extraction agent (${agentVersion}) failed:`, err);
       });
 
     // Return immediately with success status
@@ -659,6 +680,8 @@ app.post('/api/job-extraction/run', async (req, res) => {
       success: true,
       message: 'Job extraction agent started',
       status: 'running',
+      version: agentVersion,
+      features: agentVersion === 'v3' ? ['100% remote filtering', 'deduplication', 'real-time embeddings', 'skill matching'] : ['100% remote filtering', 'deduplication'],
     });
   } catch (error) {
     console.error('Error triggering job extraction agent:', error);
@@ -669,6 +692,12 @@ app.post('/api/job-extraction/run', async (req, res) => {
   }
 });
 
+// ==========================================
+// PHASE 2: RAG Integration Routes
+// Register v3 API routes for vector search, embeddings, and job recommendations
+// ==========================================
+app.use(apiRoutesV3);
+
 // Start server
 const server = app.listen(PORT, async () => {
   console.log(`\n✅ Email server running on http://localhost:${PORT}`);
@@ -677,6 +706,7 @@ const server = app.listen(PORT, async () => {
     console.log(`   └─ ${account.email}`);
   });
 
+  // Phase 1: Gmail Sync Scheduler
   if (process.env.START_SCHEDULER_IN_PROCESS === 'true') {
     try {
       const { startSyncScheduler } = await import('./gmail-sync.js');
@@ -684,6 +714,20 @@ const server = app.listen(PORT, async () => {
       console.log('📬 Gmail sync scheduler started (in-process)');
     } catch (error) {
       console.warn('⚠️  Gmail sync scheduler not available:', error.message);
+    }
+  }
+
+  // Phase 2: Job Extraction Scheduler (v2 or v3)
+  if (process.env.START_JOB_EXTRACTION_SCHEDULER === 'true') {
+    try {
+      const schedulerVersion = process.env.USE_JOB_EXTRACTION_V3 === 'true' ? 'v3' : 'v2';
+      const schedulerModule = schedulerVersion === 'v3' ? './scheduler-v3.js' : './scheduler-v2.js';
+      const { scheduler } = await import(schedulerModule);
+      
+      console.log(`✅ Job extraction scheduler ${schedulerVersion} initialized`);
+      console.log(`📊 Features: ${schedulerVersion === 'v3' ? 'embeddings, RAG, vector search' : 'deduplication, 100% remote filtering'}`);
+    } catch (error) {
+      console.warn(`⚠️  Job extraction scheduler ${process.env.USE_JOB_EXTRACTION_V3 === 'true' ? 'v3' : 'v2'} not available:`, error.message);
     }
   }
 
@@ -745,4 +789,134 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught exception:', error);
   gracefulShutdown('uncaughtException');
+});
+
+app.post('/api/gmail/refresh-token', async (req, res) => {
+  try {
+    const { refresh_token: refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is required' });
+    }
+
+    const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+    const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res.status(500).json({ error: 'Google OAuth is not configured on the server' });
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.json().catch(() => ({}));
+      return res.status(400).json({ error: error.error_description || 'Failed to refresh token' });
+    }
+
+    const tokenData = await tokenResponse.json();
+    return res.json({
+      access_token: tokenData.access_token,
+      expires_in: tokenData.expires_in || 3600,
+    });
+  } catch (error) {
+    console.error('OAuth refresh error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to refresh token' });
+  }
+});
+
+app.post('/api/google-drive/exchange-token', async (req, res) => {
+  try {
+    const { code, redirect_uri, userId } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const GOOGLE_CLIENT_ID = process.env.VITE_GOOGLE_CLIENT_ID;
+    const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+      return res.status(500).json({ error: 'Google OAuth is not configured on the server' });
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        code,
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirect_uri || `${process.env.VITE_APP_URL || 'http://localhost:5173'}/oauth/callback`,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.json().catch(() => ({}));
+      return res.status(400).json({ error: error.error_description || 'Failed to exchange authorization code' });
+    }
+
+    const tokenData = await tokenResponse.json();
+
+    let accountEmail = 'Google Drive Account';
+    try {
+      const aboutResponse = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress,displayName)', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+
+      if (aboutResponse.ok) {
+        const about = await aboutResponse.json();
+        accountEmail = about.user?.emailAddress || about.user?.displayName || accountEmail;
+      }
+    } catch (err) {
+      console.warn('Could not fetch Google Drive profile:', err.message);
+    }
+
+    if (supabase) {
+      const { error: saveError } = await supabase.from('google_drive_tokens').upsert(
+        {
+          user_id: userId,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token || null,
+          expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+
+      if (saveError) {
+        console.error('Failed to save Google Drive token:', saveError.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      accountEmail,
+      message: `Google Drive connected successfully as ${accountEmail}`,
+    });
+  } catch (error) {
+    console.error('Google Drive OAuth exchange error:', error);
+    return res.status(500).json({
+      error: error.message || 'Failed to process OAuth authorization',
+    });
+  }
 });

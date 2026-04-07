@@ -7,6 +7,7 @@ type Consultant = Database['public']['Tables']['consultants']['Row'];
 interface InterviewPipelineProps {
   interviews: Interview[];
   consultants: Consultant[];
+  requirementNumber?: number;
   onViewDetails: (interview: Interview) => void;
   onDelete: (interviewId: string) => void;
 }
@@ -46,6 +47,7 @@ const getStatusPillStyle = (status: string | null | undefined) => {
 export const InterviewPipeline = memo(({
   interviews,
   consultants,
+  requirementNumber,
   onViewDetails,
   onDelete,
 }: InterviewPipelineProps) => {
@@ -85,7 +87,11 @@ export const InterviewPipeline = memo(({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
         {interviews.map((interview, index) => {
           const consultant = consultants.find(c => c.id === interview.consultant_id);
+          const interviewNumber = (interview as any).interview_number || index + 1;
           const roundName = interview.round || `Round ${(interview as any).round_index || 1}`;
+          const interviewId = requirementNumber 
+            ? `REQ-${String(requirementNumber).padStart(3, '0')}-INT-${String(interviewNumber).padStart(2, '0')}`
+            : `INT-${String(interviewNumber).padStart(2, '0')}`;
           const statusPill = getStatusPillStyle(interview.status);
           const scheduledDate = interview.scheduled_date 
             ? new Date(interview.scheduled_date).toLocaleDateString('en-US', {
@@ -224,9 +230,32 @@ export const InterviewPipeline = memo(({
                       wordBreak: 'break-word',
                       overflowWrap: 'break-word',
                       letterSpacing: '0.2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
                     }}
                   >
                     {roundName}
+                    {/* Interview ID Badge */}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '3px 8px',
+                        backgroundColor: '#F3F4F6',
+                        color: '#374151',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        fontFamily: '"Instrument Sans", monospace',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      {interviewId}
+                    </span>
                   </div>
                 </div>
 

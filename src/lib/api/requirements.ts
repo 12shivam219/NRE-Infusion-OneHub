@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
-import { logActivity } from './audit';
+import { logActivity, formatChanges } from './audit';
 import { getCacheValue, setCacheValue, generateRequirementsCacheKey } from '../redis';
 
 type Requirement = Database['public']['Tables']['requirements']['Row'];
@@ -255,11 +255,27 @@ export const getRequirementsPage = async (
     // ⚡ OPTIMIZATION: Use optimized search strategy based on search term presence
     if (search && search.trim()) {
       const raw = search.trim().slice(0, 120);
-      const cleaned = raw
-        .replace(/[(),]/g, ' ')
-        .replace(/[%_]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+      
+      // Detect phone searches by checking digit density and count
+      // If: contains 3+ digits AND at least 30% of the string is digits OR all digits
+      const digitCount = (raw.match(/\d/g) || []).length;
+      const isAllDigits = /^\d+$/.test(raw);
+      const digitDensity = raw.length > 0 ? digitCount / raw.length : 0;
+      const isPhoneSearch = digitCount >= 3 && (isAllDigits || digitDensity > 0.3);
+      
+      let cleaned: string;
+      if (isPhoneSearch) {
+        // For phone searches: remove ALL non-digit characters to match against normalized phone numbers
+        // E.g., "609-857-8242" → "6098578242", "609857" → "609857", "(315)961-3965" → "3159613965"
+        cleaned = raw.replace(/[^\d]/g, '') || raw;
+      } else {
+        // For text searches: remove special chars and normalize whitespace
+        cleaned = raw
+          .replace(/[(),]/g, ' ')
+          .replace(/[%_]/g, ' ')
+          .replace(/[-.\s]+/g, ' ')  // Normalize phone separators to single space for text search
+          .trim();
+      }
 
       if (cleaned) {
         // Search across ALL fields for comprehensive coverage
@@ -273,7 +289,9 @@ export const getRequirementsPage = async (
           `end_client.ilike.%${cleaned}%`,
           `vendor_company.ilike.%${cleaned}%`,
           `vendor_person_name.ilike.%${cleaned}%`,
-          `vendor_phone.ilike.%${cleaned}%`,
+          // 📱 For phone searches, search against normalized version (digits only)
+          // This allows flexible matching: user can type any format, we search normalized
+          `vendor_phone_normalized.ilike.%${cleaned}%`,
           `vendor_website.ilike.%${cleaned}%`,
           `next_step.ilike.%${cleaned}%`,
         ];
@@ -457,10 +475,7 @@ export const createRequirement = async (
           actorId: userId,
           resourceType: 'requirement',
           resourceId: fetchedData.id,
-          details: {
-            requirement_number: fetchedData.requirement_number,
-            title: fetchedData.title,
-          },
+          description: `Created requirement "${fetchedData.title}" (#${fetchedData.requirement_number})`,
         });
       } catch (auditErr) {
         console.warn('Failed to log audit entry:', auditErr);
@@ -488,6 +503,17 @@ export const updateRequirement = async (
   userId?: string
 ): Promise<{ success: boolean; requirement?: Requirement; error?: string }> => {
   try {
+    // Fetch the old record first for audit comparison
+    const { data: oldData, error: fetchError } = await supabase
+      .from('requirements')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      return { success: false, error: fetchError.message };
+    }
+
     const dataToUpdate = {
       ...updates,
       updated_at: new Date().toISOString(),
@@ -505,14 +531,16 @@ export const updateRequirement = async (
       return { success: false, error: error.message };
     }
 
+    // Format the changes for human-readable audit logging
+    const { description, changes } = formatChanges(oldData, updates as Record<string, unknown>);
+    
     await logActivity({
       action: 'requirement_updated',
       actorId: userId,
       resourceType: 'requirement',
       resourceId: id,
-      details: {
-        fields: Object.keys(updates),
-      },
+      description,
+      details: { changes },
     });
 
     return { success: true, requirement: data };
@@ -531,6 +559,7 @@ export const deleteRequirement = async (
       actorId: userId,
       resourceType: 'requirement',
       resourceId: id,
+      description: 'Deleted requirement',
     });
 
     const { error } = await supabase

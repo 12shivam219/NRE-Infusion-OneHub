@@ -11,6 +11,7 @@
 import { supabase } from '../supabase';
 import { logActivity } from './audit';
 import { logger, handleApiError, retryAsync } from '../errorHandler';
+import { EMAIL_SERVER_URL, getEmailServerAuthHeaders } from '../emailServer';
 
 // Configuration constants for bulk operations
 export const BULK_EMAIL_CONFIG = {
@@ -207,11 +208,7 @@ export const createBulkEmailCampaign = async (
       actorId: userId,
       resourceType: 'bulk_email_campaign',
       resourceId: campaign.id,
-      details: {
-        subject,
-        recipients: recipients.length,
-        rotationEnabled,
-      },
+      description: `Created bulk email campaign "${subject}" for ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}`,
     });
 
     // Insert recipient records
@@ -514,15 +511,11 @@ export const sendBulkEmailCampaign = async (
     }
 
     // Call bulk send endpoint
-    const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
-    const emailApiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
-    
-    const response = await fetch(`${emailServerUrl}/api/send-bulk-emails`, {
+    const response = await fetch(`${EMAIL_SERVER_URL}/api/send-bulk-emails`, {
       method: 'POST',
-      headers: {
+      headers: await getEmailServerAuthHeaders({
         'Content-Type': 'application/json',
-        ...(emailApiKey && { 'Authorization': `Bearer ${emailApiKey}` }),
-      },
+      }),
       body: JSON.stringify({
         emails: recipientEmails,
         subject: campaign.subject,

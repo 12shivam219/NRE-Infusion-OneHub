@@ -75,6 +75,33 @@ A comprehensive, production-ready enterprise resume management system for job se
 - **Performance Monitoring**: Track application performance metrics
 - **Activity Feed**: Recent user activities
 
+## 🤖 AI Agent System (Phase 1 & Phase 2)
+
+### Phase 1: Automated Remote Job Detection ✅
+
+**Intelligently extract 100% remote job opportunities from Gmail:**
+
+- 📧 **Gmail Auto-Sync**: Monitors inbox for job emails every 10 minutes
+- 🎯 **Smart Filtering**: Uses Groq AI to detect only 100% remote positions
+- ⚡ **Deduplication**: Prevents duplicate entries with 2-level checking
+- 🔄 **Live UI Updates**: Refreshes job list every 60 seconds  
+- 📊 **Confidence Scoring**: Extracts job details (title, rate, skills, etc)
+- 🔍 **Full Audit Trail**: Complete logging of all extractions
+
+[See Phase 1 Details →](./INTEGRATION_GUIDE.md#phase-1-job-extraction--scheduling)
+
+### Phase 2: Vector Search & RAG Recommendations 🚀 (Optional)
+
+**Semantic job matching and market insights:**
+
+- 🔬 **Smart Embedding**: Converts job descriptions to searchable vectors
+- 🎲 **Similar Jobs**: Find semantically similar requirements (70%+ match)
+- 🔴 **Duplicate Detection**: Identify near-duplicates automatically (85%+ match)
+- 💡 **Skill Insights**: Extract and correlate skills across your database
+- 📈 **Market Analytics**: Trending technologies, companies, and rates
+
+[See Phase 2 Details →](./INTEGRATION_GUIDE.md#phase-2-vector-embeddings-rag--semantic-search)
+
 ## Tech Stack
 
 - **Frontend**: React 18 + TypeScript + Vite
@@ -83,6 +110,11 @@ A comprehensive, production-ready enterprise resume management system for job se
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Custom JWT implementation with Supabase
 - **Storage**: Supabase Storage
+- **AI/LLM**: Groq (llama-3.3-70b for job extraction)
+- **Embeddings**: OpenAI text-embedding-3-small (Phase 2)
+- **Vector Search**: pgvector with IVFFLAT indexes
+- **Job Queue**: Redis + BullMQ
+- **Caching**: Redis with TTL
 
 ## Prerequisites
 

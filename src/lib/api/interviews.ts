@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
-import { logActivity } from './audit';
+import { logActivity, formatChanges } from './audit';
 
 const computeRoundIndex = (roundText?: string | null | number): number => {
   if (!roundText) return 1;
@@ -286,8 +286,30 @@ export const createInterview = async (
   userId?: string
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
+    // Get the next interview number for this requirement
+    let interviewNumber = (interview as any).interview_number;
+    if (!interviewNumber) {
+      const { data: existing, error: countError } = await supabase
+        .from('interviews')
+        .select('interview_number', { count: 'exact' })
+        .eq('requirement_id', interview.requirement_id)
+        .order('interview_number', { ascending: false })
+        .limit(1);
+
+      if (countError) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error fetching existing interview_number:', countError.message);
+        }
+        // Fall back to 1 if we can't fetch
+        interviewNumber = 1;
+      } else {
+        interviewNumber = (existing?.[0]?.interview_number ?? 0) + 1;
+      }
+    }
+
     const payload = {
       ...interview,
+      interview_number: interviewNumber,
       // ensure round_index is set server-side so clients that don't provide it still get normalized ordering
       round_index: (interview as any).round_index ?? computeRoundIndex((interview as any).round),
       created_by: userId ?? null,
@@ -309,7 +331,7 @@ export const createInterview = async (
       actorId: userId,
       resourceType: 'interview',
       resourceId: data.id,
-      details: { scheduled_date: data.scheduled_date },
+      description: `Created interview #${interviewNumber} scheduled for ${new Date(data.scheduled_date).toLocaleDateString()}`,
     });
 
     return { success: true, interview: data };
@@ -324,6 +346,17 @@ export const updateInterview = async (
   userId?: string
 ): Promise<{ success: boolean; interview?: Interview; error?: string }> => {
   try {
+    // Fetch the old record first for audit comparison
+    const { data: oldData, error: fetchError } = await supabase
+      .from('interviews')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      return { success: false, error: fetchError.message };
+    }
+
     const dataToUpdate = {
       ...updates,
       // if caller updated textual round, update normalized index too
@@ -343,12 +376,16 @@ export const updateInterview = async (
       return { success: false, error: error.message };
     }
 
+    // Format the changes for human-readable audit logging
+    const { description, changes } = formatChanges(oldData, updates as Record<string, unknown>);
+    
     await logActivity({
       action: 'interview_updated',
       actorId: userId,
       resourceType: 'interview',
       resourceId: id,
-      details: { fields: Object.keys(updates) },
+      description,
+      details: { changes },
     });
 
     return { success: true, interview: data };
@@ -367,6 +404,7 @@ export const deleteInterview = async (
       actorId: userId,
       resourceType: 'interview',
       resourceId: id,
+      description: 'Deleted interview',
     });
 
     const { error } = await supabase

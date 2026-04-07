@@ -9,13 +9,3 @@
  */
 
 export { BrandButton } from './BrandButton';
-export { BrandCard, BrandCardHeader, BrandCardBody, BrandCardFooter } from './BrandCard';
-export {
-  BrandInput,
-  BrandTextarea,
-  BrandSelect,
-  BrandCheckbox,
-  BrandForm,
-  BrandFormGroup,
-} from './BrandForm';
-export { BrandBadge, BrandStatusBadge, BrandDotBadge } from './BrandBadge';

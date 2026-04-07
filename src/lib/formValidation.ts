@@ -64,8 +64,6 @@ export const validateRequirementForm = (data: {
   title: string;
   company: string;
   vendor_email?: string;
-  client_website?: string;
-  imp_website?: string;
   vendor_website?: string;
   rate?: string;
 }): ValidationError => {
@@ -83,14 +81,6 @@ export const validateRequirementForm = (data: {
 
   if (data.vendor_email && !isValidEmail(data.vendor_email)) {
     errors.vendor_email = 'Invalid email format';
-  }
-
-  if (data.client_website && !isValidUrl(data.client_website)) {
-    errors.client_website = 'Invalid URL format';
-  }
-
-  if (data.imp_website && !isValidUrl(data.imp_website)) {
-    errors.imp_website = 'Invalid URL format';
   }
 
   if (data.vendor_website && !isValidUrl(data.vendor_website)) {

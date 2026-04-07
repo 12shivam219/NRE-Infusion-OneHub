@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Edit2, Mail, History } from 'lucide-react';
+import { X, Edit2, Mail, History, Zap } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { updateRequirement } from '../../lib/api/requirements';
@@ -9,6 +9,7 @@ import { RequirementEmailManager } from './RequirementEmailManager';
 import EmailHistoryPanel from './EmailHistoryPanel';
 import { LogoLoader } from '../common/LogoLoader';
 import NextStepThread from './NextStepThread';
+import { SimilarRequirementsPanel } from './SimilarRequirementsPanel';
 import { subscribeToRequirementById, type RealtimeUpdate } from '../../lib/api/realtimeSync';
 import { cacheRequirements, type CachedRequirement } from '../../lib/offlineDB';
 import type { Database } from '../../lib/database.types';
@@ -47,7 +48,7 @@ export const RequirementDetailModal = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<Requirement> | null>(null);
-  const [activeTab, setActiveTab] = useState<'details' | 'emails' | 'description' | 'history'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'emails' | 'description' | 'history' | 'similar'>('details');
   const [remoteUpdateNotified, setRemoteUpdateNotified] = useState(false);
 
   useEffect(() => {
@@ -324,7 +325,7 @@ export const RequirementDetailModal = ({
       >
         <Tabs
           value={activeTab}
-          onChange={(_, value) => setActiveTab(value as 'details' | 'emails' | 'description' | 'history')}
+          onChange={(_, value) => setActiveTab(value as 'details' | 'emails' | 'description' | 'history' | 'similar')}
           variant="standard"
           sx={{
             '& .MuiTab-root': {
@@ -344,6 +345,7 @@ export const RequirementDetailModal = ({
           <Tab value="details" label="Overview" />
           <Tab value="emails" label="Activity" icon={<Mail className="w-4 h-4" />} iconPosition="start" />
           <Tab value="description" label="Job Description" />
+          <Tab value="similar" label="Similar Jobs" icon={<Zap className="w-4 h-4" />} iconPosition="start" />
           <Tab value="history" label="History" icon={<History className="w-4 h-4" />} iconPosition="start" />
         </Tabs>
       </Box>
@@ -400,22 +402,7 @@ export const RequirementDetailModal = ({
                           {formData?.primary_tech_stack || '-'}
                         </Typography>
                       </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                          Location
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
-                          {formData?.location || '-'}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                          Source
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
-                          {formData?.applied_for || '-'}
-                        </Typography>
-                      </Box>
+
                     </Stack>
                   </Paper>
 
@@ -540,48 +527,10 @@ export const RequirementDetailModal = ({
                     <Stack spacing={3}>
                       <Box>
                         <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                          Client Website
+                          End Client
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
-                          {formData?.client_website ? (
-                            <a
-                              href={formData.client_website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: '#4F46E5', textDecoration: 'none' }}
-                            >
-                              Visit →
-                            </a>
-                          ) : (
-                            '-'
-                          )}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                          Internal Contact
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
-                          {formData?.imp_name || '-'}
-                        </Typography>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                          Partner Website
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#0F172A', fontWeight: 500 }}>
-                          {formData?.imp_website ? (
-                            <a
-                              href={formData.imp_website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: '#4F46E5', textDecoration: 'none' }}
-                            >
-                              Visit →
-                            </a>
-                          ) : (
-                            '-'
-                          )}
+                          {formData?.end_client || '-'}
                         </Typography>
                       </Box>
                     </Stack>
@@ -690,13 +639,6 @@ export const RequirementDetailModal = ({
                     fullWidth
                   />
                   <TextField
-                    label="Location"
-                    value={formData?.location || ''}
-                    onChange={(e) => handleFieldChange('location', e.target.value)}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
                     select
                     label="Work Type"
                     value={String(formData?.remote || '')}
@@ -716,14 +658,6 @@ export const RequirementDetailModal = ({
                     size="small"
                     fullWidth
                     placeholder="e.g., 6 months"
-                  />
-                  <TextField
-                    label="Source"
-                    value={formData?.applied_for || ''}
-                    onChange={(e) => handleFieldChange('applied_for', e.target.value)}
-                    size="small"
-                    fullWidth
-                    placeholder="e.g., LinkedIn"
                   />
                   <TextField
                     label="Tech Stack"
@@ -758,7 +692,7 @@ export const RequirementDetailModal = ({
                   />
                   <TextField
                     label="Vendor Phone"
-                    type="tel"
+                    type="text"
                     value={formData?.vendor_phone || ''}
                     onChange={(e) => handleFieldChange('vendor_phone', e.target.value)}
                     size="small"
@@ -769,31 +703,6 @@ export const RequirementDetailModal = ({
                     type="url"
                     value={formData?.vendor_website || ''}
                     onChange={(e) => handleFieldChange('vendor_website', e.target.value)}
-                    size="small"
-                    fullWidth
-                    placeholder="https://example.com"
-                  />
-                  <TextField
-                    label="Internal Contact"
-                    value={formData?.imp_name || ''}
-                    onChange={(e) => handleFieldChange('imp_name', e.target.value)}
-                    size="small"
-                    fullWidth
-                  />
-                  <TextField
-                    label="Client Website"
-                    type="url"
-                    value={formData?.client_website || ''}
-                    onChange={(e) => handleFieldChange('client_website', e.target.value)}
-                    size="small"
-                    fullWidth
-                    placeholder="https://example.com"
-                  />
-                  <TextField
-                    label="Partner Website"
-                    type="url"
-                    value={formData?.imp_website || ''}
-                    onChange={(e) => handleFieldChange('imp_website', e.target.value)}
                     size="small"
                     fullWidth
                     placeholder="https://example.com"
@@ -888,6 +797,21 @@ export const RequirementDetailModal = ({
           {activeTab === 'history' && (
             <Box sx={{ p: 4 }}>
               <EmailHistoryPanel requirementId={requirement.id} />
+            </Box>
+          )}
+
+          {/* Similar Jobs Tab - Phase 2 RAG Search */}
+          {activeTab === 'similar' && requirement && (
+            <Box sx={{ maxWidth: '1200px' }}>
+              <SimilarRequirementsPanel
+                requirementId={requirement.id}
+                onViewOriginal={(id) => {
+                  // Could implement navigation to another requirement here
+                  console.log('View original:', id);
+                }}
+                showDuplicates={true}
+                maxResults={8}
+              />
             </Box>
           )}
         </Box>

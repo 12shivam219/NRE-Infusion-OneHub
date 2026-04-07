@@ -16,17 +16,19 @@ export function useDocumentsInfinite(options: {
   userId?: string;
   pageSize: number;
   search: string;
+  folderId?: string | null;
 }) {
-  const { userId, pageSize, search } = options;
+  const { userId, pageSize, search, folderId } = options;
 
   const getKey = useCallback(
     (pageIndex: number, previousPageData: DocumentsPageData | null) => {
       if (!userId) return null;
-      if (pageIndex === 0) return ['documents', userId, search, null, pageSize] as const;
+      // Bug #6: When search changes, reset pagination to page 0
+      if (pageIndex === 0) return ['documents', userId, search, folderId ?? 'root', null, pageSize] as const;
       if (previousPageData && !previousPageData.hasNextPage) return null;
-      return ['documents', userId, search, previousPageData?.cursorCreatedAt ?? null, pageSize] as const;
+      return ['documents', userId, search, folderId ?? 'root', previousPageData?.cursorCreatedAt ?? null, pageSize] as const;
     },
-    [userId, search, pageSize]
+    [userId, search, folderId, pageSize]
   );
 
   const fetcher = useCallback(
@@ -34,16 +36,19 @@ export function useDocumentsInfinite(options: {
       'documents',
       string,
       string,
+      string,
       string | null,
       number,
     ]): Promise<DocumentsPageData> => {
-      const [, uid, q, cursor, limit] = key;
+      const [, uid, q, folderKey, cursor, limit] = key;
+      const folderIdValue = folderKey === 'root' ? undefined : folderKey;
 
       const res = await getDocumentsPage({
         userId: uid,
         limit,
         cursor: cursor ? { created_at: cursor, direction: 'after' } : undefined,
         search: q || undefined,
+        folderId: folderIdValue,
         includeCount: false,
         orderBy: 'created_at',
         orderDir: 'desc',

@@ -21,19 +21,7 @@ export {
 // Gmail Integration
 export {
   getGmailAuthUrl,
-  exchangeCodeForToken,
-  refreshAccessToken,
-  getGmailProfile,
-  listGmailMessages,
-  getGmailMessage,
-  saveGmailToken,
-  getStoredGmailToken,
-  isTokenExpired,
-  disconnectGmailAccount,
-  hasGmailConnected,
 } from './api/gmailIntegration';
-
-export type { GmailToken, GmailMessage } from './api/gmailIntegration';
 
 // Matching Algorithm
 export {

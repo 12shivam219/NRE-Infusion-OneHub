@@ -1,23 +1,18 @@
 /**
  * Encryption Utility Module
  * Handles secure encryption/decryption of sensitive data (email passwords, app credentials)
- * Uses AES-256 encryption with crypto-js
+ * using browser-safe Web Crypto APIs.
  */
-import crypto from 'node:crypto';
+
+import { getEmailServerAuthHeaders } from './emailServer';
 
 const EMAIL_SERVER_URL = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
 
 async function callEmailServer(path: string, body: Record<string, unknown>) {
-  const apiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY;
-  if (!apiKey) {
-    throw new Error('Email server API key is not configured in this environment');
-  }
-
   const url = `${EMAIL_SERVER_URL}${path}`;
-  const headers: Record<string, string> = {
+  const headers: Record<string, string> = await getEmailServerAuthHeaders({
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
-  };
+  });
 
   const res = await fetch(url, {
     method: 'POST',
@@ -67,10 +62,26 @@ export function isEncrypted(text: string): boolean {
  * NOTE: This is now ASYNC because Web Crypto is async.
  */
 export async function hashPassword(password: string): Promise<string> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('Web Crypto is unavailable in this environment');
+  }
   const msgBuffer = new TextEncoder().encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function constantTimeStringEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+
+  return diff === 0;
 }
 
 /**
@@ -78,9 +89,7 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   const computedHash = await hashPassword(password);
-  const actual = crypto.createHash('sha256').update(computedHash).digest();
-  const expected = crypto.createHash('sha256').update(hash).digest();
-  return crypto.timingSafeEqual(actual, expected);
+  return constantTimeStringEquals(computedHash, hash);
 }
 
 /**
@@ -90,6 +99,9 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 export function generateEncryptionKey(): string {
   const array = new Uint8Array(16); // 16 bytes = 32 hex chars
-  crypto.getRandomValues(array);
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error('Web Crypto is unavailable in this environment');
+  }
+  globalThis.crypto.getRandomValues(array);
   return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
 }

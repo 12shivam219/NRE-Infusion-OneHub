@@ -1,6 +1,6 @@
 import { supabase } from '../supabase';
 import type { Database } from '../database.types';
-import { logActivity } from './audit';
+import { logActivity, formatChanges } from './audit';
 
 type Consultant = Database['public']['Tables']['consultants']['Row'];
 type ConsultantInsert = Database['public']['Tables']['consultants']['Insert'];
@@ -223,7 +223,7 @@ export const createConsultant = async (
       actorId: userId,
       resourceType: 'consultant',
       resourceId: data.id,
-      details: { name: data.name },
+      description: `Created consultant "${data.name}"`,
     });
 
     return { success: true, consultant: data };
@@ -238,6 +238,17 @@ export const updateConsultant = async (
   userId?: string
 ): Promise<{ success: boolean; consultant?: Consultant; error?: string }> => {
   try {
+    // Fetch the old record first for audit comparison
+    const { data: oldData, error: fetchError } = await supabase
+      .from('consultants')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      return { success: false, error: fetchError.message };
+    }
+
     const dataToUpdate = {
       ...updates,
       updated_at: new Date().toISOString(),
@@ -254,12 +265,16 @@ export const updateConsultant = async (
       return { success: false, error: error.message };
     }
 
+    // Format the changes for human-readable audit logging
+    const { description, changes } = formatChanges(oldData, updates as Record<string, unknown>);
+    
     await logActivity({
       action: 'consultant_updated',
       actorId: userId,
       resourceType: 'consultant',
       resourceId: id,
-      details: { fields: Object.keys(updates) },
+      description,
+      details: { changes },
     });
 
     return { success: true, consultant: data };
@@ -278,6 +293,7 @@ export const deleteConsultant = async (
       actorId: userId,
       resourceType: 'consultant',
       resourceId: id,
+      description: 'Deleted consultant',
     });
 
     const { error } = await supabase

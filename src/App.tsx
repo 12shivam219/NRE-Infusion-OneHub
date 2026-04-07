@@ -64,7 +64,6 @@ const AppContent = () => {
     const key = resolveThemeKeyFromRoute(location.pathname, location.search);
     setTheme(key);
     clearPreview();
-    window.dispatchEvent(new CustomEvent('adaptive-module-change', { detail: { key } }));
   }, [clearPreview, location.pathname, location.search, setTheme]);
 
   useEffect(() => {
@@ -103,6 +102,10 @@ const AppContent = () => {
     };
   }, [handleOfflineActivation]);
 
+  if (location.pathname === '/oauth/callback') {
+    return <OAuthCallbackPage />;
+  }
+
   if (isLoading) {
     return <LogoLoader fullScreen size="xl" showText label="Loading Application" />;
   }
@@ -136,32 +139,6 @@ const AppContent = () => {
       <Suspense fallback={null}>
         <LazySkipLinks />
       </Suspense>
-
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ display: 'none' }}>
-        <div
-          className="absolute inset-0 transition-opacity duration-500"
-          style={{
-            background: 'transparent',
-            opacity: 0,
-          }}
-        />
-        <div
-          className="absolute -inset-[45%] opacity-0"
-          style={{
-            background: 'transparent',
-            animation: 'none',
-            mixBlendMode: 'screen',
-          }}
-        />
-        <div
-          className="absolute inset-x-0 bottom-[-28%] h-[55vh] transition-opacity duration-500"
-          style={{
-            background: 'transparent',
-          }}
-        />
-        <div className="adaptive-haze" />
-        <div className="adaptive-system-overlay" />
-      </div>
 
       <div className="relative z-10 flex min-h-screen flex-col">
         <Header />
@@ -213,10 +190,6 @@ const AppContent = () => {
               </AdminRoute>
             }
           />
-          <Route 
-            path="/oauth/callback" 
-            element={<OAuthCallbackPage />}
-          />
           {/* Redirect root to Dashboard for all authenticated users */}
           <Route
             path="/"
@@ -233,8 +206,6 @@ const AppContent = () => {
             <LazyDraftEncryptionPanel />
           </Suspense>
       </div>
-
-      {/* Startup guide removed: no notification shown on startup */}
 
       {/* Floating Chat Widget */}
       <Suspense fallback={null}>

@@ -12,16 +12,32 @@ type Document = Database['public']['Tables']['documents']['Row'];
 // Google Drive OAuth Configuration
 // Note: VITE_GOOGLE_CLIENT_ID should be set in .env.local
 export const GOOGLE_DRIVE_CONFIG = {
-  clientId: '', // Will be configured from environment variable
+  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
   scopes: ['https://www.googleapis.com/auth/drive.readonly'],
   discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
 };
+
+const GOOGLE_REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI || `${window.location.origin}/oauth/callback`;
 
 /**
  * Check if Google OAuth is properly configured
  */
 export function isGoogleDriveConfigured(): boolean {
   return !!GOOGLE_DRIVE_CONFIG.clientId;
+}
+
+export function getGoogleDriveAuthUrl(state: string = 'google-drive-connection'): string {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_DRIVE_CONFIG.clientId,
+    redirect_uri: GOOGLE_REDIRECT_URI,
+    response_type: 'code',
+    scope: GOOGLE_DRIVE_CONFIG.scopes.join(' '),
+    access_type: 'offline',
+    prompt: 'consent',
+    state,
+  });
+
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
 /**

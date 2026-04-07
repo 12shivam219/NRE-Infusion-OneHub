@@ -476,6 +476,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
         vendor_company: sanitizeText(formData.vendor_company),
         vendor_website: formData.vendor_website || null,
         vendor_person_name: sanitizeText(formData.vendor_person_name),
+        // 📱 Store phone exactly as user entered - database trigger auto-normalizes for search
         vendor_phone: formData.vendor_phone || null,
         vendor_email: formData.vendor_email || null,
         description: sanitizeText(formData.description),
@@ -529,6 +530,7 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
           vendor_company: sanitizeText(formData.vendor_company),
           vendor_website: formData.vendor_website || null,
           vendor_person_name: sanitizeText(formData.vendor_person_name),
+          // 📱 Store phone exactly as user entered - database trigger auto-normalizes for search
           vendor_phone: formData.vendor_phone || null,
           vendor_email: formData.vendor_email || null,
           description: sanitizeText(formData.description),
@@ -940,8 +942,8 @@ export const CreateRequirementForm = ({ onClose, onSuccess, initialData }: Creat
               name="vendor_phone"
               id="req-vendor-phone"
               autoComplete="tel"
-              type="tel"
-              placeholder="(555) 123-4567"
+              type="text"
+              placeholder="(555) 123-4567 Ext-1234"
               value={formData.vendor_phone}
               onChange={handleChange}
             />

@@ -148,11 +148,7 @@ export async function createEmailRecord(
     actorId: userId,
     resourceType: 'requirement_email',
     resourceId: data.id,
-    details: {
-      requirementId,
-      recipientEmail,
-      subject,
-    },
+    description: `Sent email "${subject}" to ${recipientEmail}`,
   });
 
   return data;
@@ -477,10 +473,7 @@ export async function syncCampaignToRequirementEmails(
       actorId: userId,
       resourceType: 'bulk_email_campaign',
       resourceId: campaignId,
-      details: {
-        requirementId: campaign.requirement_id,
-        emailsCount: totalInserted,
-      },
+      description: `Synced ${totalInserted} email${totalInserted !== 1 ? 's' : ''} from campaign to requirement`,
     });
 
     console.log(

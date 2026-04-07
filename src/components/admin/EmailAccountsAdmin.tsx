@@ -20,6 +20,7 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
+import { getGmailAuthUrl } from '../../lib/gmail';
 
 interface EmailAccount {
   id: string;
@@ -118,10 +119,7 @@ export const EmailAccountsAdmin = () => {
   const handleConnectGmail = useCallback(async () => {
     try {
       setGmailConnecting(true);
-      const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      const redirectUri = `${window.location.origin}/oauth/callback`;
-
-      if (!googleClientId) {
+      if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
         showToast({
           type: 'error',
           message: 'Google OAuth is not configured. Please contact support.',
@@ -136,18 +134,10 @@ export const EmailAccountsAdmin = () => {
         message: 'You will be redirected to authorize Gmail access. Please complete the process.',
       });
 
-      const googleOAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      googleOAuthUrl.searchParams.append('client_id', googleClientId);
-      googleOAuthUrl.searchParams.append('redirect_uri', redirectUri);
-      googleOAuthUrl.searchParams.append('response_type', 'code');
-      googleOAuthUrl.searchParams.append('scope', 'https://www.googleapis.com/auth/gmail.readonly');
-      googleOAuthUrl.searchParams.append('access_type', 'offline');
-      googleOAuthUrl.searchParams.append('prompt', 'consent');
-      googleOAuthUrl.searchParams.append('state', 'gmail-connection');
-
-      const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(googleOAuthUrl.toString(), '_self');
+      const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(getGmailAuthUrl(), '_self');
       if (!ok) {
         showToast({ type: 'error', message: 'Blocked unsafe redirect to Google OAuth.' });
+        setGmailConnecting(false);
       }
     } catch (error) {
       console.error('Error connecting Gmail:', error);

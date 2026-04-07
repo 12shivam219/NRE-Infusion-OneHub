@@ -20,13 +20,6 @@ export interface ActivityLogResult {
   error?: string;
 }
 
-const resolveUserAgent = () => {
-  if (typeof navigator !== 'undefined' && navigator.userAgent) {
-    return navigator.userAgent.slice(0, 300);
-  }
-  return null;
-};
-
 /**
  * Write a unified audit entry for CRM/marketing flows.
  * Stores actor in `user_id` for queryability; additional context lives in `details`.
@@ -36,23 +29,20 @@ export const logActivity = async (params: {
   actorId?: string | null;
   resourceType?: ResourceType;
   resourceId?: string | null;
+  description?: string;
   details?: LogDetails;
-  ipAddress?: string | null;
 }): Promise<void> => {
-  const { action, actorId = null, resourceType = null, resourceId = null, details, ipAddress = null } = params;
+  const { action, actorId = null, resourceType = null, resourceId = null, description = null, details } = params;
 
   const payload: ActivityLogInsert = {
     user_id: actorId ?? null,
     action,
     resource_type: resourceType,
     resource_id: resourceId,
-    details: details
-      ? {
-          ...details,
-          userAgent: resolveUserAgent(),
-        }
-      : { userAgent: resolveUserAgent() },
-    ip_address: ipAddress,
+    details: (description
+      ? { description, ...details }
+      : details || null) as ActivityLog['details'],
+    ip_address: null,
   };
 
   try {
@@ -97,5 +87,60 @@ export const getResourceActivityLogs = async (params: {
     }
     return { success: false, error: 'Failed to fetch audit logs' };
   }
+};
+
+/**
+ * Format changes between old and new objects into a human-readable audit description.
+ * Only includes fields that actually changed.
+ * 
+ * @example
+ * formatChanges({ title: 'Old', status: 'active' }, { title: 'New', status: 'active' })
+ * // Returns:
+ * // {
+ * //   description: "title: 'Old' → 'New'",
+ * //   changes: { title: { from: 'Old', to: 'New' } }
+ * // }
+ */
+export const formatChanges = (
+  oldData: Record<string, unknown>,
+  newData: Record<string, unknown>
+): {
+  description: string;
+  changes: Record<string, { from: unknown; to: unknown }>;
+} => {
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  const fieldLines: string[] = [];
+
+  // Get all keys from both objects
+  const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+
+  for (const key of allKeys) {
+    const oldValue = oldData[key];
+    const newValue = newData[key];
+
+    // Skip if values are identical
+    if (JSON.stringify(oldValue) === JSON.stringify(newValue)) {
+      continue;
+    }
+
+    // Format the value for display
+    const formatValue = (val: unknown): string => {
+      if (val === null || val === undefined) return 'empty';
+      if (typeof val === 'string') return `'${val}'`;
+      if (typeof val === 'boolean') return val ? 'true' : 'false';
+      if (typeof val === 'number') return String(val);
+      if (val instanceof Date) return val.toISOString();
+      return JSON.stringify(val);
+    };
+
+    changes[key] = { from: oldValue, to: newValue };
+    fieldLines.push(`${key}: ${formatValue(oldValue)} → ${formatValue(newValue)}`);
+  }
+
+  const description = fieldLines.length > 0
+    ? fieldLines.join('; ')
+    : 'No changes detected';
+
+  return { description, changes };
 };
 

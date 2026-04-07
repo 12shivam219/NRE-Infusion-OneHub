@@ -1,11 +1,12 @@
-import { StrictMode, memo, useEffect, useState } from 'react';
+import { StrictMode, memo, useEffect } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ThemeProvider, type Theme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastProvider } from './contexts/ToastContext';
+import { crmThemeLight } from './lib/mui/crmTheme';
 import './index.css';
 
 // Defer heavy initialization to not block initial render
@@ -41,35 +42,14 @@ const hideInitialLoader = () => {
   }
 };
 
-// Lazy load theme creation to defer theme object instantiation
-const cachedTheme: { light?: Theme } = {};
-
-const getTheme = async (): Promise<Theme> => {
-  if (cachedTheme.light) return cachedTheme.light;
-  
-  const { crmThemeLight } = await import('./lib/mui/crmTheme');
-  cachedTheme.light = crmThemeLight;
-  return crmThemeLight;
-};
-
 export const ThemedApp = memo(() => {
-  const [theme, setTheme] = useState<Theme | null>(null);
-
-  useEffect(() => {
-    getTheme().then(setTheme);
-  }, []);
-
   // Hide initial loader when React app mounts
   useEffect(() => {
     hideInitialLoader();
   }, []);
 
-  if (!theme) {
-    return null; // Don't render until theme is loaded
-  }
-
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={crmThemeLight}>
       <CssBaseline />
       <App />
     </ThemeProvider>

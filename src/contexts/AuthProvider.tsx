@@ -18,19 +18,7 @@ const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       // ⚡ PERFORMANCE: Check cache FIRST (instant, no network)
       // This allows the UI to render immediately with the user's previous session
-      let cachedUser = getCurrentUser();
-      
-      // Fallback to localStorage only if sessionStorage is empty (for session recovery)
-      if (!cachedUser) {
-        const localUser = localStorage.getItem('user');
-        if (localUser) {
-          try {
-            cachedUser = JSON.parse(localUser);
-          } catch {
-            // Invalid data in localStorage
-          }
-        }
-      }
+      const cachedUser = getCurrentUser();
       
       if (cachedUser) {
         setUser(cachedUser);

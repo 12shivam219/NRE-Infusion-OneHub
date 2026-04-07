@@ -178,6 +178,7 @@ export interface Database {
           storage_path: string;
           version: number;
           parent_id: string | null;
+          folder_id: string | null;
           source: DocumentSource;
           google_drive_id: string | null;
           created_at: string;
@@ -193,6 +194,7 @@ export interface Database {
           storage_path: string;
           version?: number;
           parent_id?: string | null;
+          folder_id?: string | null;
           source?: DocumentSource;
           google_drive_id?: string | null;
           created_at?: string;
@@ -208,10 +210,63 @@ export interface Database {
           storage_path?: string;
           version?: number;
           parent_id?: string | null;
+          folder_id?: string | null;
           source?: DocumentSource;
           google_drive_id?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      folders: {
+        Row: {
+          id: string;
+          user_id: string;
+          parent_folder_id: string | null;
+          name: string;
+          description: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          parent_folder_id?: string | null;
+          name: string;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          parent_folder_id?: string | null;
+          name?: string;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      folder_shares: {
+        Row: {
+          id: string;
+          folder_id: string;
+          shared_with_user_id: string;
+          permission: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          folder_id: string;
+          shared_with_user_id: string;
+          permission?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          folder_id?: string;
+          shared_with_user_id?: string;
+          permission?: string;
+          created_at?: string;
         };
       };
       document_versions: {
@@ -249,15 +304,10 @@ export interface Database {
           company: string | null;
           end_client: string | null;
           description: string | null;
-          location: string | null;
           status: RequirementStatus;
           consultant_id: string | null;
-          applied_for: string | null;
           rate: string | null;
           primary_tech_stack: string | null;
-          imp_name: string | null;
-          client_website: string | null;
-          imp_website: string | null;
           vendor_company: string | null;
           vendor_website: string | null;
           vendor_person_name: string | null;
@@ -279,15 +329,10 @@ export interface Database {
           company?: string | null;
           end_client?: string | null;
           description?: string | null;
-          location?: string | null;
           status?: RequirementStatus;
           consultant_id?: string | null;
-          applied_for?: string | null;
           rate?: string | null;
           primary_tech_stack?: string | null;
-          imp_name?: string | null;
-          client_website?: string | null;
-          imp_website?: string | null;
           vendor_company?: string | null;
           vendor_website?: string | null;
           vendor_person_name?: string | null;
@@ -309,15 +354,10 @@ export interface Database {
           company?: string | null;
           end_client?: string | null;
           description?: string | null;
-          location?: string | null;
           status?: RequirementStatus;
           consultant_id?: string | null;
-          applied_for?: string | null;
           rate?: string | null;
           primary_tech_stack?: string | null;
-          imp_name?: string | null;
-          client_website?: string | null;
-          imp_website?: string | null;
           vendor_company?: string | null;
           vendor_website?: string | null;
           vendor_person_name?: string | null;
@@ -337,6 +377,7 @@ export interface Database {
           id: string;
           requirement_id: string;
           user_id: string;
+          interview_number: number | null;
           scheduled_date: string;
           scheduled_time: string | null;
           timezone: string | null;
@@ -367,6 +408,7 @@ export interface Database {
           id?: string;
           requirement_id: string;
           user_id: string;
+          interview_number?: number | null;
           scheduled_date: string;
           scheduled_time?: string | null;
           timezone?: string | null;
@@ -397,6 +439,7 @@ export interface Database {
           id?: string;
           requirement_id?: string;
           user_id?: string;
+          interview_number?: number | null;
           scheduled_date?: string;
           scheduled_time?: string | null;
           timezone?: string | null;

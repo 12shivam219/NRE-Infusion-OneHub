@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, memo, lazy, useRef } from 'react';
 import { mutate as globalMutate } from 'swr';
-import { X, SlidersHorizontal, RefreshCw } from 'lucide-react';
+import { X, RefreshCw, Settings } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCache } from '../../hooks/useOfflineCache';
 import { useToast } from '../../contexts/ToastContext';
@@ -9,6 +9,7 @@ import { useRequirementsPage } from '../../hooks/useRequirementsPage';
 import { deleteRequirement, type RequirementWithLogs } from '../../lib/api/requirements';
 import type { Database, RequirementStatus } from '../../lib/database.types';
 import { subscribeToRequirements, type RealtimeUpdate } from '../../lib/api/realtimeSync';
+import { phoneNumberMatches } from '../../lib/phoneUtils';
 import { ErrorAlert } from '../common/ErrorAlert';
 import { RequirementsTable } from './RequirementsTable';
 import { useSyncQueue } from '../../hooks/useSyncStatus';
@@ -29,6 +30,15 @@ import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
 import { styled } from '@mui/material/styles';
 
 const RequirementsReport = lazy(() => import('./RequirementsReport').then((m) => ({ default: m.RequirementsReport })));
@@ -114,7 +124,7 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
   const { user, isAdmin } = useAuth();
   const { isOnline, queueOfflineOperation } = useOfflineCache();
   const { showToast } = useToast();
-  const { filters: savedFilters, updateFilters, clearFilters, isLoaded } = useSearchFilters();
+  const { filters: savedFilters, updateFilters, isLoaded } = useSearchFilters();
 
   const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm || '');
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -124,6 +134,12 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
   const [page, setPage] = useState(0);
   const [isErrorDismissed, setIsErrorDismissed] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showToolsDialog, setShowToolsDialog] = useState(false);
+  const [localDateRange, setLocalDateRange] = useState({
+    from: savedFilters?.dateRangeFrom || '',
+    to: savedFilters?.dateRangeTo || ''
+  });
+  const [pageSize, setPageSize] = useState(100);
   const [selectedRequirement, setSelectedRequirement] = useState<Requirement | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [requirementToDelete, setRequirementToDelete] = useState<Requirement | null>(null);
@@ -141,23 +157,21 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
   }, []);
 
   // Advanced filtering state
-  const [minRate, setMinRate] = useState(savedFilters?.minRate || '');
-  const [maxRate, setMaxRate] = useState(savedFilters?.maxRate || '');
-  const [remoteFilter, setRemoteFilter] = useState<'ALL' | 'REMOTE' | 'ONSITE'>((savedFilters?.remoteFilter as 'ALL' | 'REMOTE' | 'ONSITE') || 'ALL');
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({
+  const minRate = savedFilters?.minRate || '';
+  const maxRate = savedFilters?.maxRate || '';
+  const remoteFilter = (savedFilters?.remoteFilter as 'ALL' | 'REMOTE' | 'ONSITE') || 'ALL';
+  const dateRange = useMemo(() => ({
     from: savedFilters?.dateRangeFrom || '',
     to: savedFilters?.dateRangeTo || ''
-  });
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const pageSize = 100;
+  }), [savedFilters?.dateRangeFrom, savedFilters?.dateRangeTo]);
 
   const dateFromIso = useMemo(() => {
     return dateRange.from ? new Date(`${dateRange.from}T00:00:00`).toISOString() : undefined;
-  }, [dateRange.from]);
+  }, [dateRange]);
 
   const dateToIso = useMemo(() => {
     return dateRange.to ? new Date(`${dateRange.to}T23:59:59.999`).toISOString() : undefined;
-  }, [dateRange.to]);
+  }, [dateRange]);
 
   const requirementsSWR = useRequirementsPage({
     userId: user?.id,
@@ -222,6 +236,37 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
     }
   }, [mutateRequirements, user?.id, pageSize, searchTerm, filterStatus, dateFromIso, dateToIso, sortBy, sortOrder, minRate, maxRate, remoteFilter]);
 
+  const handleApplyToolsSettings = useCallback(() => {
+    // Apply date range filter
+    updateFilters({
+      searchTerm: searchTerm,
+      sortBy,
+      sortOrder,
+      filterStatus: filterStatus.toString(),
+      minRate,
+      maxRate,
+      remoteFilter,
+      dateRangeFrom: localDateRange.from,
+      dateRangeTo: localDateRange.to,
+    });
+    
+    setPage(0);
+    setShowToolsDialog(false);
+    showToast({
+      type: 'success',
+      title: 'Filters applied',
+      message: 'Your filter settings have been updated'
+    });
+  }, [updateFilters, searchTerm, sortBy, sortOrder, filterStatus, minRate, maxRate, remoteFilter, localDateRange, showToast]);
+
+  const handleResetToolsSettings = useCallback(() => {
+    setLocalDateRange({
+      from: '',
+      to: ''
+    });
+    setPageSize(100);
+  }, []);
+
   const tableSearch = (
     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
       <Search role="search" aria-label="Search requirements">
@@ -269,15 +314,6 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
           </SearchClearWrapper>
         )}
       </Search>
-      <Tooltip title="Tools">
-        <IconButton
-          color="inherit"
-          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-          size="small"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </IconButton>
-      </Tooltip>
       <Tooltip title="Refresh">
         <IconButton
           color="inherit"
@@ -286,6 +322,15 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
           disabled={isFetchingPage}
         >
           <RefreshCw className={`w-4 h-4 ${isFetchingPage ? 'animate-spin' : ''}`} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Tools & Filters">
+        <IconButton
+          color="inherit"
+          onClick={() => setShowToolsDialog(true)}
+          size="small"
+        >
+          <Settings className="w-4 h-4" />
         </IconButton>
       </Tooltip>
     </Box>
@@ -356,7 +401,8 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
           (record.end_client || '').toLowerCase().includes(searchLower) ||
           (record.vendor_company || '').toLowerCase().includes(searchLower) ||
           (record.vendor_person_name || '').toLowerCase().includes(searchLower) ||
-          (record.vendor_phone || '').toLowerCase().includes(searchLower) ||
+          // 📱 Phone number search: normalize format for flexible matching
+          phoneNumberMatches(record.vendor_phone || '', searchLower) ||
           (record.vendor_email || '').toLowerCase().includes(searchLower) ||
           (record.vendor_website || '').toLowerCase().includes(searchLower) ||
           (record.imp_name || '').toLowerCase().includes(searchLower) ||
@@ -671,51 +717,6 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Search and Filter */}
-      <Stack spacing={2}>
-        {/* Active Filters Summary */}
-        {(searchTerm || filterStatus !== 'ALL' || (minRate || maxRate || remoteFilter !== 'ALL' || dateRange.from || dateRange.to)) ? (
-          <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface-light)', borderColor: 'rgba(234,179,8,0.2)' }}>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
-                Active filters:
-              </Typography>
-              {searchTerm ? <Chip size="small" label={`Search: "${searchTerm}"`} /> : null}
-              {filterStatus !== 'ALL' ? <Chip size="small" label={`Status: ${filterStatus}`} /> : null}
-              {minRate ? <Chip size="small" label={`Min: $${minRate}`} /> : null}
-              {maxRate ? <Chip size="small" label={`Max: $${maxRate}`} /> : null}
-              {remoteFilter !== 'ALL' ? <Chip size="small" label={remoteFilter} /> : null}
-              {dateRange.from ? <Chip size="small" label={`From: ${dateRange.from}`} /> : null}
-              {dateRange.to ? <Chip size="small" label={`To: ${dateRange.to}`} /> : null}
-              <Box sx={{ flexGrow: 1 }} />
-              {requirements.length > 0 ? (
-                <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.primary' }}>
-                  {requirements.length} result{requirements.length !== 1 ? 's' : ''}
-                </Typography>
-              ) : null}
-              <Button
-                variant="text"
-                color="error"
-                size="small"
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('ALL');
-                  setMinRate('');
-                  setMaxRate('');
-                  setRemoteFilter('ALL');
-                  setDateRange({ from: '', to: '' });
-                  clearFilters();
-                  setShowAdvancedFilters(false);
-                }}
-                title="Clear all filters and reset search"
-              >
-                ✕ Clear All
-              </Button>
-            </Stack>
-          </Paper>
-        ) : null}
-      </Stack>
-
       {/* Sync Queue Panel (collapsible) */}
       {showSyncPanel ? (
         <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'var(--darkbg-surface)', borderColor: 'rgba(234,179,8,0.2)' }}>
@@ -874,6 +875,8 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
           hasNextPage={hasNextPage}
           isFetchingPage={isFetchingPage}
           onPageChange={setPage}
+          selectedStatusFilter={filterStatus}
+          onStatusFilterChange={setFilterStatus}
         />
       </div>
 
@@ -902,6 +905,161 @@ export const RequirementsManagement = memo(({ onCreateInterview }: RequirementsM
         cancelLabel="Cancel"
         variant="danger"
       />
+
+      {/* Tools & Filters Dialog */}
+      <Dialog open={showToolsDialog} onClose={() => setShowToolsDialog(false)} fullWidth maxWidth="sm" disableScrollLock>
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem', pb: 1 }}>
+          Tools & Filters
+        </DialogTitle>
+        <DialogContent sx={{ pt: 3 }}>
+          <Stack spacing={3}>
+            {/* Date Range Section */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
+                📅 Date Range Filter
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <TextField
+                  label="From Date"
+                  type="date"
+                  value={localDateRange.from}
+                  onChange={(e) => setLocalDateRange(prev => ({ ...prev, from: e.target.value }))}
+                  size="small"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  slotProps={{
+                    input: {
+                      sx: { fontSize: 13 }
+                    }
+                  }}
+                />
+                <TextField
+                  label="To Date"
+                  type="date"
+                  value={localDateRange.to}
+                  onChange={(e) => setLocalDateRange(prev => ({ ...prev, to: e.target.value }))}
+                  size="small"
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  slotProps={{
+                    input: {
+                      sx: { fontSize: 13 }
+                    }
+                  }}
+                />
+              </Stack>
+            </Box>
+
+            {/* Rows Per Page Section */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
+                📊 Rows Per Page
+              </Typography>
+              <FormControl fullWidth size="small">
+                <InputLabel>Rows per page</InputLabel>
+                <Select
+                  value={pageSize}
+                  label="Rows per page"
+                  onChange={(e) => setPageSize(e.target.value as number)}
+                >
+                  <MenuItem value={25}>25 rows</MenuItem>
+                  <MenuItem value={50}>50 rows</MenuItem>
+                  <MenuItem value={100}>100 rows</MenuItem>
+                  <MenuItem value={250}>250 rows</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            {/* Sort Options Section */}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: '#1f2937' }}>
+                🔤 Sort Options
+              </Typography>
+              <Stack spacing={1.5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Sort by</InputLabel>
+                  <Select
+                    value={sortBy}
+                    label="Sort by"
+                    onChange={(e) => {
+                      setSortBy(e.target.value as 'date' | 'company' | 'daysOpen');
+                      setPage(0);
+                    }}
+                  >
+                    <MenuItem value="date">Date Created</MenuItem>
+                    <MenuItem value="company">Company Name</MenuItem>
+                    <MenuItem value="daysOpen">Days Open</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Sort order</InputLabel>
+                  <Select
+                    value={sortOrder}
+                    label="Sort order"
+                    onChange={(e) => {
+                      setSortOrder(e.target.value as 'asc' | 'desc');
+                      setPage(0);
+                    }}
+                  >
+                    <MenuItem value="desc">Descending (Z-A, Newest first)</MenuItem>
+                    <MenuItem value="asc">Ascending (A-Z, Oldest first)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+            </Box>
+
+            {/* Export Section */}
+            <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: '#1f2937' }}>
+                💾 Export Data
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Export all requirements to CSV or PDF with customizable columns and filters.
+              </Typography>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => {
+                  setShowReport(true);
+                  setShowToolsDialog(false);
+                }}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  backgroundColor: '#3b82f6',
+                  '&:hover': {
+                    backgroundColor: '#2563eb'
+                  }
+                }}
+              >
+                Open Export Dialog
+              </Button>
+            </Paper>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button
+            onClick={() => {
+              handleResetToolsSettings();
+              setShowToolsDialog(false);
+            }}
+            variant="outlined"
+            color="inherit"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleApplyToolsSettings}
+            variant="contained"
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600
+            }}
+          >
+            Apply Filters
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 });

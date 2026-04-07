@@ -105,10 +105,10 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
         {logs.map((log) => {
           const actor = log.user_id ? userNames.get(log.user_id) : null;
           const actorLabel = actor ? actor.name : 'Unknown';
-          const detailText =
-            log.details && typeof log.details === 'object'
-              ? JSON.stringify(log.details)
-              : '';
+          const description = log.details && typeof log.details === 'object' && 'description' in log.details
+            ? (log.details as Record<string, unknown>).description
+            : null;
+          
           return (
             <li key={log.id} className="px-4 py-3 space-y-1">
               <div className="flex items-center gap-2 text-xs text-gray-700">
@@ -125,12 +125,9 @@ export const ResourceAuditTimeline = ({ resourceId, resourceType, title = 'Audit
                   <Clock className="w-3.5 h-3.5 text-gray-400" />
                   {formatDateTime(log.created_at)}
                 </span>
-                {log.ip_address && <span className="text-gray-500">IP: {log.ip_address}</span>}
               </div>
-              {detailText && (
-                <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded p-2 break-all">
-                  {detailText}
-                </p>
+              {description && (
+                <p className="text-sm text-gray-700 font-medium">{description}</p>
               )}
             </li>
           );

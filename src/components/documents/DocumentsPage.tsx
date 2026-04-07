@@ -7,29 +7,42 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Upload,
   FileText,
   Download,
   Trash2,
   Edit,
-  Grid2X2,
-  Grid3X3,
+  Copy,
+  ClipboardPaste,
   Cloud,
   Eye,
   Monitor,
   MoreVertical,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import {
   uploadDocument,
   deleteDocument,
   downloadDocument,
+  duplicateDocumentToFolder,
+  saveDocumentToApp,
+  saveDocumentToAppFolder,
 } from "../../lib/api/documents";
 import type { Database } from "../../lib/database.types";
 import { debounce, formatFileSize } from "../../lib/utils";
+import { getRelativeTime } from "../../lib/dateFormatter";
 import { useToast } from "../../contexts/ToastContext";
 import { useDocumentsInfinite } from "../../hooks/useDocumentsInfinite";
+import { useFolders } from "../../hooks/useFolders";
+import { FolderSidebar } from "./FolderSidebar";
+import { BreadcrumbNavigation } from "./BreadcrumbNavigation";
+import { CreateFolderModal } from "./CreateFolderModal";
+import { FolderPlus } from "lucide-react";
 import { lazy, Suspense } from "react";
 
 const editorPromise = () =>
@@ -38,8 +51,10 @@ const editorPromise = () =>
   }));
 const DocumentEditor = lazy(editorPromise);
 import { DocumentPreviewModal } from "./DocumentPreviewModal";
+import { DownloadOptionsModal } from "./DownloadOptionsModal";
 import { GoogleDrivePicker } from "./GoogleDrivePicker";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { ErrorBoundary } from "../common/ErrorBoundary";
 import { useMediaQuery, useTheme } from "@mui/material";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
@@ -49,7 +64,6 @@ type UIState = {
   uploading: boolean;
   selectedDocs: Set<string>;
   searchValue: string;
-  editorLayout: "single" | "2x2" | "3x3";
   isEditorOpen: boolean;
   documentsToEdit: Document[];
   showGoogleDrive: boolean;
@@ -57,28 +71,42 @@ type UIState = {
   selectedDocumentPreview: Document | null;
   documentToDelete: string | null;
   showDeleteConfirm: boolean;
+  bulkDeleteMode: boolean;
+  deletingInProgress: boolean;
+  showCreateFolderModal: boolean;
+  sidebarOpen: boolean;
+  showDownloadOptions: boolean;
+  documentToDownload: Document | null;
+  copiedDocument: Document | null;
 };
 
 type UIAction =
   | { type: "setUploading"; value: boolean }
   | { type: "toggleSelectedDoc"; docId: string }
   | { type: "removeSelectedDoc"; docId: string }
+  | { type: "selectAllDocs"; docIds: string[] }
   | { type: "clearSelection" }
   | { type: "setSearchValue"; value: string }
-  | { type: "setEditorLayout"; value: UIState["editorLayout"] }
   | { type: "openEditor"; documents: Document[] }
   | { type: "closeEditor" }
   | { type: "setShowGoogleDrive"; value: boolean }
   | { type: "setUploadProgress"; value: Record<string, number> }
   | { type: "setSelectedDocumentPreview"; value: Document | null }
   | { type: "openDeleteConfirm"; documentId: string }
-  | { type: "closeDeleteConfirm" };
+  | { type: "closeDeleteConfirm" }
+  | { type: "openBulkDeleteConfirm" }
+  | { type: "closeBulkDeleteConfirm" }
+  | { type: "setDeletingInProgress"; value: boolean }
+  | { type: "setShowCreateFolderModal"; value: boolean }
+  | { type: "toggleSidebar" }
+  | { type: "openDownloadOptions"; document: Document }
+  | { type: "closeDownloadOptions" }
+  | { type: "setCopiedDocument"; document: Document | null };
 
 const initialUIState: UIState = {
   uploading: false,
   selectedDocs: new Set<string>(),
   searchValue: "",
-  editorLayout: "single",
   isEditorOpen: false,
   documentsToEdit: [],
   showGoogleDrive: false,
@@ -86,6 +114,13 @@ const initialUIState: UIState = {
   selectedDocumentPreview: null,
   documentToDelete: null,
   showDeleteConfirm: false,
+  bulkDeleteMode: false,
+  deletingInProgress: false,
+  showCreateFolderModal: false,
+  sidebarOpen: true,
+  showDownloadOptions: false,
+  documentToDownload: null,
+  copiedDocument: null,
 };
 
 function uiReducer(state: UIState, action: UIAction): UIState {
@@ -108,8 +143,6 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       return { ...state, selectedDocs: new Set<string>() };
     case "setSearchValue":
       return { ...state, searchValue: action.value };
-    case "setEditorLayout":
-      return { ...state, editorLayout: action.value };
     case "openEditor":
       return {
         ...state,
@@ -132,6 +165,35 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       };
     case "closeDeleteConfirm":
       return { ...state, documentToDelete: null, showDeleteConfirm: false };
+    case "selectAllDocs":
+      return { ...state, selectedDocs: new Set(action.docIds) };
+    case "openBulkDeleteConfirm":
+      return { ...state, showDeleteConfirm: true, bulkDeleteMode: true };
+    case "closeBulkDeleteConfirm":
+      return { ...state, showDeleteConfirm: false, bulkDeleteMode: false };
+    case "setDeletingInProgress":
+      return { ...state, deletingInProgress: action.value };
+    case "setShowCreateFolderModal":
+      return { ...state, showCreateFolderModal: action.value };
+    case "toggleSidebar":
+      return { ...state, sidebarOpen: !state.sidebarOpen };
+    case "openDownloadOptions":
+      return {
+        ...state,
+        showDownloadOptions: true,
+        documentToDownload: action.document,
+      };
+    case "closeDownloadOptions":
+      return {
+        ...state,
+        showDownloadOptions: false,
+        documentToDownload: null,
+      };
+    case "setCopiedDocument":
+      return {
+        ...state,
+        copiedDocument: action.document,
+      };
     default:
       return state;
   }
@@ -155,10 +217,12 @@ const DocumentRow = memo(
     onPreview: (doc: Document) => void;
     onDownload: (doc: Document) => void;
     onDelete: (id: string) => void;
+    onCopy: (doc: Document) => void;
   }) => {
-    const { doc, selected, onToggle, onPreview, onDownload, onDelete } = props;
+    const { doc, selected, onToggle, onPreview, onDownload, onDelete, onCopy } = props;
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
     const menuButtonRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const menuId = `document-row-menu-${doc.id}`;
@@ -173,6 +237,21 @@ const DocumentRow = memo(
         onToggle(doc.id);
       }
     };
+
+    useEffect(() => {
+      if (!isMenuOpen || !menuButtonRef.current) return;
+      
+      // Calculate position when menu opens (Bug #13: add safety check)
+      try {
+        const rect = menuButtonRef.current.getBoundingClientRect();
+        setMenuPos({
+          top: rect.bottom + 4,
+          right: window.innerWidth - rect.right,
+        });
+      } catch (error) {
+        console.warn('Failed to calculate menu position:', error);
+      }
+    }, [isMenuOpen]);
 
     useEffect(() => {
       if (!isMenuOpen) return;
@@ -230,17 +309,19 @@ const DocumentRow = memo(
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="text-xs font-medium text-gray-900 truncate">
+            <span className="text-sm font-semibold text-gray-900 truncate">
               {doc.original_filename}
             </span>
           </div>
         </div>
-        <div className="text-right text-xs text-gray-600">{doc.version}</div>
-        <div className="text-right text-xs text-gray-600">
+        <div className="text-right text-sm font-medium text-gray-700">
+          <span className="inline-flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-md">v{doc.version}</span>
+        </div>
+        <div className="text-right text-sm text-gray-600 font-medium">
           {formatFileSize(doc.file_size)}
         </div>
-        <div className="text-right text-xs text-gray-600">
-          {new Date(doc.created_at).toLocaleDateString()}
+        <div className="text-right text-sm text-gray-600">
+          {getRelativeTime(doc.created_at)}
         </div>
         <div className="flex items-center justify-end gap-2">
           <button
@@ -256,7 +337,7 @@ const DocumentRow = memo(
             <Eye className="w-4 h-4" />
           </button>
 
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()}>
             <button
               ref={menuButtonRef}
               type="button"
@@ -270,18 +351,40 @@ const DocumentRow = memo(
               <MoreVertical className="w-4 h-4" />
             </button>
 
-            {isMenuOpen && (
+            {isMenuOpen && createPortal(
               <div
                 ref={menuRef}
                 role="menu"
                 id={menuId}
-                className="absolute right-0 mt-2 w-44 bg-[color:var(--surface)] border border-[color:var(--border)] rounded-lg shadow-lg overflow-hidden z-20"
+                className="fixed w-48 bg-[color:var(--surface)] border border-[color:var(--border)] rounded-lg shadow-lg overflow-hidden z-[9999]"
+                style={{
+                  top: `${menuPos.top}px`,
+                  right: `${menuPos.right}px`,
+                }}
               >
                 <button
                   type="button"
                   role="menuitem"
                   className="w-full px-3 py-2 text-xs text-left text-[color:var(--text)] hover:bg-gray-50"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsMenuOpen(false);
+                    onCopy(doc);
+                  }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Copy className="w-4 h-4" aria-hidden="true" />
+                    Copy
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full px-3 py-2 text-xs text-left text-[color:var(--text)] hover:bg-gray-50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setIsMenuOpen(false);
                     onDownload(doc);
                   }}
@@ -295,7 +398,9 @@ const DocumentRow = memo(
                   type="button"
                   role="menuitem"
                   className="w-full px-3 py-2 text-xs text-left text-red-700 hover:bg-red-50"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setIsMenuOpen(false);
                     onDelete(doc.id);
                   }}
@@ -305,7 +410,8 @@ const DocumentRow = memo(
                     Delete
                   </span>
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -322,10 +428,12 @@ const MobileDocumentCard = memo(
     onPreview: (doc: Document) => void;
     onDownload: (doc: Document) => void;
     onDelete: (id: string) => void;
+    onCopy: (doc: Document) => void;
   }) => {
-    const { doc, selected, onToggle, onPreview, onDownload, onDelete } = props;
+    const { doc, selected, onToggle, onPreview, onDownload, onDelete, onCopy } = props;
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [menuPos, setMenuPos] = useState({ top: 0, right: 0 });
     const menuButtonRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     const menuId = `mobile-document-menu-${doc.id}`;
@@ -340,6 +448,21 @@ const MobileDocumentCard = memo(
         onToggle(doc.id);
       }
     };
+
+    useEffect(() => {
+      if (!isMenuOpen || !menuButtonRef.current) return;
+      
+      // Calculate position when menu opens (Bug #13: add safety check)
+      try {
+        const rect = menuButtonRef.current.getBoundingClientRect();
+        setMenuPos({
+          top: rect.bottom + 4,
+          right: window.innerWidth - rect.right,
+        });
+      } catch (error) {
+        console.warn('Failed to calculate menu position:', error);
+      }
+    }, [isMenuOpen]);
 
     useEffect(() => {
       if (!isMenuOpen) return;
@@ -424,7 +547,7 @@ const MobileDocumentCard = memo(
             <Eye className="w-4 h-4" />
           </button>
 
-          <div className="relative" onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()}>
             <button
               ref={menuButtonRef}
               type="button"
@@ -438,18 +561,40 @@ const MobileDocumentCard = memo(
               <MoreVertical className="w-4 h-4" />
             </button>
 
-            {isMenuOpen && (
+            {isMenuOpen && createPortal(
               <div
                 ref={menuRef}
                 role="menu"
                 id={menuId}
-                className="absolute right-0 mt-2 w-44 bg-[color:var(--surface)] border border-[color:var(--border)] rounded-lg shadow-lg overflow-hidden z-20"
+                className="fixed w-48 bg-[color:var(--surface)] border border-[color:var(--border)] rounded-lg shadow-lg overflow-hidden z-[9999]"
+                style={{
+                  top: `${menuPos.top}px`,
+                  right: `${menuPos.right}px`,
+                }}
               >
                 <button
                   type="button"
                   role="menuitem"
                   className="w-full px-3 py-2 text-xs text-left text-[color:var(--text)] hover:bg-gray-50"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsMenuOpen(false);
+                    onCopy(doc);
+                  }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Copy className="w-4 h-4" aria-hidden="true" />
+                    Copy
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="w-full px-3 py-2 text-xs text-left text-[color:var(--text)] hover:bg-gray-50"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setIsMenuOpen(false);
                     onDownload(doc);
                   }}
@@ -463,7 +608,9 @@ const MobileDocumentCard = memo(
                   type="button"
                   role="menuitem"
                   className="w-full px-3 py-2 text-xs text-left text-red-700 hover:bg-red-50"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     setIsMenuOpen(false);
                     onDelete(doc.id);
                   }}
@@ -473,7 +620,8 @@ const MobileDocumentCard = memo(
                     Delete
                   </span>
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         </div>
@@ -487,8 +635,16 @@ export const DocumentsPage = () => {
   const { showToast } = useToast();
   const [ui, dispatch] = useReducer(uiReducer, initialUIState);
   const [search, setSearch] = useReducer((_: string, next: string) => next, "");
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
+  const { 
+    folders: _folders, 
+    breadcrumb, 
+    createNewFolder,
+    refresh: _refreshFolders,
+  } = useFolders(currentFolderId);
 
   type DocumentsPageData = {
     documents: Document[];
@@ -502,6 +658,7 @@ export const DocumentsPage = () => {
     userId: user?.id,
     pageSize: PAGE_SIZE,
     search,
+    folderId: currentFolderId,
   });
 
   const {
@@ -529,10 +686,10 @@ export const DocumentsPage = () => {
   }, [documentsError, showToast]);
 
   useEffect(() => {
-    // When the debounced server-side search changes, reset paging and clear selection.
+    // Keep selection scoped to the currently visible result set.
     dispatch({ type: "clearSelection" });
     void reset();
-  }, [search, reset]);
+  }, [search, currentFolderId, reset]);
 
   const selectedDocIds = useMemo(
     () => Array.from(ui.selectedDocs),
@@ -564,23 +721,29 @@ export const DocumentsPage = () => {
       return;
     }
 
-    const maxDocs =
-      ui.editorLayout === "single" ? 1 : ui.editorLayout === "2x2" ? 4 : 9;
-    if (selectedDocIds.length > maxDocs) {
+    if (selectedDocIds.length > 1) {
       showToast({
         type: "warning",
-        title: "Too many documents selected",
-        message: `Maximum ${maxDocs} documents can be edited in ${ui.editorLayout} layout.`,
+        title: "Only one document at a time",
+        message: "Please select only one document to edit.",
       });
       return;
     }
 
     const docsToEdit = documents.filter((doc) => ui.selectedDocs.has(doc.id));
+    if (docsToEdit.length !== 1) {
+      dispatch({ type: "clearSelection" });
+      showToast({
+        type: "warning",
+        title: "Selection changed",
+        message: "Please reselect the document you want to edit.",
+      });
+      return;
+    }
     dispatch({ type: "openEditor", documents: docsToEdit });
   }, [
     documents,
     ui.selectedDocs,
-    ui.editorLayout,
     isMobile,
     selectedDocIds.length,
     showToast,
@@ -595,7 +758,20 @@ export const DocumentsPage = () => {
   );
 
   useEffect(() => {
-    debouncedUpdateSearch(ui.searchValue);
+    let isMounted = true;
+    
+    const executeSearch = () => {
+      if (isMounted) {
+        debouncedUpdateSearch(ui.searchValue);
+      }
+    };
+    
+    executeSearch();
+    
+    // Cancel pending updates on unmount (Bug #7)
+    return () => {
+      isMounted = false;
+    };
   }, [ui.searchValue, debouncedUpdateSearch]);
 
   useEffect(() => {
@@ -647,6 +823,30 @@ export const DocumentsPage = () => {
     dispatch({ type: "clearSelection" });
     await reset();
   }, [reset]);
+
+  const pendingTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const uploadAbortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  // Cleanup pending timeouts and uploads on unmount (Bug #3, #15: memory leak)
+  useEffect(() => {
+    const pendingTimeouts = pendingTimeoutsRef.current;
+    const uploadAbortControllers = uploadAbortControllersRef.current;
+
+    return () => {
+      pendingTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+      pendingTimeoutsRef.current = [];
+      
+      // Cancel all in-progress uploads (Bug #15)
+      uploadAbortControllers.forEach((controller, fileId) => {
+        try {
+          controller.abort();
+        } catch (error) {
+          console.warn(`Failed to abort upload for ${fileId}:`, error);
+        }
+      });
+      uploadAbortControllers.clear();
+    };
+  }, []);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -716,21 +916,24 @@ export const DocumentsPage = () => {
         dispatch({ type: "setUploadProgress", value: { ...progressMap } });
       }, 200);
 
-      const result = await uploadDocument(file, user.id);
+      const result = await uploadDocument(file, user.id, 'local', undefined, currentFolderId);
       clearInterval(progressInterval);
 
       if (result.success) {
         progressMap[fileId] = 100;
         dispatch({ type: "setUploadProgress", value: { ...progressMap } });
         successCount++;
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           dispatch({
             type: "setUploadProgress",
             value: Object.fromEntries(
               Object.entries(progressMap).filter(([k]) => k !== fileId)
             ),
           });
+          // Remove from tracked timeouts
+          pendingTimeoutsRef.current = pendingTimeoutsRef.current.filter(id => id !== timeoutId);
         }, 500);
+        pendingTimeoutsRef.current.push(timeoutId);
       } else if (result.error) {
         delete progressMap[fileId];
         dispatch({ type: "setUploadProgress", value: { ...progressMap } });
@@ -741,6 +944,10 @@ export const DocumentsPage = () => {
         });
       }
     }
+
+    // Clear all pending timeouts to prevent state conflicts
+    pendingTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId));
+    pendingTimeoutsRef.current = [];
 
     await refreshDocuments();
     dispatch({ type: "setUploading", value: false });
@@ -767,33 +974,50 @@ export const DocumentsPage = () => {
 
     dispatch({ type: "closeDeleteConfirm" });
     dispatch({ type: "removeSelectedDoc", docId: documentId });
+    
+    // Close preview if the deleted document was being previewed
+    if (ui.selectedDocumentPreview?.id === documentId) {
+      dispatch({ type: "setSelectedDocumentPreview", value: null });
+    }
 
     const removeFromPages = (
       pages: DocumentsPageData[] | undefined
     ): DocumentsPageData[] => {
       if (!pages) return [];
-      return pages.map((p) => ({
-        ...p,
-        documents: (p.documents || []).filter((d) => d.id !== documentId),
-      }));
+      return pages
+        .map((p) => ({
+          ...p,
+          documents: (p.documents || []).filter((d) => d.id !== documentId),
+        }))
+        .filter((p) => p.documents.length > 0); // Remove empty pages
     };
 
     try {
+      console.log(`Deleting document: ${documentId}`);
+      
+      // Delete the document from the API
+      const result = await deleteDocument(documentId);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete document");
+      }
+
+      console.log(`Document deleted successfully from API: ${documentId}`);
+
+      // Update the cache by filtering out the deleted document from all pages
       await mutateDocuments(
-        async (currentPages?: DocumentsPageData[]) => {
-          const result = await deleteDocument(documentId);
-          if (!result.success) {
-            throw new Error(result.error || "Failed to delete document");
-          }
-          return removeFromPages(currentPages);
+        (currentPages?: DocumentsPageData[]) => {
+          if (!currentPages) return undefined;
+          const filtered = removeFromPages(currentPages);
+          console.log(`Cache updated: removed document ${documentId}`, filtered);
+          return filtered;
         },
         {
-          optimisticData: (currentData: any) => removeFromPages(currentData),
-          rollbackOnError: true,
-          populateCache: true,
           revalidate: false,
+          populateCache: true,
         }
       );
+
+      console.log(`Mutation completed, cache updated`);
 
       showToast({
         type: "success",
@@ -801,6 +1025,11 @@ export const DocumentsPage = () => {
         message: "The document has been removed.",
       });
     } catch (err) {
+      console.error('Delete failed, revalidating cache:', err);
+      
+      // On error, revalidate to ensure the UI is in sync with server
+      await mutateDocuments();
+      
       showToast({
         type: "error",
         title: "Failed to delete document",
@@ -810,13 +1039,109 @@ export const DocumentsPage = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    const documentIds = Array.from(ui.selectedDocs);
+    if (documentIds.length === 0) return;
+
+    // Set loading state (Bug #18)
+    dispatch({ type: "setDeletingInProgress", value: true });
+
+    // Don't dispatch until after mutation succeeds (Bug #2: race condition)
+    
+    // Close preview if it's one of the deleted documents
+    if (ui.selectedDocumentPreview && documentIds.includes(ui.selectedDocumentPreview.id)) {
+      dispatch({ type: "setSelectedDocumentPreview", value: null });
+    }
+
+    const removeFromPages = (
+      pages: DocumentsPageData[] | undefined
+    ): DocumentsPageData[] => {
+      if (!pages) return [];
+      return pages
+        .map((p) => ({
+          ...p,
+          documents: (p.documents || []).filter((d) => !documentIds.includes(d.id)),
+        }))
+        .filter((p) => p.documents.length > 0); // Remove empty pages
+    };
+
+    try {
+      console.log(`Deleting ${documentIds.length} documents:`, documentIds);
+      
+      // Delete all documents in parallel
+      const deletePromises = documentIds.map(id => deleteDocument(id));
+      const results = await Promise.all(deletePromises);
+      
+      // Check if all deletes were successful
+      const allSuccessful = results.every(r => r.success);
+      if (!allSuccessful) {
+        const failedCount = results.filter(r => !r.success).length;
+        throw new Error(`Failed to delete ${failedCount} document(s)`);
+      }
+
+      console.log(`All documents deleted successfully from API`);
+
+      // Update the cache by filtering out the deleted documents from all pages
+      await mutateDocuments(
+        (currentPages?: DocumentsPageData[]) => {
+          if (!currentPages) return undefined;
+          const filtered = removeFromPages(currentPages);
+          console.log(`Cache updated: removed ${documentIds.length} documents`, filtered);
+          return filtered;
+        },
+        {
+          revalidate: false,
+          populateCache: true,
+        }
+      );
+
+      console.log(`Mutation completed, cache updated`);
+
+      // Dispatch state updates only after mutation succeeds
+      dispatch({ type: "closeBulkDeleteConfirm" });
+      dispatch({ type: "clearSelection" });
+
+      showToast({
+        type: "success",
+        title: "Documents deleted",
+        message: `${documentIds.length} document${documentIds.length > 1 ? "s" : ""} have been removed.`,
+      });
+    } catch (err) {
+      console.error('Bulk delete failed, revalidating cache:', err);
+      
+      // On error, revalidate to ensure the UI is in sync with server
+      await mutateDocuments();
+      
+      // Still close dialog on error
+      dispatch({ type: "closeBulkDeleteConfirm" });
+      
+      showToast({
+        type: "error",
+        title: "Failed to delete documents",
+        message:
+          err instanceof Error ? err.message : "Failed to delete documents",
+      });
+    } finally {
+      dispatch({ type: "setDeletingInProgress", value: false });
+    }
+  };
+
   const handleDownload = useCallback(
+    (document: Document) => {
+      dispatch({ type: "openDownloadOptions", document });
+    },
+    [dispatch]
+  );
+
+  const handleDownloadLocal = useCallback(
     async (document: Document) => {
       const result = await downloadDocument(document.storage_path);
       if (result.success && result.url) {
         const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(result.url, '_blank');
         if (!ok) {
           showToast({ type: 'error', title: 'Blocked Link', message: 'This download link is not allowed.' });
+        } else {
+          showToast({ type: 'success', title: 'Download started', message: `${document.original_filename} is downloading.` });
         }
       } else if (result.error) {
         showToast({
@@ -827,6 +1152,111 @@ export const DocumentsPage = () => {
       }
     },
     [showToast]
+  );
+
+  const handleSaveToApp = useCallback(
+    async (document: Document) => {
+      const result = await saveDocumentToApp(document.id, user?.id || '');
+      if (result.success) {
+        await refreshDocuments();
+        showToast({
+          type: 'success',
+          title: 'Saved to App',
+          message: `${document.original_filename} has been saved to your app library.`,
+        });
+      } else if (result.error) {
+        showToast({
+          type: 'error',
+          title: 'Failed to save to app',
+          message: result.error,
+        });
+      }
+    },
+    [showToast, user?.id, refreshDocuments]
+  );
+
+  const handleSaveToAppFolder = useCallback(
+    async (document: Document, folderId: string | null) => {
+      const result = await saveDocumentToAppFolder(document.id, user?.id || '', folderId);
+      if (result.success) {
+        await refreshDocuments();
+        showToast({
+          type: 'success',
+          title: 'Saved to App Folder',
+          message: `${document.original_filename} has been saved to your application folder.`,
+        });
+      } else if (result.error) {
+        showToast({
+          type: 'error',
+          title: 'Failed to save to app folder',
+          message: result.error,
+        });
+      }
+    },
+    [showToast, user?.id, refreshDocuments]
+  );
+
+  const handleCopyDocument = useCallback(
+    (document: Document) => {
+      dispatch({ type: "setCopiedDocument", document });
+      showToast({
+        type: "success",
+        title: "Copied",
+        message: `${document.original_filename} is ready to paste.`,
+      });
+    },
+    [showToast]
+  );
+
+  const handlePasteDocument = useCallback(async () => {
+    if (!ui.copiedDocument || !user?.id) return;
+
+    const result = await duplicateDocumentToFolder(
+      ui.copiedDocument.id,
+      user.id,
+      currentFolderId
+    );
+
+    if (result.success) {
+      await refreshDocuments();
+      showToast({
+        type: "success",
+        title: "Pasted",
+        message: `${ui.copiedDocument.original_filename} was copied to ${
+          currentFolderId ? "this folder" : "root documents"
+        }.`,
+      });
+    } else if (result.error) {
+      showToast({
+        type: "error",
+        title: "Paste failed",
+        message: result.error,
+      });
+    }
+  }, [currentFolderId, refreshDocuments, showToast, ui.copiedDocument, user?.id]);
+
+  const handleCreateFolder = useCallback(
+    async (name: string, description?: string) => {
+      try {
+        await createNewFolder(name, description);
+        dispatch({ type: "setShowCreateFolderModal", value: false });
+        showToast({
+          type: "success",
+          title: "Folder created",
+          message: `"${name}" folder has been created successfully.`,
+        });
+        // Refresh documents to show in the list
+        mutateDocuments?.();
+      } catch (error) {
+        showToast({
+          type: "error",
+          title: "Failed to create folder",
+          message: error instanceof Error ? error.message : "Failed to create folder",
+        });
+        throw error;
+      }
+    },
+    [createNewFolder, showToast, mutateDocuments]
   );
 
   const toggleDocSelection = useCallback((docId: string) => {
@@ -848,7 +1278,7 @@ export const DocumentsPage = () => {
     count: documents.length,
     getScrollElement: () => document.getElementById("main-content"),
     estimateSize: () => 76,
-    overscan: 10,
+    overscan: 15, // Bug #21: Increased overscan to handle measurement delays during lazy loading
     measureElement: typeof window !== 'undefined' && navigator.userAgent.indexOf('jsdom') === -1 ? element => element?.getBoundingClientRect().height : undefined,
   });
 
@@ -894,6 +1324,12 @@ export const DocumentsPage = () => {
     return () => el.removeEventListener("scroll", onScroll);
   }, [isMobile, initialLoading, loadMore, hasMore, loadingMore]);
 
+  // Callback to refresh sidebar when a folder is created
+  const handleFolderCreated = useCallback(() => {
+    // This callback will be called when folderCreateCounter changes
+    // FolderSidebar will use it to trigger a refresh
+  }, []);
+
   if (initialLoading) {
     return (
       <div className="p-4 sm:p-6 md:p-8">
@@ -918,80 +1354,90 @@ export const DocumentsPage = () => {
   }
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xs sm:text-xs font-medium text-gray-900">
-            Resume Editor
-          </h1>
-          <p className="text-gray-600 mt-2 text-xs sm:text-base">
-            Upload, edit, and manage your resumes
-          </p>
+    <div className="flex flex-col md:flex-row h-full">
+      {/* Folder Sidebar - Desktop only, collapsible */}
+      {!isMobile && (
+        <div
+          className={`hidden md:flex md:flex-col transition-all duration-300 border-r border-gray-200 bg-gray-50 overflow-hidden ${
+            ui.sidebarOpen ? "w-64" : "w-0"
+          }`}
+        >
+          {ui.sidebarOpen && (
+            <FolderSidebar
+              currentFolderId={currentFolderId}
+              onFolderSelect={setCurrentFolderId}
+              onCreateFolder={() =>
+                dispatch({ type: "setShowCreateFolderModal", value: true })
+              }
+              onFolderDeleted={() => {
+                // Refresh documents list after folder is deleted
+                mutateDocuments?.();
+              }}
+              onFolderCreated={handleFolderCreated}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Sidebar Toggle + Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 px-4 sm:px-6 md:px-8 py-3 md:py-4 border-b border-gray-200 bg-white">
+          {/* Sidebar Toggle Button (Desktop only) */}
+          {!isMobile && (
+            <button
+              onClick={() => dispatch({ type: "toggleSidebar" })}
+              className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+              title={ui.sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+              aria-label={ui.sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            >
+              {ui.sidebarOpen ? (
+                <ChevronLeft className="w-5 h-5 text-gray-600" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-gray-600" />
+              )}
+            </button>
+          )}
+
+          {/* Breadcrumb Navigation */}
+          {(currentFolderId || !isMobile) && (
+            <div className="flex-1 min-w-0">
+              <BreadcrumbNavigation
+                path={breadcrumb}
+                onNavigate={setCurrentFolderId}
+                currentFolderId={currentFolderId}
+              />
+            </div>
+          )}
         </div>
 
+        {/* Scrollable Content Area */}
+        <div id="main-content" className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
           <div className="w-full sm:w-80">
-            <input
-              id="documents-search"
-              value={ui.searchValue}
-              onChange={(e) =>
-                dispatch({ type: "setSearchValue", value: e.target.value })
-              }
-              placeholder="Search documents..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-accent-600"
-              aria-label="Search documents"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 p-1">
-            <button
-              type="button"
-              onClick={() =>
-                dispatch({ type: "setEditorLayout", value: "single" })
-              }
-              className={`p-2 rounded transition ${
-                ui.editorLayout === "single"
-                  ? "bg-primary-800 text-white"
-                  : "text-gray-600"
-              } focus-ring`}
-              title="Single document"
-              aria-label="Single document layout"
-              aria-pressed={ui.editorLayout === "single"}
-            >
-              <FileText className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                dispatch({ type: "setEditorLayout", value: "2x2" })
-              }
-              className={`p-2 rounded transition ${
-                ui.editorLayout === "2x2"
-                  ? "bg-primary-800 text-white"
-                  : "text-gray-600"
-              } focus-ring`}
-              title="2x2 layout"
-              aria-label="2x2 layout"
-              aria-pressed={ui.editorLayout === "2x2"}
-            >
-              <Grid2X2 className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                dispatch({ type: "setEditorLayout", value: "3x3" })
-              }
-              className={`p-2 rounded transition ${
-                ui.editorLayout === "3x3"
-                  ? "bg-primary-800 text-white"
-                  : "text-gray-600"
-              } focus-ring`}
-              title="3x3 layout"
-              aria-label="3x3 layout"
-              aria-pressed={ui.editorLayout === "3x3"}
-            >
-              <Grid3X3 className="w-4 h-4" />
-            </button>
+            <div className="relative">
+              <input
+                id="documents-search"
+                value={ui.searchValue}
+                onChange={(e) =>
+                  dispatch({ type: "setSearchValue", value: e.target.value })
+                }
+                placeholder="Search documents..."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition placeholder:text-gray-400"
+                aria-label="Search documents"
+              />
+              {ui.searchValue && (
+                <button
+                  onClick={() => dispatch({ type: "setSearchValue", value: "" })}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  aria-label="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           <button
@@ -1007,6 +1453,32 @@ export const DocumentsPage = () => {
             <span className="hidden sm:inline">Google Drive</span>
           </button>
 
+          <button
+            type="button"
+            onClick={() =>
+              dispatch({ type: "setShowCreateFolderModal", value: true })
+            }
+            className="btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 focus-ring"
+            title="Create a new folder"
+            aria-label="Create a new folder"
+          >
+            <FolderPlus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">New Folder</span>
+          </button>
+
+          {ui.copiedDocument && (
+            <button
+              type="button"
+              onClick={handlePasteDocument}
+              className="btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 focus-ring"
+              title={`Paste ${ui.copiedDocument.original_filename} here`}
+              aria-label={`Paste ${ui.copiedDocument.original_filename} here`}
+            >
+              <ClipboardPaste className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Paste Here</span>
+            </button>
+          )}
+
           <label className="btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2 cursor-pointer">
             <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
             {ui.uploading ? "Uploading..." : "Upload"}
@@ -1019,14 +1491,82 @@ export const DocumentsPage = () => {
               disabled={ui.uploading}
             />
           </label>
+
+          {documents.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedDocIds.length === documents.length) {
+                    // Deselect all if all are already selected (Bug #11)
+                    dispatch({ type: "clearSelection" });
+                  } else {
+                    // Select all
+                    dispatch({ type: "selectAllDocs", docIds: documents.map(d => d.id) });
+                  }
+                }}
+                className="btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 focus-ring"
+                title={selectedDocIds.length === documents.length ? "Deselect all documents" : "Select all documents"}
+                aria-label={selectedDocIds.length === documents.length ? "Deselect all documents" : "Select all documents"}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedDocIds.length === documents.length && documents.length > 0}
+                  readOnly
+                  className="w-4 h-4"
+                  aria-hidden="true"
+                />
+                <span className="hidden sm:inline">{selectedDocIds.length === documents.length ? "Deselect All" : "Select All"}</span>
+              </button>
+
+              {selectedDocIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: "clearSelection" })}
+                  className="btn-secondary w-full sm:w-auto inline-flex items-center justify-center gap-2 focus-ring"
+                  title="Deselect all documents"
+                  aria-label="Deselect all documents"
+                >
+                  <span className="hidden sm:inline">Deselect All</span>
+                  <span className="sm:hidden">Clear</span>
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
+      {ui.copiedDocument && (
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-emerald-900">
+            <span className="font-semibold">Copied:</span>{" "}
+            <span>{ui.copiedDocument.original_filename}</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePasteDocument}
+              className="btn-secondary inline-flex items-center justify-center gap-2"
+            >
+              <ClipboardPaste className="w-4 h-4" />
+              Paste Here
+            </button>
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "setCopiedDocument", document: null })}
+              className="btn-outline"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {selectedDocIds.length > 0 && (
-        <div className="mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="text-blue-900 text-xs sm:text-base">
-            {selectedDocIds.length} document
-            {selectedDocIds.length > 1 ? "s" : ""} selected
+        <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-600 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+          <div className="text-blue-900 font-medium text-sm">
+            <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full text-xs font-bold">{selectedDocIds.length}</span>
+            <span className="ml-2">document{selectedDocIds.length > 1 ? "s" : ""} selected</span>
           </div>
           <button
             onClick={openEditor}
@@ -1057,9 +1597,23 @@ export const DocumentsPage = () => {
             ) : (
               <>
                 <Edit className="w-4 h-4" />
-                Open in Editor
+                Edit
               </>
             )}
+          </button>
+
+          <button
+            onClick={() => dispatch({ type: "openBulkDeleteConfirm" })}
+            disabled={ui.deletingInProgress}
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 rounded-lg font-medium text-sm transition focus-ring disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={ui.deletingInProgress ? "Deleting..." : "Delete all selected documents"}
+            aria-label="Delete all selected documents"
+          >
+            <span className={ui.deletingInProgress ? "inline-block animate-spin" : ""}>
+              <Trash2 className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline">{ui.deletingInProgress ? "Deleting..." : "Delete Selected"}</span>
+            <span className="sm:hidden">{ui.deletingInProgress ? "..." : "Delete"}</span>
           </button>
         </div>
       )}
@@ -1133,7 +1687,7 @@ export const DocumentsPage = () => {
           </div>
         </div>
       ) : (
-        <div className="card-base overflow-hidden">
+        <div className="card-base overflow-visible">
           {isMobile ? (
             <div className="divide-y divide-gray-100">
               {documents.map((doc) => (
@@ -1145,6 +1699,7 @@ export const DocumentsPage = () => {
                   onPreview={handlePreview}
                   onDownload={handleDownload}
                   onDelete={handleRowDelete}
+                  onCopy={handleCopyDocument}
                 />
               ))}
               {(loadingMore || hasMore) && (
@@ -1157,15 +1712,13 @@ export const DocumentsPage = () => {
             </div>
           ) : (
             <>
-              <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-                <div className="grid grid-cols-[44px_1fr_110px_110px_130px_140px] items-center px-4 py-3 text-xs font-semibold text-gray-600">
-                  <div />
-                  <div>Filename</div>
-                  <div className="text-right">Version</div>
-                  <div className="text-right">Size</div>
-                  <div className="text-right">Created</div>
-                  <div className="text-right">Actions</div>
-                </div>
+              <div className="grid grid-cols-[44px_1fr_110px_110px_130px_140px] items-center px-4 py-3 text-xs font-semibold text-gray-700 bg-gray-50 border-b border-gray-200">
+                <div />
+                <div>Filename</div>
+                <div className="text-right">Version</div>
+                <div className="text-right">Size</div>
+                <div className="text-right">Created</div>
+                <div className="text-right">Actions</div>
               </div>
 
               <div
@@ -1196,6 +1749,7 @@ export const DocumentsPage = () => {
                         onPreview={handlePreview}
                         onDownload={handleDownload}
                         onDelete={handleRowDelete}
+                        onCopy={handleCopyDocument}
                       />
                     </div>
                   );
@@ -1217,30 +1771,55 @@ export const DocumentsPage = () => {
       {/* Document Editor Modal */}
 
       {ui.isEditorOpen && (
-        <Suspense
+        <ErrorBoundary
           fallback={
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-              <div className="bg-white p-4 rounded-lg shadow-lg">
-                Loading Editor...
+              <div className="card-base card-p-md max-w-md w-full text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-red-600 mb-3" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Editor Error</h3>
+                <p className="text-gray-600 mb-6 text-xs">
+                  The document editor encountered an error. Please close this dialog and try again.
+                </p>
+                <button
+                  onClick={() => {
+                    dispatch({ type: "closeEditor" });
+                    dispatch({ type: "clearSelection" });
+                  }}
+                  className="px-4 py-2 bg-primary-800 text-white rounded-lg font-medium hover:bg-primary-900 transition"
+                >
+                  Close Editor
+                </button>
               </div>
             </div>
           }
         >
-          <DocumentEditor
-            documents={ui.documentsToEdit}
-            layout={ui.editorLayout}
-            onClose={() => {
-              dispatch({ type: "closeEditor" });
-              dispatch({ type: "clearSelection" });
-              refreshDocuments();
-            }}
-            onSave={async () => {
-              dispatch({ type: "closeEditor" });
-              dispatch({ type: "clearSelection" });
-              await refreshDocuments();
-            }}
-          />
-        </Suspense>
+          <Suspense
+            fallback={
+              <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+                <div className="bg-white p-4 rounded-lg shadow-lg">
+                  Loading Editor...
+                </div>
+              </div>
+            }
+          >
+            <DocumentEditor
+              documents={ui.documentsToEdit}
+              layout="single"
+              onClose={() => {
+                dispatch({ type: "closeEditor" });
+                dispatch({ type: "clearSelection" });
+                refreshDocuments();
+              }}
+              onSave={async () => {
+                dispatch({ type: "closeEditor" });
+                dispatch({ type: "clearSelection" });
+                await refreshDocuments();
+              }}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       {/* Google Drive Picker Modal */}
@@ -1263,15 +1842,57 @@ export const DocumentsPage = () => {
       <ConfirmDialog
         isOpen={ui.showDeleteConfirm}
         onClose={() => {
-          dispatch({ type: "closeDeleteConfirm" });
+          if (ui.bulkDeleteMode) {
+            dispatch({ type: "closeBulkDeleteConfirm" });
+          } else {
+            dispatch({ type: "closeDeleteConfirm" });
+          }
         }}
-        onConfirm={handleDelete}
-        title="Delete Document"
-        message="Are you sure you want to delete this document? This action cannot be undone."
+        onConfirm={ui.bulkDeleteMode ? handleBulkDelete : handleDelete}
+        title={ui.bulkDeleteMode ? "Delete Multiple Documents" : "Delete Document"}
+        message={
+          ui.bulkDeleteMode
+            ? `Are you sure you want to delete ${ui.selectedDocs.size} document${ui.selectedDocs.size > 1 ? "s" : ""}? This action cannot be undone.`
+            : "Are you sure you want to delete this document? This action cannot be undone."
+        }
         confirmLabel="Delete"
         cancelLabel="Cancel"
         variant="danger"
       />
+
+      {/* Create Folder Modal */}
+      <CreateFolderModal
+        isOpen={ui.showCreateFolderModal}
+        onClose={() =>
+          dispatch({ type: "setShowCreateFolderModal", value: false })
+        }
+        onCreate={handleCreateFolder}
+      />
+
+      {/* Download Options Modal */}
+      <DownloadOptionsModal
+        isOpen={ui.showDownloadOptions}
+        fileName={ui.documentToDownload?.original_filename || 'Document'}
+        onClose={() => dispatch({ type: "closeDownloadOptions" })}
+        onDownloadLocal={async () => {
+          if (ui.documentToDownload) {
+            await handleDownloadLocal(ui.documentToDownload);
+          }
+        }}
+        onSaveToApp={async () => {
+          if (ui.documentToDownload) {
+            await handleSaveToApp(ui.documentToDownload);
+          }
+        }}
+        onSaveToAppFolder={async (folderId) => {
+          if (ui.documentToDownload) {
+            await handleSaveToAppFolder(ui.documentToDownload, folderId);
+          }
+        }}
+      />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

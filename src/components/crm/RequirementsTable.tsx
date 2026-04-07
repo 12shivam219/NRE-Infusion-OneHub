@@ -832,6 +832,7 @@ export const RequirementsTable = memo(({
                                   <InterviewPipeline
                                     interviews={interviews}
                                     consultants={consultants}
+                                    requirementNumber={req.requirement_number ?? undefined}
                                     onViewDetails={handleViewInterview}
                                     onDelete={handleDeleteInterview}
                                   />

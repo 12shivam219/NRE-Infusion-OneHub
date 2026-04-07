@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Cloud, Plus, X, Check } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../contexts/ToastContext';
@@ -8,6 +8,7 @@ import {
   downloadGoogleDriveFile,
   getGoogleDriveToken,
   isGoogleDriveConfigured,
+  getGoogleDriveAuthUrl,
 } from '../../lib/api/googleDrive';
 import type { Database } from '../../lib/database.types';
 
@@ -29,7 +30,7 @@ export const GoogleDrivePicker = ({
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [authenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
   const [files, setFiles] = useState<
     Array<{ id: string; name: string; mimeType: string; size: number }>
   >([]);
@@ -41,11 +42,45 @@ export const GoogleDrivePicker = ({
   // HOOKS MUST BE DEFINED BEFORE EARLY RETURNS
 
   const handleAuthenticate = useCallback(async () => {
+    if (!isGoogleDriveConfigured()) {
+      showToast({
+        type: 'error',
+        message: 'Google Drive OAuth is not configured. Please contact support.',
+      });
+      return;
+    }
+
     showToast({
       type: 'info',
-      message: 'Google Drive OAuth setup required - contact your administrator',
+      message: 'Redirecting to Google Drive authorization...',
     });
+
+    const ok = (await import('../../lib/safeRedirect')).safeOpenUrl(getGoogleDriveAuthUrl(), '_self');
+    if (!ok) {
+      showToast({
+        type: 'error',
+        message: 'Blocked unsafe redirect to Google OAuth.',
+      });
+    }
   }, [showToast]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let isActive = true;
+
+    const loadTokenState = async () => {
+      const tokenResult = await getGoogleDriveToken(user.id);
+      if (!isActive) return;
+      setAuthenticated(!!tokenResult.success && !!tokenResult.token);
+    };
+
+    void loadTokenState();
+
+    return () => {
+      isActive = false;
+    };
+  }, [user]);
 
   const handleLoadFiles = useCallback(async () => {
     if (!user) return; // Guard clause for type safety

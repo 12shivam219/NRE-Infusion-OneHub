@@ -383,7 +383,7 @@ export const getFreshUserData = async (): Promise<User | null> => {
       return null;
     }
 
-    // Update localStorage with fresh data
+    // Update sessionStorage with fresh data
     const user: User = {
       id: userData.id,
       email: userData.email,
@@ -394,7 +394,7 @@ export const getFreshUserData = async (): Promise<User | null> => {
       origin_ip: userData.origin_ip,
     };
 
-    localStorage.setItem('user', JSON.stringify(user));
+    sessionStorage.setItem('user', JSON.stringify(user));
     return user;
   } catch (error) {
     if (import.meta.env.DEV) console.error('Exception fetching fresh user data:', error);
@@ -403,7 +403,7 @@ export const getFreshUserData = async (): Promise<User | null> => {
 };
 
 export const isAuthenticated = (): boolean => {
-  return !!localStorage.getItem('user');
+  return !!sessionStorage.getItem('user');
 };
 
 /**

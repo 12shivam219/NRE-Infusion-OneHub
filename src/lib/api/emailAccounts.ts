@@ -6,6 +6,7 @@
 import { supabase } from '../supabase';
 import { logger, handleApiError, retryAsync } from '../errorHandler';
 import { encryptData } from '../encryption';
+import { EMAIL_SERVER_URL, getEmailServerAuthHeaders } from '../emailServer';
 
 interface EmailAccount {
   id: string;
@@ -222,15 +223,13 @@ export const testEmailAccount = async (
   emailAddress: string
 ): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
-    const emailServerUrl = import.meta.env.VITE_EMAIL_SERVER_URL || 'http://localhost:3001';
-    const apiKey = import.meta.env.VITE_EMAIL_SERVER_API_KEY || '';
-    
-    const response = await fetch(`${emailServerUrl}/api/send-email`, {
+    const headers = await getEmailServerAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+
+    const response = await fetch(`${EMAIL_SERVER_URL}/api/send-email`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify({
         to: emailAddress,
         subject: 'Test Email from Loster CRM',
